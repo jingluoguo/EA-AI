@@ -34,6 +34,18 @@ class Event:
 
 
 @dataclass(frozen=True)
+class Query:
+    intent: str
+    target: str
+    qualifiers: tuple[str, ...] = ()
+
+    def linearize(self) -> str:
+        if self.qualifiers:
+            return f"QUERY {self.intent}({self.target},{','.join(self.qualifiers)})"
+        return f"QUERY {self.intent}({self.target})"
+
+
+@dataclass(frozen=True)
 class Structure:
     """Explicit intermediate state between natural language and answers."""
 
@@ -41,12 +53,15 @@ class Structure:
     relations: tuple[Relation, ...]
     events: tuple[Event, ...]
     rules: tuple[str, ...]
+    query: Query | None = None
 
     def linearize(self) -> str:
         lines = [entity.linearize() for entity in self.entities]
         lines.extend(relation.linearize() for relation in self.relations)
         lines.extend(event.linearize() for event in self.events)
         lines.extend(f"RULE {rule}" for rule in self.rules)
+        if self.query is not None:
+            lines.append(self.query.linearize())
         return "\n".join(lines)
 
 
