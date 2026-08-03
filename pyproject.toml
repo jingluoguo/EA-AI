@@ -1,0 +1,29 @@
+[project]
+name = "ea-ai"
+version = "0.1.0"
+description = "Minimal structural language model lab"
+readme = "README.md"
+authors = [
+    { name = "guoshijun", email = "guoshijun@regen-bio.com" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=2.0.2",
+]
+
+[project.optional-dependencies]
+neural = [
+    "torch>=2.2",
+]
+
+[project.scripts]
+ea-ai = "ea_ai:main"
+struct-demo = "struct_llm.cli:run_symbolic_demo"
+struct-ask = "struct_llm.cli:ask_symbolic"
+struct-ask-neural = "struct_llm.cli:ask_neural"
+struct-make-dataset = "struct_llm.cli:make_dataset"
+struct-train-tiny = "struct_llm.cli:train_tiny_model"
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
