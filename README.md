@@ -94,7 +94,8 @@ ENTITY item=钥匙
 ENTITY container=盒子
 ENTITY place=厨房
 REL in(钥匙,盒子)
-EVENT put_in(小明,钥匙)
+REL at(盒子,厨房)
+EVENT put_in(小明,钥匙) WITH holder=盒子
 EVENT handle(小明,钥匙)
 EVENT move(盒子,厨房)
 RULE container_moves_contents
@@ -111,6 +112,8 @@ QUERY location(钥匙)
 当前 symbolic baseline 会先逐句抽取事件和关系，再根据问题抽取 `QUERY` 并推导规则；它不再要求整段文本命中一个完整枚举模板。
 
 它现在也支持更开放的“内容查询”，例如“实验室里至少有什么？”会沿着移动和包含关系做闭包推理。
+
+`REL` 表示当前世界状态，`EVENT` 表示按原文顺序保留的历史事件。后发生的放入、移动、交接、涂色会更新当前状态；历史事件仍可用于回答“谁把 X 放进 Y？”这类事件角色问题。
 
 ### 抽象建模规则
 
@@ -131,6 +134,6 @@ QUERY actor_for_event(put_in,item=芯片,holder=托盘)
 最后用已有事件和关系验证：
 
 ```text
-EVENT put_in(小郭,芯片)
+EVENT put_in(小郭,芯片) WITH holder=托盘
 REL in(芯片,托盘)
 ```

@@ -50,7 +50,8 @@ def parse_text(text: str) -> Structure:
 
         new_entities, new_relations, new_events = extracted
         entities.extend(new_entities)
-        relations.extend(new_relations)
+        for relation in new_relations:
+            _apply_state_relation(relations, relation)
         events.extend(new_events)
 
     if not entities and not relations and not events:
@@ -61,7 +62,7 @@ def parse_text(text: str) -> Structure:
     structure = Structure(
         entities=deduped_entities,
         relations=tuple(dict.fromkeys(relations)),
-        events=tuple(dict.fromkeys(events)),
+        events=tuple(events),
         rules=(),
         query=query,
     )
@@ -88,7 +89,7 @@ def answer_from_structure(structure: Structure) -> str:
 
     if "actor_handles_item" in rule_set:
         query = _require_query(structure)
-        event = _event_for_target(structure, "handle", query.target)
+        event = _latest_event_for_target(structure, "handle", query.target)
         return f"{event.actor}拿的{query.target}。"
 
     if "holder_contains_things" in rule_set:
@@ -99,31 +100,32 @@ def answer_from_structure(structure: Structure) -> str:
     if "container_moves_contents" in rule_set:
         query = structure.query
         relation = _relation_for_left(structure, "in", query.target) if query else _only_relation(structure, "in")
-        event = _event_for_actor(structure, "move", relation.right)
+        at_relation = _relation_for_left(structure, "at", relation.right)
         item = relation.left
         container = relation.right
-        place = event.target
-        if event.actor != container:
-            raise ParseError("Move event actor must be the same container that holds the item.")
+        place = at_relation.right
         return f"{item}在{place}的{container}里。"
 
     if "transfer_changes_owner" in rule_set:
         query = structure.query
-        owns_before = (
-            _relation_for_right(structure, "owns_before", query.target)
+        owner = (
+            _relation_for_left(structure, "owner", query.target)
             if query
-            else _only_relation(structure, "owns_before")
+            else _only_relation(structure, "owner")
         )
-        event = _only_event(structure, "give")
-        item = owns_before.right
-        receiver = event.target
+        item = owner.left
+        receiver = owner.right
         return f"{receiver}拥有{item}。"
 
     if "paint_changes_color" in rule_set:
         query = structure.query
-        event = _event_for_actor(structure, "paint", query.target) if query else _only_event(structure, "paint")
-        item = event.actor
-        color = event.target
+        color_relation = (
+            _relation_for_left(structure, "color", query.target)
+            if query
+            else _only_relation(structure, "color")
+        )
+        item = color_relation.left
+        color = color_relation.right
         return f"{item}是{color}。"
 
     raise ParseError(f"No rule can answer structure: {structure.linearize()}")
@@ -177,7 +179,7 @@ def _parse_statement(sentence: str) -> tuple[list[Entity], list[Relation], list[
             ],
             [Relation("in", data["item"], data["container"])],
             [
-                Event("put_in", data["person"], data["item"]),
+                Event("put_in", data["person"], data["item"], (f"holder={data['container']}",)),
                 Event("handle", data["person"], data["item"]),
             ],
         )
@@ -190,7 +192,7 @@ def _parse_statement(sentence: str) -> tuple[list[Entity], list[Relation], list[
                 Entity(_moved_role(data["thing"]), data["thing"]),
                 Entity("place", data["place"]),
             ],
-            [],
+            [Relation("at", data["thing"], data["place"])],
             [Event("move", data["thing"], data["place"])],
         )
 
@@ -203,7 +205,7 @@ def _parse_statement(sentence: str) -> tuple[list[Entity], list[Relation], list[
                 Entity("receiver", data["receiver"]),
                 Entity("item", data["item"]),
             ],
-            [Relation("owns_before", data["giver"], data["item"])],
+            [Relation("owner", data["item"], data["receiver"])],
             [
                 Event("give", data["giver"], data["receiver"]),
                 Event("handle", data["giver"], data["item"]),
@@ -219,7 +221,7 @@ def _parse_statement(sentence: str) -> tuple[list[Entity], list[Relation], list[
                 Entity("item", data["item"]),
                 Entity("color", data["color"]),
             ],
-            [],
+            [Relation("color", data["item"], data["color"])],
             [
                 Event("paint", data["item"], data["color"]),
                 Event("handle", data["person"], data["item"]),
@@ -380,14 +382,13 @@ def _infer_rules(structure: Structure) -> tuple[str, ...]:
 
     if query.intent == "location":
         in_relations = [relation for relation in structure.relations if relation.name == "in" and relation.left == query.target]
-        if any(_has_event_actor(structure, "move", relation.right) for relation in in_relations):
+        if any(_has_relation_left(structure, "at", relation.right) for relation in in_relations):
             rules.append("container_moves_contents")
 
-    if query.intent == "owner" and _has_relation_right(structure, "owns_before", query.target):
-        if _has_event(structure, "give"):
-            rules.append("transfer_changes_owner")
+    if query.intent == "owner" and _has_relation_left(structure, "owner", query.target):
+        rules.append("transfer_changes_owner")
 
-    if query.intent == "color" and _has_event_actor(structure, "paint", query.target):
+    if query.intent == "color" and _has_relation_left(structure, "color", query.target):
         rules.append("paint_changes_color")
 
     return tuple(rules)
@@ -398,6 +399,16 @@ def _dedupe_entities(entities: list[Entity]) -> tuple[Entity, ...]:
     for entity in entities:
         by_name.setdefault(entity.name, entity)
     return tuple(by_name.values())
+
+
+def _apply_state_relation(relations: list[Relation], relation: Relation) -> None:
+    if relation.name in {"in", "at", "owner", "color"}:
+        relations[:] = [
+            existing
+            for existing in relations
+            if not (existing.name == relation.name and existing.left == relation.left)
+        ]
+    relations.append(relation)
 
 
 def _moved_role(name: str) -> str:
@@ -421,7 +432,7 @@ def _contents_in_holder(structure: Structure, holder: str) -> tuple[str, ...]:
 
 
 def _direct_contents(structure: Structure, holder: str) -> list[str]:
-    contents = [event.actor for event in structure.events if event.name == "move" and event.target == holder]
+    contents = [relation.left for relation in structure.relations if relation.name == "at" and relation.right == holder]
     contents.extend(
         relation.left for relation in structure.relations if relation.name == "in" and relation.right == holder
     )
@@ -450,7 +461,7 @@ def _actor_for_event_query(structure: Structure, query: Query) -> str:
         for event in structure.events
         if event.name == query.target
         and event.target == item
-        and any(relation.name == "in" and relation.left == item and relation.right == holder for relation in structure.relations)
+        and _event_qualifier(event, "holder") == holder
     ]
     if len(matches) != 1:
         raise ParseError(f"Expected exactly one actor for event query, got {len(matches)}.")
@@ -462,6 +473,16 @@ def _query_qualifier(query: Query, key: str) -> str:
     matches = [qualifier.removeprefix(prefix) for qualifier in query.qualifiers if qualifier.startswith(prefix)]
     if len(matches) != 1:
         raise ParseError(f"Expected exactly one query qualifier {key}, got {len(matches)}.")
+    return matches[0]
+
+
+def _event_qualifier(event: Event, key: str) -> str | None:
+    prefix = f"{key}="
+    matches = [qualifier.removeprefix(prefix) for qualifier in event.qualifiers if qualifier.startswith(prefix)]
+    if not matches:
+        return None
+    if len(matches) != 1:
+        raise ParseError(f"Expected at most one event qualifier {key}, got {len(matches)}.")
     return matches[0]
 
 
@@ -499,8 +520,19 @@ def _event_for_target(structure: Structure, name: str, target: str) -> Event:
     return matches[0]
 
 
+def _latest_event_for_target(structure: Structure, name: str, target: str) -> Event:
+    matches = [event for event in structure.events if event.name == name and event.target == target]
+    if not matches:
+        raise ParseError(f"Expected at least one {name} event for {target}.")
+    return matches[-1]
+
+
 def _has_relation_right(structure: Structure, name: str, right: str) -> bool:
     return any(relation.name == name and relation.right == right for relation in structure.relations)
+
+
+def _has_relation_left(structure: Structure, name: str, left: str) -> bool:
+    return any(relation.name == name and relation.left == left for relation in structure.relations)
 
 
 def _has_event(structure: Structure, name: str) -> bool:

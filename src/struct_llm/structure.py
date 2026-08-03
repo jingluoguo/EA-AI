@@ -28,8 +28,11 @@ class Event:
     name: str
     actor: str
     target: str
+    qualifiers: tuple[str, ...] = ()
 
     def linearize(self) -> str:
+        if self.qualifiers:
+            return f"EVENT {self.name}({self.actor},{self.target}) WITH {','.join(self.qualifiers)}"
         return f"EVENT {self.name}({self.actor},{self.target})"
 
 
