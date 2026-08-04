@@ -19,53 +19,8 @@ from ..structure import Entity, Query
 from .text_processing import split_query_candidate
 
 
-PUT_IN_EVENT_QUESTION_RE = (
-    re.compile(r"(?P<actor>谁)把(?P<item>.+?)放进(?P<holder>[^，,。？！?]+)"),
-    re.compile(r"(?P<item>[^，,。？！?]+?)(?:是)?(?P<actor>谁)放进(?P<holder>[^，,。？！?]+)"),
-    re.compile(r"(?P<item>[^，,。？！?]+?)被(?P<actor>谁)放进(?P<holder>[^，,。？！?]+)"),
-)
-EARLIEST_PUT_IN_EVENT_QUESTION_RE = (
-    re.compile(r"^(?:最先|先)(?P<actor>谁)把(?P<item>.+?)放进(?P<holder>[^，,。？！?]+)$"),
-    re.compile(r"(?P<actor>谁)(?:最先|先)把(?P<item>.+?)放进(?P<holder>[^，,。？！?]+)"),
-    re.compile(r"(?P<item>[^，,。？！?]+?)(?:最先|先)(?:是)?(?P<actor>谁)放进(?P<holder>[^，,。？！?]+)"),
-    re.compile(r"(?P<item>[^，,。？！?]+?)被(?:最先|先)(?:是)?(?P<actor>谁)放进(?P<holder>[^，,。？！?]+)"),
-)
-LATEST_PUT_IN_EVENT_QUESTION_RE = (
-    re.compile(r"^(?:最后|最近)(?P<actor>谁)把(?P<item>.+?)放进(?P<holder>[^，,。？！?]+)$"),
-    re.compile(r"^(?P<actor>谁)(?:最后|最近)把(?P<item>.+?)放进(?P<holder>[^，,。？！?]+)$"),
-    re.compile(r"^(?P<item>[^，,。？！?]+?)(?:最后|最近)(?:是)?(?P<actor>谁)放进(?P<holder>[^，,。？！?]+)$"),
-    re.compile(r"^(?P<item>[^，,。？！?]+?)被(?:最后|最近)(?:是)?(?P<actor>谁)放进(?P<holder>[^，,。？！?]+)$"),
-)
-TAKE_OUT_EVENT_QUESTION_RE = (
-    re.compile(r"(?P<actor>谁)把(?P<item>.+?)从(?P<source>[^，,。？！?]+)取出"),
-    re.compile(r"(?P<item>[^，,。？！?]+?)(?:是)?(?P<actor>谁)从(?P<source>[^，,。？！?]+)取出"),
-    re.compile(r"(?P<item>[^，,。？！?]+?)被(?P<actor>谁)从(?P<source>[^，,。？！?]+)取出"),
-)
-EARLIEST_TAKE_OUT_EVENT_QUESTION_RE = (
-    re.compile(r"^(?:最先|先)(?P<actor>谁)把(?P<item>.+?)从(?P<source>[^，,。？！?]+)取出$"),
-    re.compile(r"(?P<actor>谁)(?:最先|先)把(?P<item>.+?)从(?P<source>[^，,。？！?]+)取出"),
-    re.compile(r"(?P<item>[^，,。？！?]+?)(?:最先|先)(?:是)?(?P<actor>谁)从(?P<source>[^，,。？！?]+)取出"),
-    re.compile(r"(?P<item>[^，,。？！?]+?)被(?:最先|先)(?:是)?(?P<actor>谁)从(?P<source>[^，,。？！?]+)取出"),
-)
-LATEST_TAKE_OUT_EVENT_QUESTION_RE = (
-    re.compile(r"^(?:最后|最近)(?P<actor>谁)把(?P<item>.+?)从(?P<source>[^，,。？！?]+)取出$"),
-    re.compile(r"^(?P<actor>谁)(?:最后|最近)把(?P<item>.+?)从(?P<source>[^，,。？！?]+)取出$"),
-    re.compile(r"^(?P<item>[^，,。？！?]+?)(?:最后|最近)(?:是)?(?P<actor>谁)从(?P<source>[^，,。？！?]+)取出$"),
-    re.compile(r"^(?P<item>[^，,。？！?]+?)被(?:最后|最近)(?:是)?(?P<actor>谁)从(?P<source>[^，,。？！?]+)取出$"),
-)
 BELIEF_VERBS = ("认为", "相信", "觉得", "以为")
-POLAR_LOCATION_IN_RE = re.compile(
-    r"^(?P<target>.+?)在(?P<place>.+?(?:里面|里边|里头|内部|里|内|中))吗$"
-)
-POLAR_LOCATION_AT_RE = re.compile(r"^(?P<target>.+?)在(?P<place>.+?)吗$")
-POLAR_CONTENTS_RE = re.compile(
-    r"^(?P<holder>.+?(?:里面|里边|里头|内部|里|内|中))有(?P<item>.+?)吗$"
-)
-POLAR_SAME_LOCATION_RE = re.compile(
-    r"^(?P<left>.+?)和(?P<right>.+?)(?:是不是|是否|都)?在(?:同一个|同一)(?P<kind>地方|地点|位置|容器)吗$"
-)
-POLAR_EXISTENCE_RE = re.compile(r"^(?P<target>.+?)(?:是否)?存在吗$")
-POLAR_EXISTENCE_RE2 = re.compile(r"^(?P<target>.+?)还在吗$")
+LIGHT_DIALOG_ACT_TARGETS = {"greeting", "thanks", "farewell"}
 COUNTERFACTUAL_TAKE_OUT_RE = (
     re.compile(r"(?P<actor>.+?)没有把(?P<theme>.+?)从(?P<source>.+?)取出$"),
     re.compile(r"(?P<actor>.+?)没有从(?P<source>.+?)取出(?P<theme>.+?)$"),
@@ -109,6 +64,9 @@ def parse_query_candidates(
             except ParseError as error:
                 errors.append(error)
 
+    if any(not is_light_dialog_act_query(query) for query in parsed_queries):
+        parsed_queries = [query for query in parsed_queries if not is_light_dialog_act_query(query)]
+
     if len(parsed_queries) > 1:
         return Query("compound", "multi", subqueries=tuple(parsed_queries))
     if len(parsed_queries) == 1:
@@ -144,6 +102,43 @@ def parse_query(
     raise ParseError(f"Cannot parse question: {sentence}")
 
 
+def is_light_dialog_act_query(query: Query) -> bool:
+    return query.intent == "dialog_act" and query.target in LIGHT_DIALOG_ACT_TARGETS
+
+
+def parse_dialog_act_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_question(sentence).strip()
+    if normalized in {"你好", "您好", "嗨", "哈喽", "在吗", "在不在", "在么", "有人吗"}:
+        return Query("dialog_act", "greeting")
+    if "谢谢" in normalized or "感谢" in normalized:
+        return Query("dialog_act", "thanks")
+    if normalized in {"再见", "拜拜"}:
+        return Query("dialog_act", "farewell")
+    if normalized in {"你是谁", "你叫什么", "你叫什么名字"}:
+        return Query("dialog_act", "identity")
+    if any(
+        phrase in normalized
+        for phrase in ("你能做什么", "你会什么", "你可以做什么", "你能帮我什么", "你可以帮我什么")
+    ):
+        return Query("dialog_act", "capabilities")
+    if any(word in normalized for word in ("总结", "概括", "回顾")) or (
+        "刚才" in normalized and "说了什么" in normalized
+    ):
+        return Query("dialog_act", "summary")
+    return None
+
+
+def parse_profile_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_question(sentence).strip()
+    if any(phrase in normalized for phrase in ("我叫什么", "我是谁", "我的名字", "我的姓名")):
+        return Query("profile", "我", ("attribute=name",))
+    if any(phrase in normalized for phrase in ("我喜欢什么", "我的爱好", "我爱好什么")):
+        return Query("profile", "我", ("attribute=likes",))
+    if any(phrase in normalized for phrase in ("我讨厌什么", "我不喜欢什么")):
+        return Query("profile", "我", ("attribute=dislikes",))
+    return None
+
+
 def should_parse_candidate_as_unit(candidate: str) -> bool:
     normalized = candidate.strip()
     if normalized.startswith("如果") and "没有" in normalized:
@@ -156,11 +151,11 @@ def should_parse_candidate_as_unit(candidate: str) -> bool:
 
 
 def parse_event_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    put_in = parse_put_in_event_question(sentence, entities)
+    put_in = parse_put_in_event_question_semantic(sentence, entities)
     if put_in is not None:
         return put_in
 
-    take_out = parse_take_out_event_question(sentence, entities)
+    take_out = parse_take_out_event_question_semantic(sentence, entities)
     if take_out is not None:
         return take_out
 
@@ -168,11 +163,11 @@ def parse_event_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Q
 
 
 def parse_earliest_event_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    put_in = parse_earliest_put_in_event_question(sentence, entities)
+    put_in = parse_earliest_put_in_event_question_semantic(sentence, entities)
     if put_in is not None:
         return put_in
 
-    take_out = parse_earliest_take_out_event_question(sentence, entities)
+    take_out = parse_earliest_take_out_event_question_semantic(sentence, entities)
     if take_out is not None:
         return take_out
 
@@ -180,11 +175,11 @@ def parse_earliest_event_query(sentence: str, entities: tuple[Entity, ...]) -> O
 
 
 def parse_latest_event_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    put_in = parse_latest_put_in_event_question(sentence, entities)
+    put_in = parse_latest_put_in_event_question_semantic(sentence, entities)
     if put_in is not None:
         return put_in
 
-    take_out = parse_latest_take_out_event_question(sentence, entities)
+    take_out = parse_latest_take_out_event_question_semantic(sentence, entities)
     if take_out is not None:
         return take_out
 
@@ -234,79 +229,98 @@ def parse_contradiction_query(sentence: str, entities: tuple[Entity, ...]) -> Op
 
 
 def parse_polar_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    if not sentence.endswith("吗"):
+    normalized = normalize_question(sentence).strip()
+    if not is_polar_question(sentence, normalized):
         return None
 
-    existence = parse_polar_existence_query(sentence, entities)
+    existence = parse_polar_existence_query_semantic(normalized, entities)
     if existence is not None:
         return existence
 
-    same_location = parse_polar_same_location_query(sentence, entities)
+    same_location = parse_polar_same_location_query_semantic(normalized, entities)
     if same_location is not None:
         return same_location
 
-    location = parse_polar_location_query(sentence, entities)
+    location = parse_polar_location_query_semantic(normalized, entities)
     if location is not None:
         return location
 
-    contents = parse_polar_contents_query(sentence, entities)
+    contents = parse_polar_contents_query_semantic(normalized, entities)
     if contents is not None:
         return contents
 
-    same_location = parse_polar_same_location_query(sentence, entities)
-    if same_location is not None:
-        return same_location
-
     return None
 
 
-def parse_polar_existence_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    for pattern in (POLAR_EXISTENCE_RE, POLAR_EXISTENCE_RE2):
-        match = pattern.match(sentence)
-        if not match:
+def is_polar_question(sentence: str, normalized: str) -> bool:
+    if sentence.endswith("吗") or normalized.endswith("吗"):
+        return True
+    return any(marker in normalized for marker in ("是不是", "有没有"))
+
+
+def parse_polar_existence_query_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_question(sentence).strip()
+    body = normalized.removesuffix("吗")
+    for marker in ("是否存在", "还在", "存在"):
+        if marker not in body:
             continue
-        target = normalize_entity_slot(match.group("target"), entities)
-        return Query("polar_existence", target)
+        target_text = body.split(marker, 1)[0]
+        if not target_text:
+            return None
+        return Query("polar_existence", normalize_entity_slot(target_text, entities))
     return None
 
 
-def parse_polar_location_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    if any(word in sentence for word in ("哪里", "哪儿", "什么地方", "同一个", "同一")):
+def parse_polar_location_query_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_question(sentence).strip()
+    body = normalized.removesuffix("吗")
+    if any(word in body for word in ("哪里", "哪儿", "什么地方", "同一个", "同一")):
         return None
-    for pattern in (POLAR_LOCATION_IN_RE, POLAR_LOCATION_AT_RE):
-        match = pattern.match(sentence)
-        if not match:
-            continue
-        target = normalize_entity_slot(match.group("target"), entities)
-        place_text = match.group("place")
-        place_role = next((entity.role for entity in entities if entity.name == normalize_entity_slot(place_text, entities)), None)
-        expected_kind = "at" if place_role == "place" else "in"
-        place = (
-            normalize_entity_slot(place_text, entities)
-            if expected_kind == "at"
-            else normalize_container_slot(place_text)
-        )
-        return Query("polar_location", target, (f"expected={place}", f"kind={expected_kind}"))
-    return None
+    marker = find_last_marker(body, "在")
+    if marker is None:
+        return None
+    target_text = body[:marker]
+    place_text = body[marker + len("在") :]
+    if not target_text or not place_text:
+        return None
+    target = normalize_entity_slot(target_text, entities)
+    place_role = next((entity.role for entity in entities if entity.name == normalize_entity_slot(place_text, entities)), None)
+    expected_kind = "at" if place_role == "place" else "in"
+    place = normalize_entity_slot(place_text, entities) if expected_kind == "at" else normalize_container_slot(place_text)
+    return Query("polar_location", target, (f"expected={place}", f"kind={expected_kind}"))
 
 
-def parse_polar_contents_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    if any(word in sentence for word in ("什么", "几个", "多少", "数量")):
+def parse_polar_contents_query_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_question(sentence).strip()
+    body = normalized.removesuffix("吗")
+    if any(word in body for word in ("什么", "几个", "多少", "数量")):
         return None
-    match = POLAR_CONTENTS_RE.match(sentence)
-    if not match:
+    if "有没有" in body:
+        holder_text, item_text = body.split("有没有", 1)
+    else:
+        marker = find_last_marker(body, "有")
+        if marker is None:
+            return None
+        holder_text = body[:marker]
+        item_text = body[marker + len("有") :]
+    if not holder_text or not item_text:
         return None
-    holder = normalize_entity_slot(normalize_container_slot(match.group("holder")), entities)
-    item = normalize_entity_slot(match.group("item"), entities)
+    holder = normalize_entity_slot(normalize_container_slot(holder_text), entities)
+    item = normalize_entity_slot(item_text, entities)
     return Query("polar_contents", holder, (f"item={item}",))
 
 
-def parse_polar_same_location_query(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    match = POLAR_SAME_LOCATION_RE.match(sentence)
-    if not match:
+def parse_polar_same_location_query_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_question(sentence).strip()
+    body = normalized.removesuffix("吗")
+    if "和" not in body or ("在同一个" not in body and "在同一" not in body):
         return None
-    left = normalize_entity_slot(match.group("left"), entities)
-    right = normalize_entity_slot(match.group("right"), entities)
+    left_text, rest = body.split("和", 1)
+    right_text = rest.split("在", 1)[0]
+    if not left_text or not right_text:
+        return None
+    left = normalize_entity_slot(left_text, entities)
+    right = normalize_entity_slot(right_text, entities)
     return Query("same_location", f"{left}和{right}", (f"left={left}", f"right={right}"))
 
 
@@ -576,7 +590,135 @@ def temporal_event_qualifiers(anchor: str, frame) -> tuple[str, ...]:
     return tuple(qualifiers)
 
 
+def parse_put_in_event_question_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_question(sentence).strip()
+    if "放进" not in normalized or "谁" not in normalized:
+        return None
+    left, right = normalized.split("放进", 1)
+    item = extract_event_item(left, entities, ("把", "是", "被"))
+    if item is None:
+        return None
+    holder = normalize_entity_slot(normalize_container_slot(right), entities)
+    return Query("actor_for_event", "put_in", (f"item={item}", f"holder={holder}"))
+
+
+def parse_take_out_event_question_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_take_out_expression(normalize_question(sentence)).strip()
+    if "取出" not in normalized or "谁" not in normalized:
+        return None
+    left, right = normalized.split("取出", 1)
+    if "从" not in left:
+        return None
+    before_source, source_text = left.rsplit("从", 1)
+    item = extract_take_out_event_item(before_source, right, entities)
+    source = normalize_entity_slot(normalize_container_slot(source_text), entities)
+    if item is None:
+        return None
+    return Query("actor_for_event", "take_out", (f"item={item}", f"source={source}"))
+
+
+def parse_earliest_put_in_event_question_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_question(sentence).strip()
+    if "放进" not in normalized or "谁" not in normalized or not any(prefix in normalized for prefix in ("最先", "先")):
+        return None
+    query = parse_put_in_event_question_semantic(normalized, entities)
+    if query is None:
+        return None
+    return Query("earliest_actor_for_event", query.target, query.qualifiers)
+
+
+def parse_earliest_take_out_event_question_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_take_out_expression(normalize_question(sentence)).strip()
+    if "取出" not in normalized or "谁" not in normalized or not any(prefix in normalized for prefix in ("最先", "先")):
+        return None
+    query = parse_take_out_event_question_semantic(normalized, entities)
+    if query is None:
+        return None
+    return Query("earliest_actor_for_event", query.target, query.qualifiers)
+
+
+def parse_latest_put_in_event_question_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_question(sentence).strip()
+    if "放进" not in normalized or "谁" not in normalized or not any(prefix in normalized for prefix in ("最后", "最近")):
+        return None
+    query = parse_put_in_event_question_semantic(normalized, entities)
+    if query is None:
+        return None
+    return Query("latest_actor_for_event", query.target, query.qualifiers)
+
+
+def parse_latest_take_out_event_question_semantic(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
+    normalized = normalize_take_out_expression(normalize_question(sentence)).strip()
+    if "取出" not in normalized or "谁" not in normalized or not any(prefix in normalized for prefix in ("最后", "最近")):
+        return None
+    query = parse_take_out_event_question_semantic(normalized, entities)
+    if query is None:
+        return None
+    return Query("latest_actor_for_event", query.target, query.qualifiers)
+
+
+def extract_event_item(text: str, entities: tuple[Entity, ...], markers: tuple[str, ...]) -> str | None:
+    candidate = text
+    for marker in markers:
+        if marker not in candidate:
+            continue
+        before, after = candidate.split(marker, 1)
+        if marker in {"把", "是"}:
+            preferred = entity_in_text(after, entities, ("item", "container", "thing")) or entity_in_text(
+                before, entities, ("item", "container", "thing")
+            )
+        elif marker == "被":
+            preferred = entity_in_text(before, entities, ("item", "container", "thing")) or entity_in_text(
+                after, entities, ("item", "container", "thing")
+            )
+        else:
+            preferred = entity_in_text(before, entities, ("item", "container", "thing")) or entity_in_text(
+                after, entities, ("item", "container", "thing")
+            )
+        if preferred is not None:
+            return preferred
+    matches = [entity.name for entity in entities if entity.role in ("item", "container", "thing") and entity.name in candidate]
+    if matches:
+        return max(matches, key=len)
+    normalized = normalize_entity_slot(candidate, entities)
+    return normalized if normalized else None
+
+
+def extract_take_out_event_item(before_source: str, after_action: str, entities: tuple[Entity, ...]) -> str | None:
+    right_item = entity_in_text(after_action, entities, ("item", "container", "thing"))
+    if right_item is not None:
+        return right_item
+
+    if "把" in before_source:
+        _, after = before_source.rsplit("把", 1)
+        item = entity_in_text(after, entities, ("item", "container", "thing"))
+        if item is not None:
+            return item
+
+    if "被" in before_source:
+        before, after = before_source.split("被", 1)
+        item = entity_in_text(before, entities, ("item", "container", "thing")) or entity_in_text(
+            after, entities, ("item", "container", "thing")
+        )
+        if item is not None:
+            return item
+
+    if "是" in before_source:
+        before, after = before_source.split("是", 1)
+        item = entity_in_text(before, entities, ("item", "container", "thing"))
+        if item is not None:
+            return item
+        if "谁" not in after:
+            item = entity_in_text(after, entities, ("item", "container", "thing"))
+            if item is not None:
+                return item
+
+    return entity_in_text(before_source, entities, ("item", "container", "thing"))
+
+
 DEFAULT_QUERY_PARSERS: tuple[QueryParser, ...] = (
+    parse_dialog_act_query,
+    parse_profile_query,
     parse_earliest_event_query,
     parse_latest_event_query,
     parse_event_query,
@@ -607,111 +749,6 @@ DEFAULT_QUERY_PARSERS: tuple[QueryParser, ...] = (
 )
 
 
-def parse_put_in_event_question(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    for pattern in PUT_IN_EVENT_QUESTION_RE:
-        match = pattern.search(sentence)
-        if match and match.group("actor") == "谁":
-            return event_actor_query("put_in", match.group("item"), match.group("holder"), entities)
-    return None
-
-
-def parse_take_out_event_question(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    normalized = normalize_take_out_expression(sentence)
-    for pattern in TAKE_OUT_EVENT_QUESTION_RE:
-        match = pattern.search(normalized)
-        if match and match.group("actor") == "谁":
-            return event_actor_query(
-                "take_out",
-                match.group("item"),
-                match.group("source"),
-                entities,
-                source_key="source",
-            )
-    return None
-
-
-def parse_earliest_put_in_event_question(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    normalized = normalize_question(sentence)
-    for pattern in EARLIEST_PUT_IN_EVENT_QUESTION_RE:
-        match = pattern.search(normalized)
-        if match and match.group("actor") == "谁":
-            return event_actor_query(
-                "put_in",
-                match.group("item"),
-                match.group("holder"),
-                entities,
-                source_key="holder",
-                intent="earliest_actor_for_event",
-            )
-    return None
-
-
-def parse_earliest_take_out_event_question(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    normalized = normalize_take_out_expression(normalize_question(sentence))
-    for pattern in EARLIEST_TAKE_OUT_EVENT_QUESTION_RE:
-        match = pattern.search(normalized)
-        if match and match.group("actor") == "谁":
-            return event_actor_query(
-                "take_out",
-                match.group("item"),
-                match.group("source"),
-                entities,
-                source_key="source",
-                intent="earliest_actor_for_event",
-            )
-    return None
-
-
-def parse_latest_put_in_event_question(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    normalized = normalize_question(sentence)
-    for pattern in LATEST_PUT_IN_EVENT_QUESTION_RE:
-        match = pattern.match(normalized)
-        if match and match.group("actor") == "谁":
-            return event_actor_query(
-                "put_in",
-                match.group("item"),
-                match.group("holder"),
-                entities,
-                source_key="holder",
-                intent="latest_actor_for_event",
-            )
-    return None
-
-
-def parse_latest_take_out_event_question(sentence: str, entities: tuple[Entity, ...]) -> Optional[Query]:
-    normalized = normalize_take_out_expression(normalize_question(sentence))
-    for pattern in LATEST_TAKE_OUT_EVENT_QUESTION_RE:
-        match = pattern.match(normalized)
-        if match and match.group("actor") == "谁":
-            return event_actor_query(
-                "take_out",
-                match.group("item"),
-                match.group("source"),
-                entities,
-                source_key="source",
-                intent="latest_actor_for_event",
-            )
-    return None
-
-
-def event_actor_query(
-    event_name: str,
-    item: str,
-    holder: str,
-    entities: tuple[Entity, ...],
-    source_key: str = "holder",
-    intent: str = "actor_for_event",
-) -> Query:
-    return Query(
-        intent,
-        event_name,
-        (
-            f"item={normalize_entity_slot(item, entities)}",
-            f"{source_key}={normalize_entity_slot(normalize_container_slot(holder), entities)}",
-        ),
-    )
-
-
 def extract_query_target(
     sentence: str,
     intent_words: tuple[str, ...],
@@ -723,7 +760,10 @@ def extract_query_target(
         target = target.replace(word, "")
     if not target:
         raise ParseError(f"Cannot extract query target from question: {sentence}")
-    return normalize_entity_slot(target, entities)
+    normalized = normalize_entity_slot(target, entities)
+    if normalized in {"前者", "后者"}:
+        raise ParseError(f"Cannot resolve query target from question: {sentence}")
+    return normalized
 
 
 def entity_in_text(sentence: str, entities: tuple[Entity, ...], roles: tuple[str, ...]) -> str | None:
@@ -766,6 +806,11 @@ def first_present(sentence: str, words: tuple[str, ...]) -> str | None:
     if not matches:
         return None
     return min(matches, key=sentence.index)
+
+
+def find_last_marker(sentence: str, marker: str) -> int | None:
+    index = sentence.rfind(marker)
+    return index if index >= 0 else None
 
 
 def split_counterfactual(sentence: str, entities: tuple[Entity, ...]) -> tuple[str, str] | None:

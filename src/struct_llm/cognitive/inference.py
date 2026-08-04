@@ -127,6 +127,23 @@ def infer_compound_query(structure: Structure) -> str | None:
     return None
 
 
+def infer_dialog_act(structure: Structure) -> str | None:
+    query = structure.query
+    if query is None or query.intent != "dialog_act":
+        return None
+    if query.target == "summary":
+        return "conversation_summary" if summary_descriptions(structure) else "conversation_summary_empty"
+    return f"dialog_{query.target}"
+
+
+def infer_profile_lookup(structure: Structure) -> str | None:
+    query = structure.query
+    if query is None or query.intent != "profile":
+        return None
+    attribute = query_qualifier(query, "attribute")
+    return f"profile_{attribute}_found" if profile_values(structure, query.target, attribute) else f"profile_{attribute}_unknown"
+
+
 def infer_actor_handles_item(structure: Structure) -> str | None:
     query = structure.query
     if query is not None and query.intent == "actor_for_item" and has_frame_with_role(
@@ -485,6 +502,51 @@ def answer_subquery(structure: Structure, query: Query) -> str:
         states=substructure.states,
     )
     return answer_from_structure(substructure)
+
+
+def answer_dialog_act(structure: Structure) -> str | None:
+    query = structure.query
+    if query is None or query.intent != "dialog_act":
+        return None
+    rules = set(structure.rules)
+    if "dialog_greeting" in rules:
+        return "你好，我在。"
+    if "dialog_thanks" in rules:
+        return "不客气。"
+    if "dialog_farewell" in rules:
+        return "再见。"
+    if "dialog_identity" in rules:
+        return "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。"
+    if "dialog_capabilities" in rules:
+        return "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要。"
+    if "conversation_summary" in rules:
+        return f"已知：{'；'.join(summary_descriptions(structure))}。"
+    if "conversation_summary_empty" in rules:
+        return "我还没有可总结的内容。"
+    return None
+
+
+def answer_profile_lookup(structure: Structure) -> str | None:
+    query = structure.query
+    if query is None or query.intent != "profile":
+        return None
+    attribute = query_qualifier(query, "attribute")
+    values = profile_values(structure, query.target, attribute)
+    if not values:
+        if attribute == "name":
+            return "我还不知道你叫什么。"
+        if attribute == "likes":
+            return "我还不知道你喜欢什么。"
+        if attribute == "dislikes":
+            return "我还不知道你不喜欢什么。"
+        return "我还不知道这项信息。"
+    if attribute == "name":
+        return f"你叫{values[-1]}。"
+    if attribute == "likes":
+        return f"你喜欢{join_names(values)}。"
+    if attribute == "dislikes":
+        return f"你不喜欢{join_names(values)}。"
+    return None
 
 
 def answer_event_actor(structure: Structure) -> str | None:
@@ -1299,6 +1361,23 @@ def inventory_by_owner(structure: Structure) -> dict[str, tuple[str, ...]]:
     return {owner: tuple(items) for owner, items in inventories.items()}
 
 
+def profile_values(structure: Structure, target: str, attribute: str) -> tuple[str, ...]:
+    return tuple(
+        state.right
+        for state in structure.states
+        if state.name == attribute and state.left == target
+    )
+
+
+def summary_descriptions(structure: Structure) -> tuple[str, ...]:
+    descriptions = [
+        describe_historical_frame(frame)
+        for frame in structure.frames
+        if frame.frame_type != "handle"
+    ]
+    return tuple(dict.fromkeys(descriptions))
+
+
 def action_descriptions_for_actor(structure: Structure, actor: str) -> tuple[str, ...]:
     descriptions: list[str] = []
     for frame in structure.frames:
@@ -1330,6 +1409,20 @@ def describe_historical_frame(frame: Frame) -> str:
     actor = frame.role("actor")
     if actor:
         return f"{actor}{describe_frame_action(frame)}"
+    if frame.frame_type == "profile_name":
+        return f"{required_frame_role(frame, 'subject')}叫{required_frame_role(frame, 'value')}"
+    if frame.frame_type == "profile_like":
+        return f"{required_frame_role(frame, 'subject')}喜欢{required_frame_role(frame, 'value')}"
+    if frame.frame_type == "profile_dislike":
+        return f"{required_frame_role(frame, 'subject')}不喜欢{required_frame_role(frame, 'value')}"
+    if frame.frame_type == "say":
+        return f"{required_frame_role(frame, 'speaker')}说{required_frame_role(frame, 'proposition')}"
+    if frame.frame_type == "believe":
+        return f"{required_frame_role(frame, 'person')}认为{required_frame_role(frame, 'proposition')}"
+    if frame.frame_type == "because":
+        return f"因为{required_frame_role(frame, 'cause')}，所以{required_frame_role(frame, 'effect')}"
+    if frame.frame_type == "if_then":
+        return f"如果{required_frame_role(frame, 'antecedent')}，就{required_frame_role(frame, 'consequent')}"
     if frame.frame_type == "move":
         return f"{required_frame_role(frame, 'theme')}被带到{required_frame_role(frame, 'goal')}"
     if frame.frame_type == "take_out":
@@ -1770,6 +1863,8 @@ DEFAULT_RULE_INFERERS: tuple[RuleInferer, ...] = (
     infer_earliest_event_actor_matches,
     infer_latest_event_actor_matches,
     infer_compound_query,
+    infer_dialog_act,
+    infer_profile_lookup,
     infer_event_actor_matches,
     infer_actor_handles_item,
     infer_latest_actor_for_item,
@@ -1814,6 +1909,8 @@ DEFAULT_ANSWERERS: tuple[Answerer, ...] = (
     answer_earliest_event_actor,
     answer_latest_event_actor,
     answer_compound_query,
+    answer_dialog_act,
+    answer_profile_lookup,
     answer_event_actor,
     answer_actor_handles_item,
     answer_latest_actor_for_item,

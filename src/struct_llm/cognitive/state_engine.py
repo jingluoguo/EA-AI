@@ -72,6 +72,27 @@ def overwrite_current_state(states: list[State], state: State) -> bool:
         ]
         states.append(state)
         return True
+    if state.name == "name":
+        states[:] = [
+            existing
+            for existing in states
+            if not (existing.name == state.name and existing.left == state.left)
+        ]
+        states.append(state)
+        return True
+    if state.name in {"likes", "dislikes"}:
+        opposite = "dislikes" if state.name == "likes" else "likes"
+        states[:] = [
+            existing
+            for existing in states
+            if not (
+                existing.left == state.left
+                and existing.right == state.right
+                and existing.name in {state.name, opposite}
+            )
+        ]
+        states.append(state)
+        return True
     return False
 
 

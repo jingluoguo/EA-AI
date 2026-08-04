@@ -79,6 +79,18 @@ EVENT_SCHEMAS: dict[str, EventSchema] = {
         effects=(StateEffect("exists", "theme", "result"),),
         qualifier_roles=(("item", "theme"),),
     ),
+    "profile_name": EventSchema(
+        "profile_name",
+        effects=(StateEffect("name", "subject", "value"),),
+    ),
+    "profile_like": EventSchema(
+        "profile_like",
+        effects=(StateEffect("likes", "subject", "value"),),
+    ),
+    "profile_dislike": EventSchema(
+        "profile_dislike",
+        effects=(StateEffect("dislikes", "subject", "value"),),
+    ),
 }
 
 

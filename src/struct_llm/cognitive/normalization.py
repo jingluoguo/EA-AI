@@ -47,6 +47,29 @@ DEMONSTRATIVE_PREFIXES = ("这个", "这件", "那个", "那件")
 QUESTION_NOISE_RE = re.compile(
     r"^(?:你|您)?(?:知道|了解|明白)(?:吗|嘛)?(?:的话)?$|^(?:请问|告诉我|帮我看看|给我说一下|想知道|想了解|想问)$"
 )
+CHAT_EXPRESSION_HINTS = (
+    "你好",
+    "您好",
+    "嗨",
+    "哈喽",
+    "谢谢",
+    "感谢",
+    "再见",
+    "拜拜",
+    "你是谁",
+    "你叫什么",
+    "你能做什么",
+    "你会什么",
+    "你可以做什么",
+    "总结",
+    "概括",
+    "回顾",
+    "刚才说了什么",
+    "我叫什么",
+    "我是谁",
+    "我喜欢什么",
+    "我讨厌什么",
+)
 
 
 def normalize_question(sentence: str) -> str:
@@ -130,6 +153,8 @@ def is_question_noise(sentence: str) -> bool:
     normalized = normalize_question(sentence).strip()
     if not normalized:
         return True
+    if any(hint in normalized for hint in CHAT_EXPRESSION_HINTS):
+        return False
     if QUESTION_NOISE_RE.match(normalized):
         return True
     if len(normalized) <= 3 and not any(

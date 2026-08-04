@@ -286,6 +286,37 @@ class ReasonerTest(unittest.TestCase):
                 self.assertIn(query_line, structure)
                 self.assertEqual(prediction.answer, answer)
 
+    def test_polar_query_surface_markers_normalize_to_existing_query_types(self) -> None:
+        examples = (
+            (
+                "小郭把芯片放进托盘。芯片是不是在托盘里面？",
+                "QUERY polar_location(芯片,expected=托盘,kind=in)",
+                "是，芯片在托盘里。",
+            ),
+            (
+                "小郭把芯片放进托盘。托盘被带到实验室。实验室里面有没有芯片？",
+                "QUERY polar_contents(实验室,item=芯片)",
+                "是，实验室里有芯片。",
+            ),
+            (
+                "工程师制造芯片。芯片是不是存在？",
+                "QUERY polar_existence(芯片)",
+                "是，芯片存在。",
+            ),
+            (
+                "小郭把芯片放进托盘。小王把药瓶放进托盘。芯片和药瓶是不是在同一个位置？",
+                "QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)",
+                "是，芯片和药瓶在同一个地方。",
+            ),
+        )
+
+        for text, query_line, answer in examples:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(query_line, structure)
+                self.assertEqual(prediction.answer, answer)
+
     def test_polar_queries_return_negative_and_unknown_answers(self) -> None:
         examples = (
             ("工程师销毁芯片。芯片存在吗？", "QUERY polar_existence(芯片)", "不是，芯片不存在。"),
@@ -503,6 +534,38 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("EVENT put_in(小王,芯片) WITH holder=盒子", structure)
         self.assertIn("QUERY actor_for_event(put_in,item=芯片,holder=盒子)", structure)
         self.assertEqual(prediction.answer, "小王把芯片放进盒子。")
+
+    def test_event_actor_query_uses_role_slots_for_chatty_surface_forms(self) -> None:
+        examples = (
+            (
+                "小郭把芯片放进托盘。现在到底是谁把芯片放进了托盘？",
+                "QUERY actor_for_event(put_in,item=芯片,holder=托盘)",
+                "小郭把芯片放进托盘。",
+            ),
+            (
+                "小郭把芯片放进托盘。芯片到底被谁放进了托盘里面？",
+                "QUERY actor_for_event(put_in,item=芯片,holder=托盘)",
+                "小郭把芯片放进托盘。",
+            ),
+            (
+                "小郭把芯片放进托盘。你知道吗？你知道的话，可以告诉我芯片到底被谁放进托盘里面？",
+                "QUERY actor_for_event(put_in,item=芯片,holder=托盘)",
+                "小郭把芯片放进托盘。",
+            ),
+            (
+                "小郭把芯片放进托盘。小王从托盘里取出芯片。谁从托盘里面拿出来芯片？",
+                "QUERY actor_for_event(take_out,item=芯片,source=托盘)",
+                "小王把芯片从托盘取出。",
+            ),
+        )
+
+        for text, query_line, answer in examples:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(query_line, structure)
+                self.assertIn("RULE event_actor_matches", structure)
+                self.assertEqual(prediction.answer, answer)
 
     def test_take_out_removes_current_container_state(self) -> None:
         prediction = predict("小郭把芯片放进托盘。小王把芯片从托盘里取出来。芯片在哪里？")
@@ -984,6 +1047,91 @@ class ReasonerTest(unittest.TestCase):
     def test_relative_pronouns_fail_closed_when_context_is_too_short(self) -> None:
         with self.assertRaises(ParseError):
             predict("前者在哪里？")
+
+    def test_dialog_act_queries_can_answer_without_domain_state(self) -> None:
+        examples = (
+            ("你好", "QUERY dialog_act(greeting)", "你好，我在。"),
+            ("谢谢你", "QUERY dialog_act(thanks)", "不客气。"),
+            ("你是谁？", "QUERY dialog_act(identity)", "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。"),
+            (
+                "你能做什么？",
+                "QUERY dialog_act(capabilities)",
+                "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要。",
+            ),
+        )
+
+        for text, query_line, answer in examples:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(query_line, structure)
+                self.assertIn("RULE dialog_", structure)
+                self.assertEqual(prediction.answer, answer)
+
+    def test_chat_summary_reuses_frame_history(self) -> None:
+        prediction = predict("小郭把芯片放进托盘。小王把托盘带到实验室。总结一下")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("QUERY dialog_act(summary)", structure)
+        self.assertIn("RULE conversation_summary", structure)
+        self.assertEqual(prediction.answer, "已知：小郭把芯片放进托盘；小王把托盘带到实验室。")
+
+    def test_user_profile_statements_are_queryable_chat_state(self) -> None:
+        prediction = predict("我叫小王。我喜欢咖啡。我叫什么，我喜欢什么？")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL name(我,小王)", structure)
+        self.assertIn("REL likes(我,咖啡)", structure)
+        self.assertIn("QUERY compound(multi)", structure)
+        self.assertIn("SUBQUERY profile(我,attribute=name)", structure)
+        self.assertIn("SUBQUERY profile(我,attribute=likes)", structure)
+        self.assertEqual(prediction.answer, "你叫小王；你喜欢咖啡。")
+
+    def test_profile_name_overwrites_and_preferences_can_be_corrected(self) -> None:
+        prediction = predict("我叫小王。其实我叫小李。我喜欢咖啡。后来我不喜欢咖啡。我叫什么，我喜欢什么，我不喜欢什么？")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL name(我,小李)", structure)
+        self.assertNotIn("REL name(我,小王)", structure)
+        self.assertNotIn("REL likes(我,咖啡)", structure)
+        self.assertIn("REL dislikes(我,咖啡)", structure)
+        self.assertEqual(prediction.answer, "你叫小李；我还不知道你喜欢什么；你不喜欢咖啡。")
+
+    def test_mixed_chat_fragments_preserve_task_core(self) -> None:
+        prediction = predict("小郭把芯片放进托盘。你好，我想知道芯片在哪里？")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("QUERY location(芯片)", structure)
+        self.assertNotIn("SUBQUERY dialog_act(greeting)", structure)
+        self.assertEqual(prediction.answer, "芯片在托盘里。")
+
+    def test_mixed_question_fragment_can_record_profile_statement(self) -> None:
+        prediction = predict("我叫小王，你能做什么？我叫什么？")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("FRAME f1 type=profile_name time=1", structure)
+        self.assertIn("QUERY compound(multi)", structure)
+        self.assertIn("SUBQUERY dialog_act(capabilities)", structure)
+        self.assertIn("SUBQUERY profile(我,attribute=name)", structure)
+        self.assertEqual(
+            prediction.answer,
+            "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要；你叫小王。",
+        )
+
+    def test_surface_parser_uses_role_boundaries_instead_of_exact_sentence_regex(self) -> None:
+        examples = (
+            ("小红把药瓶交给了医生。药瓶是谁拥有的？", "REL owner(药瓶,医生)", "了医生", "医生拥有药瓶。"),
+            ("小王把盒子关上了。盒子是什么状态？", "REL access(盒子,关闭)", "盒子了", "盒子是关闭状态。"),
+            ("工程师把芯片销毁了。芯片是否存在？", "REL exists(芯片,不存在)", "芯片了", "芯片不存在。"),
+        )
+
+        for text, expected_line, polluted_slot, answer in examples:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(expected_line, structure)
+                self.assertNotIn(polluted_slot, structure)
+                self.assertEqual(prediction.answer, answer)
 
     def test_if_then_rule_applies_when_antecedent_holds(self) -> None:
         prediction = predict(

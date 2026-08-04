@@ -4,11 +4,11 @@ from .capabilities import CognitiveCapabilities
 from ..errors import ParseError
 from .frame_parser import dedupe_entities, with_time
 from .inference import expand_conditionals
-from .query_parser import parse_query_candidates
+from .query_parser import parse_query_candidates, should_parse_candidate_as_unit
 from ..reference_resolution import resolve_references
 from .state_engine import materialize_events, materialize_relations
 from ..structure import Entity, Frame, State, Structure
-from .text_processing import split_sentences
+from .text_processing import is_query_like_fragment, split_query_candidate, split_sentences
 
 
 def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities) -> Structure:
@@ -18,17 +18,8 @@ def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities)
     query_candidates: list[str] = []
     next_time = 1
 
-    for sentence, is_question in split_sentences(text):
-        sentence = resolve_references(sentence, dedupe_entities(entities))
-        if is_question:
-            query_candidates.append(sentence)
-            continue
-
-        extracted = capabilities.parse_statement(sentence)
-        if extracted is None:
-            query_candidates.append(sentence)
-            continue
-
+    def add_extracted(extracted) -> None:
+        nonlocal next_time
         new_entities, new_frames = extracted
         entities.extend(new_entities)
         for frame in new_frames:
@@ -38,11 +29,41 @@ def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities)
             for state in capabilities.states_from_frame(timed_frame):
                 capabilities.apply_state(states, state)
 
-    if not entities and not states and not frames:
-        raise ParseError(f"Cannot extract structure from text: {text}")
+    for sentence, is_question in split_sentences(text):
+        raw_sentence = sentence
+        resolved_sentence = resolve_references(raw_sentence, dedupe_entities(entities))
+        extracted = (
+            None
+            if is_question or is_query_like_fragment(resolved_sentence)
+            else capabilities.parse_statement(resolved_sentence)
+        )
+        if extracted is not None:
+            add_extracted(extracted)
+            continue
 
-    deduped_entities = dedupe_entities(entities)
+        if should_parse_candidate_as_unit(resolved_sentence):
+            query_candidates.append(resolved_sentence)
+            continue
+
+        for fragment in split_query_candidate(raw_sentence):
+            resolved_fragment = resolve_references(fragment, dedupe_entities(entities))
+            fragment_extracted = (
+                None
+                if is_query_like_fragment(resolved_fragment)
+                else capabilities.parse_statement(resolved_fragment)
+            )
+            if fragment_extracted is not None:
+                add_extracted(fragment_extracted)
+            else:
+                query_candidates.append(resolved_fragment)
+
+    if not entities and not states and not frames:
+        deduped_entities = dedupe_entities(entities)
+    else:
+        deduped_entities = dedupe_entities(entities)
     query = parse_query_candidates(query_candidates, deduped_entities, capabilities.query_parsers)
+    if not entities and not states and not frames and query is None:
+        raise ParseError(f"Cannot extract structure from text: {text}")
     structure = Structure(
         entities=deduped_entities,
         relations=materialize_relations(states),

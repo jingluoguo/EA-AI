@@ -12,11 +12,438 @@ from .normalization import (
 from ..structure import Entity, Frame, Role
 
 
+CONTAINMENT_VERBS = ("放到", "放入", "放进")
+TAKE_OUT_VERBS = ("取出来", "拿出来", "取出", "拿出", "取走", "拿走")
+CONTAINER_SUFFIXES = ("里面", "里边", "里头", "内部", "里", "内", "中")
+
+
+def first_marker(text: str, markers: tuple[str, ...]) -> tuple[int, str] | None:
+    matches = [(text.find(marker), marker) for marker in markers if marker in text]
+    if not matches:
+        return None
+    return min(matches, key=lambda item: item[0])
+
+
+def split_once(text: str, marker: str) -> tuple[str, str] | None:
+    if marker not in text:
+        return None
+    before, after = text.split(marker, 1)
+    return before, after
+
+
+def strip_any_prefix(text: str, prefixes: tuple[str, ...]) -> str:
+    normalized = text
+    changed = True
+    while changed:
+        changed = False
+        for prefix in sorted(prefixes, key=len, reverse=True):
+            if normalized.startswith(prefix) and len(normalized) > len(prefix):
+                normalized = normalized[len(prefix) :]
+                changed = True
+    return normalized
+
+
+def parse_surface_statement(sentence: str) -> StatementParseResult | None:
+    parsed = parse_surface_control_statement(sentence)
+    if parsed is not None:
+        return parsed
+    parsed = parse_surface_event_statement(sentence)
+    if parsed is not None:
+        return parsed
+    return None
+
+
+def parse_surface_control_statement(sentence: str) -> StatementParseResult | None:
+    normalized = normalize_slot_value(sentence).strip().rstrip("。！？!?")
+
+    parsed = split_if_then(normalized)
+    if parsed is not None:
+        antecedent, consequent = parsed
+        return (
+            [],
+            [frame_from_roles("if_then", antecedent=normalize_clause_text(antecedent), consequent=normalize_clause_text(consequent))],
+        )
+
+    for prefix in ("因为", "由于"):
+        if not normalized.startswith(prefix):
+            continue
+        body = normalized[len(prefix) :]
+        for separator in ("所以", "因此", "就"):
+            if separator not in body:
+                continue
+            cause, effect = body.split(separator, 1)
+            effect = effect.lstrip("，,")
+            effect_result = parse_effect_clause(normalize_clause_text(effect))
+            frames = [frame_from_roles("because", cause=normalize_clause_text(cause), effect=normalize_clause_text(effect))]
+            if effect_result is not None:
+                effect_entities, effect_frames = effect_result
+                return effect_entities, frames + effect_frames
+            return [], frames
+
+    for prefix in ("据",):
+        if "说" not in normalized or not normalized.startswith(prefix):
+            continue
+        body = normalized[len(prefix) :]
+        speaker, proposition = body.split("说", 1)
+        proposition = proposition.lstrip("：:，,")
+        return (
+            [Entity("person", normalize_slot_value(speaker))],
+            [frame_from_roles("say", speaker=normalize_slot_value(speaker), proposition=normalize_clause_text(proposition))],
+        )
+
+    if "说" in normalized and not normalized.startswith("据"):
+        speaker, proposition = normalized.split("说", 1)
+        proposition = proposition.lstrip("：:，,")
+        if speaker and proposition:
+            return (
+                [Entity("person", normalize_slot_value(speaker))],
+                [frame_from_roles("say", speaker=normalize_slot_value(speaker), proposition=normalize_clause_text(proposition))],
+            )
+
+    for verb in ("认为", "相信", "觉得", "以为"):
+        if verb not in normalized:
+            continue
+        person, proposition = normalized.split(verb, 1)
+        if person and proposition:
+            return (
+                [Entity("person", normalize_slot_value(person))],
+                [frame_from_roles("believe", person=normalize_slot_value(person), proposition=normalize_clause_text(proposition))],
+            )
+
+    profile = parse_profile_statement(normalized)
+    if profile is not None:
+        return profile
+
+    return None
+
+
+def parse_surface_event_statement(sentence: str) -> StatementParseResult | None:
+    normalized = normalize_slot_value(sentence).strip().rstrip("。！？!?")
+
+    correction = parse_surface_location_correction(normalized)
+    if correction is not None:
+        return correction
+
+    negated = parse_surface_location_negation(normalized)
+    if negated is not None:
+        return negated
+
+    located = parse_surface_location_statement(normalized)
+    if located is not None:
+        return located
+
+    if any(marker in normalized for marker in CONTAINMENT_VERBS):
+        normalized = normalize_containment_expression(normalized)
+        marker = first_marker(normalized, ("放进",))
+        if marker is not None and "把" in normalized[: marker[0]]:
+            before, after = normalized[: marker[0]], normalized[marker[0] + len(marker[1]) :]
+            subject_part, item_part = before.split("把", 1) if "把" in before else ("", "")
+            item = normalize_slot_value(item_part)
+            container = normalize_container_slot(after)
+            if subject_part and item and container:
+                return (
+                    [
+                        Entity("person", normalize_slot_value(subject_part)),
+                        Entity("item", item),
+                        Entity("container", container),
+                    ],
+                    [frame_from_roles("put_in", actor=normalize_slot_value(subject_part), theme=item, goal=container), handle_frame(normalize_slot_value(subject_part), item)],
+                )
+
+    take_out_markers = ("取出",)
+    normalized_take_out = normalize_take_out_expression(normalized)
+    if any(marker in normalized_take_out for marker in take_out_markers):
+        marker = first_marker(normalized_take_out, take_out_markers)
+        if marker is not None:
+            before, after = normalized_take_out[: marker[0]], normalized_take_out[marker[0] + len(marker[1]) :]
+            if "把" in before and "从" in before:
+                actor_part, rest = before.split("把", 1)
+                item_part, source_part = rest.split("从", 1)
+                return (
+                    [
+                        Entity("person", normalize_slot_value(actor_part)),
+                        Entity("item", normalize_slot_value(item_part)),
+                        Entity("container", normalize_container_slot(source_part)),
+                    ],
+                    [frame_from_roles("take_out", actor=normalize_slot_value(actor_part), theme=normalize_slot_value(item_part), source=normalize_container_slot(source_part)), handle_frame(normalize_slot_value(actor_part), normalize_slot_value(item_part))],
+                )
+            if "被" in before and "从" in before and before.index("被") < before.index("从"):
+                item_part, rest = before.split("被", 1)
+                actor_part, source_part = rest.split("从", 1)
+                return (
+                    [
+                        Entity("person", normalize_slot_value(actor_part)),
+                        Entity("item", normalize_slot_value(item_part)),
+                        Entity("container", normalize_container_slot(source_part)),
+                    ],
+                    [frame_from_roles("take_out", actor=normalize_slot_value(actor_part), theme=normalize_slot_value(item_part), source=normalize_container_slot(source_part)), handle_frame(normalize_slot_value(actor_part), normalize_slot_value(item_part))],
+                )
+            if "从" in before and "被" in before and before.index("从") < before.index("被"):
+                item_part, rest = before.split("从", 1)
+                source_part, _ = rest.split("被", 1)
+                return (
+                    [
+                        Entity("item", normalize_slot_value(item_part)),
+                        Entity("container", normalize_container_slot(source_part)),
+                    ],
+                    [frame_from_roles("take_out", theme=normalize_slot_value(item_part), source=normalize_container_slot(source_part))],
+                )
+            if "从" in before:
+                actor_part, source_part = before.split("从", 1)
+                item = normalize_slot_value(after)
+                return (
+                    [
+                        Entity("person", normalize_slot_value(actor_part)),
+                        Entity("item", item),
+                        Entity("container", normalize_container_slot(source_part)),
+                    ],
+                    [frame_from_roles("take_out", actor=normalize_slot_value(actor_part), theme=item, source=normalize_container_slot(source_part)), handle_frame(normalize_slot_value(actor_part), item)],
+                )
+
+    move_marker = first_marker(normalized, ("带到",))
+    if move_marker is not None:
+        before, after = normalized[: move_marker[0]], normalized[move_marker[0] + len(move_marker[1]) :]
+        if "把" in before:
+            actor_part, thing_part = before.split("把", 1)
+            return (
+                [
+                    Entity("person", normalize_slot_value(actor_part)),
+                    Entity(moved_role(thing_part), normalize_slot_value(thing_part)),
+                    Entity("place", normalize_slot_value(after)),
+                ],
+                [frame_from_roles("move", actor=normalize_slot_value(actor_part), theme=normalize_slot_value(thing_part), goal=normalize_slot_value(after)), handle_frame(normalize_slot_value(actor_part), normalize_slot_value(thing_part))],
+            )
+        if "被" in before:
+            thing_part, actor_part = before.split("被", 1)
+            return (
+                [
+                    Entity(moved_role(thing_part), normalize_slot_value(thing_part)),
+                    Entity("place", normalize_slot_value(after)),
+                ],
+                [frame_from_roles("move", actor=normalize_slot_value(actor_part), theme=normalize_slot_value(thing_part), goal=normalize_slot_value(after))],
+            )
+
+    if "交给" in normalized:
+        giver_part, receiver_part = normalized.split("交给", 1)
+        if "把" in giver_part:
+            actor_part, item_part = giver_part.split("把", 1)
+            return (
+                [
+                    Entity("giver", normalize_slot_value(actor_part)),
+                    Entity("receiver", normalize_slot_value(receiver_part)),
+                    Entity("item", normalize_slot_value(item_part)),
+                ],
+                [frame_from_roles("give", actor=normalize_slot_value(actor_part), theme=normalize_slot_value(item_part), recipient=normalize_slot_value(receiver_part)), handle_frame(normalize_slot_value(actor_part), normalize_slot_value(item_part))],
+            )
+
+    if "涂成" in normalized:
+        person_part, rest = normalized.split("涂成", 1)
+        if "把" in person_part:
+            actor_part, item_part = person_part.split("把", 1)
+            return (
+                [
+                    Entity("person", normalize_slot_value(actor_part)),
+                    Entity("item", normalize_slot_value(item_part)),
+                    Entity("color", normalize_slot_value(rest)),
+                ],
+                [frame_from_roles("paint", actor=normalize_slot_value(actor_part), theme=normalize_slot_value(item_part), result=normalize_slot_value(rest)), handle_frame(normalize_slot_value(actor_part), normalize_slot_value(item_part))],
+            )
+
+    for action, frame_type in (("打开", "open"), ("关闭", "close"), ("关上", "close"), ("合上", "close")):
+        if action not in normalized:
+            continue
+        before, after = normalized.split(action, 1)
+        if "被" in before:
+            thing_part, actor_part = before.split("被", 1)
+            thing = normalize_slot_value(thing_part)
+            result = "打开" if frame_type == "open" else "关闭"
+            return (
+                [Entity("person", normalize_slot_value(actor_part)), Entity(moved_role(thing), thing)],
+                [frame_from_roles(frame_type, actor=normalize_slot_value(actor_part), theme=thing, result=result), handle_frame(normalize_slot_value(actor_part), thing)],
+            )
+        if "把" in before:
+            actor_part, thing_part = before.split("把", 1)
+            thing = normalize_slot_value(thing_part)
+            result = "打开" if frame_type == "open" else "关闭"
+            return (
+                [Entity("person", normalize_slot_value(actor_part)), Entity(moved_role(thing), thing)],
+                [frame_from_roles(frame_type, actor=normalize_slot_value(actor_part), theme=thing, result=result), handle_frame(normalize_slot_value(actor_part), thing)],
+            )
+        if before and after:
+            thing = normalize_slot_value(after)
+            result = "打开" if frame_type == "open" else "关闭"
+            return (
+                [Entity("person", normalize_slot_value(before)), Entity(moved_role(thing), thing)],
+                [frame_from_roles(frame_type, actor=normalize_slot_value(before), theme=thing, result=result), handle_frame(normalize_slot_value(before), thing)],
+            )
+        if before and after == "":
+            thing = normalize_slot_value(before)
+            result = "打开" if frame_type == "open" else "关闭"
+            return (
+                [Entity(moved_role(thing), thing)],
+                [frame_from_roles(frame_type, theme=thing, result=result)],
+            )
+
+    for action, frame_type, result in (
+        ("制造出来", "create", "存在"),
+        ("制造", "create", "存在"),
+        ("创建", "create", "存在"),
+        ("生成", "create", "存在"),
+        ("销毁", "destroy", "不存在"),
+        ("删除", "destroy", "不存在"),
+        ("消灭", "destroy", "不存在"),
+    ):
+        if action not in normalized:
+            continue
+        before, after = normalized.split(action, 1)
+        if "被" in before:
+            thing_part, actor_part = before.split("被", 1)
+            thing = normalize_slot_value(thing_part)
+            return (
+                [Entity("person", normalize_slot_value(actor_part)), Entity(moved_role(thing), thing)],
+                [frame_from_roles(frame_type, actor=normalize_slot_value(actor_part), theme=thing, result=result), handle_frame(normalize_slot_value(actor_part), thing)],
+            )
+        if "把" in before:
+            actor_part, thing_part = before.split("把", 1)
+            thing = normalize_slot_value(thing_part or after)
+            return (
+                [Entity("person", normalize_slot_value(actor_part)), Entity(moved_role(thing), thing)],
+                [frame_from_roles(frame_type, actor=normalize_slot_value(actor_part), theme=thing, result=result), handle_frame(normalize_slot_value(actor_part), thing)],
+            )
+        if before and after:
+            actor_part = before
+            thing = normalize_slot_value(after)
+            return (
+                [Entity("person", normalize_slot_value(actor_part)), Entity(moved_role(thing), thing)],
+                [frame_from_roles(frame_type, actor=normalize_slot_value(actor_part), theme=thing, result=result), handle_frame(normalize_slot_value(actor_part), thing)],
+            )
+
+    return None
+
+
+def parse_surface_location_correction(sentence: str) -> StatementParseResult | None:
+    split = split_location_negation(sentence)
+    if split is None:
+        return None
+    item, rest = split
+    corrected = split_location_correction(rest)
+    if corrected is None:
+        return None
+    old_container, new_container = corrected
+    return (
+        [
+            Entity("item", item),
+            Entity("container", old_container),
+            Entity("container", new_container),
+        ],
+        [
+            frame_from_roles("not_in", theme=item, source=old_container),
+            frame_from_roles("be_in", theme=item, goal=new_container),
+        ],
+    )
+
+
+def parse_surface_location_negation(sentence: str) -> StatementParseResult | None:
+    for marker in ("没有", "不包含", "没"):
+        if marker not in sentence:
+            continue
+        holder_text, item_text = sentence.split(marker, 1)
+        if has_container_suffix(holder_text) and item_text:
+            container = normalize_container_slot(holder_text)
+            item = normalize_slot_value(item_text)
+            return (
+                [Entity("item", item), Entity("container", container)],
+                [frame_from_roles("not_in", theme=item, source=container)],
+            )
+
+    split = split_location_negation(sentence)
+    if split is None:
+        return None
+    item, container_text = split
+    if not item or not container_text:
+        return None
+    container = normalize_container_slot(container_text)
+    return (
+        [Entity("item", item), Entity("container", container)],
+        [frame_from_roles("not_in", theme=item, source=container)],
+    )
+
+
+def parse_surface_location_statement(sentence: str) -> StatementParseResult | None:
+    if "在" not in sentence:
+        return None
+    item_text, location_text = sentence.split("在", 1)
+    item = normalize_slot_value(item_text)
+    location = normalize_slot_value(location_text)
+    if not item or not location:
+        return None
+
+    if "的" in location:
+        place_text, container_text = location.split("的", 1)
+        place = normalize_slot_value(place_text)
+        container = normalize_container_slot(container_text)
+        if place and container:
+            return (
+                [
+                    Entity("item", item),
+                    Entity("place", place),
+                    Entity("container", container),
+                ],
+                [
+                    frame_from_roles("move", theme=container, goal=place),
+                    frame_from_roles("be_in", theme=item, goal=container),
+                ],
+            )
+
+    if has_container_suffix(location):
+        container = normalize_container_slot(location)
+        return (
+            [Entity("item", item), Entity("container", container)],
+            [frame_from_roles("be_in", theme=item, goal=container)],
+        )
+
+    return (
+        [Entity(moved_role(item), item), Entity("place", location)],
+        [frame_from_roles("move", theme=item, goal=location)],
+    )
+
+
+def split_location_negation(sentence: str) -> tuple[str, str] | None:
+    for marker in ("没有在", "不是在", "不在", "没在"):
+        if marker not in sentence:
+            continue
+        item_text, container_text = sentence.split(marker, 1)
+        item = normalize_slot_value(item_text)
+        if item:
+            return item, container_text
+    return None
+
+
+def split_location_correction(rest: str) -> tuple[str, str] | None:
+    normalized = rest.strip(" ，,")
+    for connector in ("而是在", "，是在", ",是在", "，在", ",在", "而在", "是在"):
+        if connector not in normalized:
+            continue
+        old_text, new_text = normalized.split(connector, 1)
+        old_container = normalize_container_slot(old_text.strip(" ，,"))
+        new_container = normalize_container_slot(new_text.strip(" ，,"))
+        if old_container and new_container:
+            return old_container, new_container
+    return None
+
+
+def has_container_suffix(text: str) -> bool:
+    normalized = normalize_slot_value(text)
+    return any(normalized.endswith(suffix) and len(normalized) > len(suffix) for suffix in CONTAINER_SUFFIXES)
+
+
 PUT_IN_RE = re.compile(r"^(?P<person>.+?)把(?P<item>.+?)放进(?P<container>.+?)$")
 BECAUSE_RE = re.compile(r"^(?:因为|由于)(?P<cause>.+?)(?:，|,)?(?:所以|因此|就)(?P<effect>.+?)$")
 REPORT_RE = re.compile(r"^据(?P<speaker>.+?)说[：:，,]?(?P<proposition>.+?)$")
 SAY_RE = re.compile(r"^(?P<speaker>.+?)说[：:，,]?(?P<proposition>.+?)$")
 BELIEVE_RE = re.compile(r"^(?P<person>.+?)(?:认为|相信|觉得|以为)(?P<proposition>.+?)$")
+PROFILE_NAME_RE = re.compile(r"^(?P<subject>我|本人|自己)(?:的(?:名字|姓名)(?:叫|是)?|叫|是)(?P<value>.+?)$")
+PROFILE_PREFERENCE_RE = re.compile(r"^(?P<subject>我|本人|自己)(?P<verb>不喜欢|讨厌|喜欢|爱)(?P<value>.+?)$")
 ACTIVE_TAKE_OUT_RE = re.compile(r"^(?P<person>.+?)把(?P<item>.+?)从(?P<container>.+?)取出$")
 FRONTED_TAKE_OUT_RE = re.compile(r"^(?P<person>.+?)从(?P<container>.+?)取出(?P<item>.+?)$")
 PASSIVE_TAKE_OUT_RE = re.compile(r"^(?P<item>.+?)被(?P<person>.+?)从(?P<container>.+?)取出$")
@@ -119,6 +546,37 @@ def parse_believe_statement(sentence: str) -> StatementParseResult | None:
     return (
         [Entity("person", person)],
         [frame_from_roles("believe", person=person, proposition=proposition)],
+    )
+
+
+def parse_profile_statement(sentence: str) -> StatementParseResult | None:
+    normalized = normalize_slot_value(sentence)
+    name = PROFILE_NAME_RE.match(normalized)
+    if name:
+        data = name.groupdict()
+        subject = normalize_slot_value(data["subject"])
+        value = normalize_slot_value(data["value"])
+        return (
+            [
+                Entity("self", subject),
+                Entity("profile_value", value),
+            ],
+            [frame_from_roles("profile_name", subject=subject, value=value)],
+        )
+
+    preference = PROFILE_PREFERENCE_RE.match(normalized)
+    if not preference:
+        return None
+    data = preference.groupdict()
+    subject = normalize_slot_value(data["subject"])
+    value = normalize_slot_value(data["value"])
+    frame_type = "profile_dislike" if data["verb"] in {"不喜欢", "讨厌"} else "profile_like"
+    return (
+        [
+            Entity("self", subject),
+            Entity("profile_value", value),
+        ],
+        [frame_from_roles(frame_type, subject=subject, value=value)],
     )
 
 
@@ -389,17 +847,7 @@ def parse_create_destroy_statement(sentence: str) -> StatementParseResult | None
 
 def parse_effect_clause(sentence: str) -> StatementParseResult | None:
     parsers = (
-        parse_put_in_statement,
-        parse_take_out_statement,
-        parse_negated_in_statement,
-        parse_located_in_statement,
-        parse_simple_in_statement,
-        parse_passive_move_statement,
-        parse_active_move_statement,
-        parse_give_statement,
-        parse_paint_statement,
-        parse_open_close_statement,
-        parse_create_destroy_statement,
+        parse_surface_statement,
     )
     for parser in parsers:
         parsed = parser(sentence)
@@ -446,22 +894,7 @@ def dedupe_entities(entities: list[Entity]) -> tuple[Entity, ...]:
 
 
 DEFAULT_STATEMENT_PARSERS: tuple[StatementParser, ...] = (
-    parse_if_then_statement,
-    parse_because_statement,
-    parse_report_statement,
-    parse_say_statement,
-    parse_believe_statement,
-    parse_put_in_statement,
-    parse_take_out_statement,
-    parse_negated_in_statement,
-    parse_located_in_statement,
-    parse_simple_in_statement,
-    parse_passive_move_statement,
-    parse_active_move_statement,
-    parse_give_statement,
-    parse_paint_statement,
-    parse_open_close_statement,
-    parse_create_destroy_statement,
+    parse_surface_statement,
 )
 
 

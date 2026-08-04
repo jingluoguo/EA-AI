@@ -143,6 +143,10 @@ class Frame:
             result = self.role("result") or ""
             qualifiers = (f"result={result}",) if result else ()
             return Event(self.frame_type, actor, theme, qualifiers)
+        if self.frame_type in {"profile_name", "profile_like", "profile_dislike"}:
+            subject = self.role("subject") or ""
+            value = self.role("value") or ""
+            return Event(self.frame_type, subject, value)
         if self.frame_type == "handle":
             actor = self.role("actor") or ""
             theme = self.role("theme") or ""
