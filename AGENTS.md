@@ -18,7 +18,7 @@
 - 构建理想模型：优先把语言归一到实体、`FRAME/ROLE`、`STATE`、`QUERY`、规则等中间结构。`EVENT/REL` 只能作为兼容线性化视图，不能成为新增推理能力的主模型。例如“谁把芯片放进托盘？”、“芯片是谁放进托盘的？”、“芯片被谁放进托盘的？”应归一为同一个事件角色查询。
 - 数学表达：让推理依赖可计算的 frame 角色匹配、状态查询、关系闭包、事件角色约束或状态转换，而不是依赖整段文本正则。
 - 模块边界：新增切句/候选保留能力放在 `text_processing.py`；新增表层剥离和槽位清理放在 `normalization.py`；新增陈述事件抽取放在 `frame_parser.py`；新增状态转移放在 `state_engine.py`；新增问题抽象放在 `query_parser.py`；新增规则和答案放在 `inference.py`。`cognitive/capabilities.py` 负责定义认知内核可插拔能力接口和组合方式；`cognitive/kernel.py` 是唯一结构推理流水线，负责串联现有解析、状态、查询和推理层。`reasoner.py` 只能作为编排层，不应重新堆积业务规则。
-- 能力注册：陈述解析、状态投影、状态覆盖、Query 解析、规则推导、答案生成都必须以小能力函数注册到 `CognitiveCapabilities`。新增能力时优先追加或注入对应层的 parser/projector/inferer/answerer，不能为了一个新问法改成端到端特殊分支。`StructuralCapabilities` 只作为兼容旧调用的别名。
+- 能力注册：陈述解析、状态投影、状态覆盖、Query 解析、规则推导、答案生成都必须以小能力函数注册到 `CognitiveCapabilities`。新增能力时优先追加或注入对应层的 parser/projector/inferer/answerer，不能为了一个新问法改成端到端特殊分支。
 - 模块化扩展：模块先有边界，再有能力；先能插拔，再谈增强。规划、具身、情感、自我认知、持续学习等外层系统模块可以先以空实现注册，后续逐步增强，但不能把逻辑直接堆回 `reasoner.py`。`modules/cognitive.py` 只能把认知内核挂载到外层模块注册表，不能另起一套 query/parser 规则。
 - 实验验证：每次新增能力都要加入覆盖主动、被动、换序或同义表达的测试，证明它们映射到同一个中间结构。
 

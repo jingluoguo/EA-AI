@@ -9,7 +9,6 @@ from .capabilities import (
     StateReducer,
     StatementParser,
     StatementParseResult,
-    StructuralCapabilities,
 )
 
 __all__ = [
@@ -21,5 +20,4 @@ __all__ = [
     "StateReducer",
     "StatementParser",
     "StatementParseResult",
-    "StructuralCapabilities",
 ]

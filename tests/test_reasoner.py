@@ -7,7 +7,6 @@ from struct_llm.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, sta
 from struct_llm.cognitive import CognitiveCapabilities
 from struct_llm.cognitive.frame_parser import frame_from_roles, with_time
 from struct_llm.cognitive.normalization import normalize_entity_slot
-from struct_llm.capabilities import StructuralCapabilities
 from struct_llm.modules import ModuleContext, default_module_registry
 from struct_llm.modules.cognitive import CognitiveKernelModule
 from struct_llm.reasoner import default_capabilities, parse_text, predict as _predict
@@ -29,7 +28,6 @@ class ReasonerTest(unittest.TestCase):
         capabilities = default_capabilities()
 
         self.assertIsInstance(capabilities, CognitiveCapabilities)
-        self.assertIs(StructuralCapabilities, CognitiveCapabilities)
 
     def test_default_module_registry_exposes_outer_system_slots(self) -> None:
         registry = default_module_registry(default_capabilities())

@@ -57,7 +57,7 @@ Order matters. Statements are processed in source order. Later `put_in`, `move`,
 
 ### Capability Composition
 
-To prevent `reasoner.py` from growing back into a large if/regex file, the cognitive kernel is composed with `CognitiveCapabilities`. `StructuralCapabilities` remains as a compatibility alias for older callers:
+To prevent `reasoner.py` from growing back into a large if/regex file, the cognitive kernel is composed with `CognitiveCapabilities`:
 
 ```python
 capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
@@ -114,15 +114,8 @@ src/struct_llm/
     state_engine.py     # FRAME -> current STATE
     query_parser.py     # query candidates -> QUERY
     inference.py        # QUERY + FRAME/STATE -> rules and answers
-  capabilities.py       # Compatibility exports; real capability registration lives in cognitive/capabilities.py
-  text_processing.py    # Compatibility exports; real implementation lives in cognitive/
-  normalization.py      # Compatibility exports; real implementation lives in cognitive/
-  frame_parser.py       # Compatibility exports; real implementation lives in cognitive/
-  state_engine.py       # Compatibility exports; real implementation lives in cognitive/
-  query_parser.py       # Compatibility exports; real implementation lives in cognitive/
-  inference.py          # Compatibility exports; real implementation lives in cognitive/
   reasoner.py           # Lightweight orchestration layer
-  modules/              # Outer pluggable modules; cognitive mounts the kernel and is not a second parser system
+  modules/              # Outer pluggable modules; cognitive mounts the kernel
   vocab.py              # Character-level vocabulary for the neural model
   model.py              # Optional PyTorch tiny Transformer
 scripts/

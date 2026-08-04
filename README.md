@@ -57,7 +57,7 @@
 
 ### 能力组合
 
-为了避免 `reasoner.py` 重新膨胀成大 if/regex 文件，当前认知内核用 `CognitiveCapabilities` 组合能力。`StructuralCapabilities` 仍作为兼容旧调用的别名保留：
+为了避免 `reasoner.py` 重新膨胀成大 if/regex 文件，当前认知内核用 `CognitiveCapabilities` 组合能力：
 
 ```python
 capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
@@ -113,15 +113,8 @@ src/struct_llm/
     state_engine.py     # FRAME -> 当前 STATE
     query_parser.py     # 查询候选 -> QUERY
     inference.py        # QUERY + FRAME/STATE -> 规则和答案
-  capabilities.py       # 兼容导出，实际能力注册在 cognitive/capabilities.py
-  text_processing.py    # 兼容导出，实际实现位于 cognitive/
-  normalization.py      # 兼容导出，实际实现位于 cognitive/
-  frame_parser.py       # 兼容导出，实际实现位于 cognitive/
-  state_engine.py       # 兼容导出，实际实现位于 cognitive/
-  query_parser.py       # 兼容导出，实际实现位于 cognitive/
-  inference.py          # 兼容导出，实际实现位于 cognitive/
   reasoner.py           # 轻量编排层
-  modules/              # 外层可插拔模块；cognitive 模块挂载认知内核，不另起第二套解析系统
+  modules/              # 外层可插拔模块；cognitive 模块挂载认知内核
   vocab.py              # 神经模型用的字符级词表
   model.py              # PyTorch tiny Transformer，可选依赖
 scripts/

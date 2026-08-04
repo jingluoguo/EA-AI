@@ -70,7 +70,7 @@ src/struct_llm/cognitive/
 - `CognitiveCapabilities`：一句话怎么解析成 `FRAME/STATE/QUERY`，以及怎么推理出答案。
 - `ModuleRegistry`：一次 agent 运行有哪些外围系统参与，例如记忆、规划、对齐、学习。
 
-现有的 `text_processing.py`、`normalization.py`、`frame_parser.py`、`state_engine.py`、`query_parser.py`、`inference.py` 已经移动到 `struct_llm/cognitive/` 并通过 `cognitive/kernel.py` 融入认知内核。根目录同名文件只做兼容导出。`modules/cognitive.py` 只是把认知内核挂载到外层 `ModuleRegistry`，不能另起一套 query/parser 规则。
+现有的 `text_processing.py`、`normalization.py`、`frame_parser.py`、`state_engine.py`、`query_parser.py`、`inference.py` 已经移动到 `struct_llm/cognitive/` 并通过 `cognitive/kernel.py` 融入认知内核。`modules/cognitive.py` 只是把认知内核挂载到外层 `ModuleRegistry`，不能另起一套 query/parser 规则。
 
 ## 接口方向
 

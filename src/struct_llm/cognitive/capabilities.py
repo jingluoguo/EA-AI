@@ -124,6 +124,3 @@ class CognitiveCapabilities:
             rule_inferers=self.rule_inferers,
             answerers=(*self.answerers, *answerers),
         )
-
-
-StructuralCapabilities = CognitiveCapabilities
