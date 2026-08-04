@@ -29,13 +29,14 @@ In code, this means:
 
 ### Core Structures
 
-`FRAME/ROLE/STATE/QUERY` is the core semantic layer of the symbolic baseline:
+`FRAME/ROLE/STATE/QUERY/INTENT` is the core semantic layer of the symbolic baseline:
 
 - `ENTITY`: recognized objects, such as people, items, containers, and places.
 - `FRAME`: historical events preserved in source order, such as `put_in`, `move`, `give`, and `paint`.
 - `ROLE`: event roles, such as `actor`, `theme`, `goal`, and `recipient`.
 - `STATE`: the current world state projected from events, such as `in(芯片,盒子)` or `at(托盘,实验室)`.
 - `QUERY`: a computable abstraction of the user question, such as `actor_for_event(put_in,item=芯片,holder=盒子)`.
+- `INTENT`: a mental-state hypothesis inferred from observed behavior, with fields such as `subject`, `goal`, `belief`, `strategy`, `evidence`, and `confidence`.
 - `RULE`: an inferred reasoning rule, such as `event_actor_matches` or `container_moves_contents`.
 
 `REL` and `EVENT` are still displayed by the CLI, but they are compatibility and readability views. `REL` is materialized from current `STATE`; `EVENT` is materialized from historical `FRAME`. New reasoning capabilities should be built on `FRAME/ROLE/STATE/QUERY`, not on `REL/EVENT` as the primary model.
@@ -49,6 +50,7 @@ raw text
   -> frame_parser: statements -> Entity + FRAME/ROLE
   -> state_engine: FRAME -> current STATE
   -> query_parser: query candidates -> QUERY
+  -> intent_analyzers: complete Structure + learned examples -> INTENT
   -> inference: QUERY + FRAME/STATE -> RULE + answer
   -> reasoner: orchestration and Prediction
 ```
@@ -64,7 +66,7 @@ capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
 prediction = predict(text, capabilities)
 ```
 
-There are six pluggable capability types:
+There are seven pluggable capability types:
 
 - `statement_parsers`: parse a statement into `Entity + Frame`.
 - `state_projectors`: project a `Frame` into `State`.
@@ -72,8 +74,37 @@ There are six pluggable capability types:
 - `query_parsers`: parse a normalized question candidate into `Query`.
 - `rule_inferers`: infer a rule name from a complete `Structure`.
 - `answerers`: generate natural-language answers from a ruled `Structure`.
+- `intent_analyzers`: learnable intent-analysis capabilities that take the raw text and complete `Structure`, then emit `Intention` hypotheses.
 
 When adding a capability, first decide which layer owns it. Then add a small function to the corresponding module and register it in the default capability list. Use `.with_query_parsers(...)` and similar methods only when an external caller wants to inject a temporary extension.
+
+### Feeding Intent Data
+
+Intent analysis should not keep growing by matching more user phrasings. Feed "behavior observation -> mental-state hypothesis" data instead, so the system can learn `Goal + Belief + Strategy`:
+
+```json
+{"observation":"妈妈在找眼镜","intention":{"subject":"妈妈","goal":"找到眼镜","belief":"妈妈不知道眼镜在哪里","strategy":"在可能的位置寻找眼镜","evidence":"妈妈在找眼镜","confidence":0.75,"source":"human_feedback"}}
+```
+
+Save examples as JSONL, then inject them in code:
+
+```python
+from struct_llm.cognitive.intent_learning import InMemoryIntentAnalyzer
+from struct_llm.reasoner import default_capabilities, predict
+
+analyzer = InMemoryIntentAnalyzer.from_jsonl("data/intent_examples.jsonl")
+capabilities = default_capabilities().with_intent_analyzers(analyzer)
+prediction = predict("妈妈在找眼镜。你是谁？", capabilities)
+print(prediction.structure.linearize())
+```
+
+Or feed the same file through the CLI:
+
+```bash
+uv run struct-ask --intent-data data/intent_examples.jsonl "妈妈在找眼镜。你是谁？"
+```
+
+`InMemoryIntentAnalyzer` is a cold-start prototype: without examples it does not guess intent; with examples it emits `INTENT` intermediate structures. Later this slot can be replaced by retrieval, a trained classifier/generator, online feedback persistence, or multi-agent reinforcement learning without expanding wording-specific rules.
 
 ### Modular Extension Principle
 
@@ -99,6 +130,7 @@ See [docs/modular_architecture.md](docs/modular_architecture.md) for the rollout
   data/
     train.jsonl        # symbolic/neural training data
     test.jsonl         # test data
+    intent_examples.jsonl # optional intent-analysis training/feedback examples
     tiny_model.pt      # tiny Transformer artifact, if trained
 src/struct_llm/
   world.py              # Tiny world: people, items, containers, places, task templates
@@ -113,6 +145,7 @@ src/struct_llm/
     frame_parser.py     # Statement -> Entity + FRAME/ROLE
     state_engine.py     # FRAME -> current STATE
     query_parser.py     # query candidates -> QUERY
+    intent_learning.py  # observation examples -> INTENT; replaceable by trained models
     inference.py        # QUERY + FRAME/STATE -> rules and answers
   reasoner.py           # Lightweight orchestration layer
   modules/              # Outer pluggable modules; cognitive mounts the kernel
@@ -143,6 +176,8 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 `Makefile` is the daily command surface. `make ask` calls `uv run struct-ask "$(TEXT)"`; `make test` runs standard-library unittest.
 
 `structure.py` defines all intermediate structures. Prefer extending this structural model instead of encoding semantics in strings.
+
+`cognitive/intent_learning.py` owns learnable intent analysis. It maps behavior observations into `Intention(subject, goal, belief, strategy, evidence, confidence)`. The default implementation consumes training/feedback examples and does not embed wording rules.
 
 `event_schema.py` defines event role aliases and state effects. For example, `put_in` projects to `in(theme, goal)`, `move` projects to `at(theme, goal)`, `open/close` projects to `access(theme, result)`, and `create/destroy` projects to `exists(theme, result)`. Event-query matching and counterfactual event exclusion reuse the same role aliases.
 
@@ -195,6 +230,7 @@ The symbolic baseline currently supports these structural capabilities:
 - Reference resolution: context-based follow-up phrases such as "this chip" and "here" are mapped back to known entities.
 - Source tracking: questions like "who said the chip is in the tray?" are separated from factual world state.
 - Belief worlds: personal-view queries such as "where does Xiao Wang think the chip is?" and "who believes the chip is in the box?", without rewriting factual world state.
+- Learnable intent hypotheses: `intent_examples.jsonl` or `.with_intent_analyzers(...)` can inject observation examples and emit `INTENT` intermediate structures.
 - Contradiction detection: questions such as "is there any contradiction?" compare claims or beliefs against the current factual state.
 - Counterfactual replay: questions such as "where would X be if someone had not done an event?" are answered by excluding the target event and replaying `FRAME -> STATE`.
 

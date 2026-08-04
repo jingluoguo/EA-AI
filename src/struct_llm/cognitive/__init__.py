@@ -3,6 +3,7 @@
 from .capabilities import (
     Answerer,
     CognitiveCapabilities,
+    IntentAnalyzer,
     QueryParser,
     RuleInferer,
     StateProjector,
@@ -10,10 +11,14 @@ from .capabilities import (
     StatementParser,
     StatementParseResult,
 )
+from .intent_learning import InMemoryIntentAnalyzer, IntentTrainingExample
 
 __all__ = [
     "Answerer",
     "CognitiveCapabilities",
+    "InMemoryIntentAnalyzer",
+    "IntentAnalyzer",
+    "IntentTrainingExample",
     "QueryParser",
     "RuleInferer",
     "StateProjector",

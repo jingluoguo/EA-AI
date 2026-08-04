@@ -500,6 +500,7 @@ def answer_subquery(structure: Structure, query: Query) -> str:
         query=substructure.query,
         frames=substructure.frames,
         states=substructure.states,
+        intentions=substructure.intentions,
     )
     return answer_from_structure(substructure)
 
@@ -1317,6 +1318,7 @@ def structure_with_frames_states(structure: Structure, frames: list[Frame], stat
         query=structure.query,
         frames=tuple(frames),
         states=tuple(states),
+        intentions=structure.intentions,
     )
 
 
@@ -1584,6 +1586,7 @@ def structure_with_states(structure: Structure, states: list[State]) -> Structur
         query=structure.query,
         frames=structure.frames,
         states=tuple(states),
+        intentions=structure.intentions,
     )
 
 
@@ -1596,6 +1599,7 @@ def structure_with_query(structure: Structure, query: Query) -> Structure:
         query=query,
         frames=structure.frames,
         states=structure.states,
+        intentions=structure.intentions,
     )
 
 

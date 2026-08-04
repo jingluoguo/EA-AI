@@ -74,6 +74,17 @@ def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities)
         states=tuple(states),
     )
     structure = expand_conditionals(structure, capabilities)
+    intentions = capabilities.analyze_intentions(text, structure)
+    structure = Structure(
+        entities=structure.entities,
+        relations=structure.relations,
+        events=structure.events,
+        rules=(),
+        query=structure.query,
+        frames=structure.frames,
+        states=structure.states,
+        intentions=intentions,
+    )
     return Structure(
         entities=structure.entities,
         relations=structure.relations,
@@ -82,4 +93,5 @@ def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities)
         query=structure.query,
         frames=structure.frames,
         states=structure.states,
+        intentions=structure.intentions,
     )

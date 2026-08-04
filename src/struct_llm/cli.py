@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .cognitive.intent_learning import InMemoryIntentAnalyzer
 from .dataset import generate_examples, write_jsonl
-from .reasoner import predict
+from .reasoner import default_capabilities, predict
 
 
 QUESTIONS = (
@@ -23,10 +24,16 @@ def run_symbolic_demo() -> None:
 def ask_symbolic() -> None:
     parser = argparse.ArgumentParser(description="Ask the explicit structural reasoner.")
     parser.add_argument("text", nargs="?", help="Question text. Omit it to enter interactive mode.")
+    parser.add_argument("--intent-data", help="JSONL file with learned intent examples.")
+    parser.add_argument("--intent-min-score", type=float, default=0.6)
     args = parser.parse_args()
+    capabilities = default_capabilities()
+    if args.intent_data:
+        analyzer = InMemoryIntentAnalyzer.from_jsonl(Path(args.intent_data), min_score=args.intent_min_score)
+        capabilities = capabilities.with_intent_analyzers(analyzer)
 
     if args.text:
-        print_prediction(args.text)
+        print_prediction(args.text, capabilities)
         return
 
     print("输入一句话，按回车推理；输入 exit 退出。")
@@ -35,7 +42,7 @@ def ask_symbolic() -> None:
         if text.lower() in {"exit", "quit", "q"}:
             break
         if text:
-            print_prediction(text)
+            print_prediction(text, capabilities)
 
 
 def ask_neural() -> None:
@@ -60,8 +67,8 @@ def ask_neural() -> None:
             print_neural_prediction(predictor(text))
 
 
-def print_prediction(question: str) -> None:
-    prediction = predict(question)
+def print_prediction(question: str, capabilities=None) -> None:
+    prediction = predict(question, capabilities)
     print("=" * 60)
     print(question)
     print()

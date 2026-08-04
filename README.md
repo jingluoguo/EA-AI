@@ -29,13 +29,14 @@
 
 ### 核心结构
 
-`FRAME/ROLE/STATE/QUERY` 是当前 symbolic baseline 的核心语义层：
+`FRAME/ROLE/STATE/QUERY/INTENT` 是当前 symbolic baseline 的核心语义层：
 
 - `ENTITY`：识别出的对象，例如人、物品、容器、地点。
 - `FRAME`：按原文顺序保留的历史事件，例如 `put_in`、`move`、`give`、`paint`。
 - `ROLE`：事件角色，例如 `actor`、`theme`、`goal`、`recipient`。
 - `STATE`：由事件投影出的当前世界状态，例如 `in(芯片,盒子)`、`at(托盘,实验室)`。
 - `QUERY`：把用户问题归一成可计算查询，例如 `actor_for_event(put_in,item=芯片,holder=盒子)`。
+- `INTENT`：从观察到的行为推断出的心智假设，例如 `subject`、`goal`、`belief`、`strategy`、`evidence`、`confidence`。
 - `RULE`：推理阶段命中的规则，例如 `event_actor_matches`、`container_moves_contents`。
 
 `REL` 和 `EVENT` 仍会在 CLI 输出里显示，但它们只是兼容和阅读视图：`REL` 来自当前 `STATE`，`EVENT` 来自历史 `FRAME`。新增推理能力应该优先基于 `FRAME/ROLE/STATE/QUERY`，不要把 `REL/EVENT` 当主模型。
@@ -49,6 +50,7 @@
   -> frame_parser 陈述句抽取 Entity + FRAME/ROLE
   -> state_engine FRAME 投影为当前 STATE
   -> query_parser 查询候选抽象为 QUERY
+  -> intent_analyzers 从完整结构和训练样本推断 INTENT
   -> inference 根据 QUERY + FRAME/STATE 推导 RULE 和答案
   -> reasoner 编排并返回 Prediction
 ```
@@ -64,7 +66,7 @@ capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
 prediction = predict(text, capabilities)
 ```
 
-可插拔能力分成六类：
+可插拔能力分成七类：
 
 - `statement_parsers`：陈述解析能力，输入句子，输出 `Entity + Frame`。
 - `state_projectors`：状态投影能力，输入 `Frame`，输出 `State`。
@@ -72,8 +74,37 @@ prediction = predict(text, capabilities)
 - `query_parsers`：问题抽象能力，输入归一后的候选问题，输出 `Query`。
 - `rule_inferers`：规则推导能力，输入完整 `Structure`，输出命中的规则名。
 - `answerers`：答案生成能力，输入带规则的 `Structure`，输出自然语言答案。
+- `intent_analyzers`：可学习意图分析能力，输入原文和完整 `Structure`，输出 `Intention` 假设。
 
 新增能力时，先判断它属于哪一层，再在对应模块新增小函数并注册到默认能力列表。只有当外部调用想临时扩展某种表达时，才通过 `.with_query_parsers(...)` 这类方法注入。
+
+### 喂意图数据
+
+意图分析不要继续靠“匹配用户怎么问”。推荐喂的是“行为观察 -> 心智假设”数据，让系统逐步学习 `Goal + Belief + Strategy`：
+
+```json
+{"observation":"妈妈在找眼镜","intention":{"subject":"妈妈","goal":"找到眼镜","belief":"妈妈不知道眼镜在哪里","strategy":"在可能的位置寻找眼镜","evidence":"妈妈在找眼镜","confidence":0.75,"source":"human_feedback"}}
+```
+
+保存为 JSONL 后，可以在代码里注入：
+
+```python
+from struct_llm.cognitive.intent_learning import InMemoryIntentAnalyzer
+from struct_llm.reasoner import default_capabilities, predict
+
+analyzer = InMemoryIntentAnalyzer.from_jsonl("data/intent_examples.jsonl")
+capabilities = default_capabilities().with_intent_analyzers(analyzer)
+prediction = predict("妈妈在找眼镜。你是谁？", capabilities)
+print(prediction.structure.linearize())
+```
+
+也可以通过 CLI 直接喂：
+
+```bash
+uv run struct-ask --intent-data data/intent_examples.jsonl "妈妈在找眼镜。你是谁？"
+```
+
+当前 `InMemoryIntentAnalyzer` 是冷启动原型：默认没有样本就不会猜意图；有样本时会输出 `INTENT` 中间结构。后续可以把这个插槽替换成检索、训练好的分类/生成模型、在线反馈写回或多智能体强化学习模块，而不需要扩展文案匹配。
 
 ### 模块化扩展原则
 
@@ -98,6 +129,7 @@ prediction = predict(text, capabilities)
   data/
     train.jsonl        # symbolic/neural 训练数据
     test.jsonl         # 测试数据
+    intent_examples.jsonl # 可选：意图分析训练/反馈样本
     tiny_model.pt      # tiny Transformer 训练产物，如果已训练
 src/struct_llm/
   world.py              # 微型世界：人物、物品、容器、地点、任务模板
@@ -112,6 +144,7 @@ src/struct_llm/
     frame_parser.py     # 陈述句 -> Entity + FRAME/ROLE
     state_engine.py     # FRAME -> 当前 STATE
     query_parser.py     # 查询候选 -> QUERY
+    intent_learning.py  # 观察样本 -> INTENT，可替换为训练模型
     inference.py        # QUERY + FRAME/STATE -> 规则和答案
   reasoner.py           # 轻量编排层
   modules/              # 外层可插拔模块；cognitive 模块挂载认知内核
@@ -142,6 +175,8 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 `Makefile` 是日常入口。`make ask` 会调用 `uv run struct-ask "$(TEXT)"`；`make test` 会调用标准库 unittest。
 
 `structure.py` 定义所有中间结构。优先扩展这里的结构模型，而不是把语义塞进字符串。
+
+`cognitive/intent_learning.py` 负责可学习意图分析。它把行为观察映射到 `Intention(subject, goal, belief, strategy, evidence, confidence)`；默认实现只消费训练/反馈样本，不内置文案规则。
 
 `event_schema.py` 定义事件的角色别名和状态效果。例如 `put_in` 投影为 `in(theme, goal)`，`move` 投影为 `at(theme, goal)`，`open/close` 投影为 `access(theme, result)`，`create/destroy` 投影为 `exists(theme, result)`。事件查询匹配和反事实事件排除也复用这里的角色别名。
 
@@ -194,6 +229,7 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 - 指代解析：支持“这个芯片”“这里”“这里有什么”这类基于上下文的追问入口。
 - 来源跟踪：支持“谁说芯片在托盘里？”并将说法与事实分离。
 - 信念世界：支持“小王认为芯片在哪里？”“谁认为芯片在盒子里？”这类个人视图查询，并且信念不会改写事实世界。
+- 可学习意图假设：支持通过 `intent_examples.jsonl` 或 `.with_intent_analyzers(...)` 注入观察样本，输出 `INTENT` 中间结构。
 - 矛盾检测：支持“有没有矛盾？”“哪里有冲突？”并比较说法/信念与当前事实状态。
 - 反事实重放：支持“如果某人没有做某事件，X 会在哪里？”通过排除目标事件后重放 `FRAME -> STATE` 来回答。
 

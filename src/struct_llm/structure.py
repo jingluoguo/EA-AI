@@ -51,6 +51,29 @@ class Event:
 
 
 @dataclass(frozen=True)
+class Intention:
+    subject: str
+    goal: str
+    belief: str = ""
+    strategy: str = ""
+    evidence: str = ""
+    confidence: float = 1.0
+    source: str = "learned"
+
+    def linearize(self) -> str:
+        parts = [f"subject={self.subject}", f"goal={self.goal}"]
+        if self.belief:
+            parts.append(f"belief={self.belief}")
+        if self.strategy:
+            parts.append(f"strategy={self.strategy}")
+        if self.evidence:
+            parts.append(f"evidence={self.evidence}")
+        parts.append(f"confidence={self.confidence:.2f}")
+        parts.append(f"source={self.source}")
+        return f"INTENT {','.join(parts)}"
+
+
+@dataclass(frozen=True)
 class Role:
     frame_id: str
     name: str
@@ -182,6 +205,7 @@ class Structure:
     query: Query | None = None
     frames: tuple[Frame, ...] = ()
     states: tuple[State, ...] = ()
+    intentions: tuple[Intention, ...] = ()
 
     def linearize(self) -> str:
         lines = [entity.linearize() for entity in self.entities]
@@ -191,6 +215,7 @@ class Structure:
         relations = self.relations or tuple(state.to_relation() for state in states)
         lines.extend(relation.linearize() for relation in relations)
         lines.extend(event.linearize() for event in events)
+        lines.extend(intention.linearize() for intention in self.intentions)
         lines.extend(frame.linearize() for frame in frames)
         lines.extend(f"RULE {rule}" for rule in self.rules)
         query = self.query

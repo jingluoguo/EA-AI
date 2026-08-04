@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from struct_llm.errors import ParseError
 from struct_llm.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, states_for_frame_schema
 from struct_llm.cognitive import CognitiveCapabilities
 from struct_llm.cognitive.frame_parser import frame_from_roles, with_time
+from struct_llm.cognitive.intent_learning import InMemoryIntentAnalyzer
 from struct_llm.cognitive.normalization import normalize_entity_slot
 from struct_llm.modules import ModuleContext, default_module_registry
 from struct_llm.modules.cognitive import CognitiveKernelModule
 from struct_llm.reasoner import default_capabilities, parse_text, predict as _predict
-from struct_llm.structure import Entity, Query
+from struct_llm.structure import Entity, Intention, Query
 
 
 def predict(text: str, capabilities: CognitiveCapabilities | None = None):
@@ -95,6 +99,63 @@ class ReasonerTest(unittest.TestCase):
         self.assertTrue(frame_matches_qualifiers(put_in, ("item=芯片", "holder=托盘")))
         self.assertTrue(frame_matches_qualifiers(take_out, ("item=芯片", "source=托盘")))
         self.assertFalse(frame_matches_qualifiers(put_in, ("item=芯片", "holder=盒子")))
+
+    def test_default_intent_analysis_does_not_guess_without_learning_signal(self) -> None:
+        prediction = predict("小郭把芯片放进托盘。芯片在哪里？")
+
+        self.assertNotIn("INTENT ", prediction.structure.linearize())
+
+    def test_learned_intent_analyzer_adds_goal_belief_strategy_hypothesis(self) -> None:
+        analyzer = InMemoryIntentAnalyzer().learn(
+            "小郭把芯片放进托盘",
+            Intention(
+                subject="小郭",
+                goal="让芯片进入托盘",
+                belief="芯片还不在托盘里",
+                strategy="把芯片放进托盘",
+                evidence="小郭把芯片放进托盘",
+                confidence=0.8,
+                source="feedback",
+            ),
+        )
+        capabilities = default_capabilities().with_intent_analyzers(analyzer)
+
+        prediction = predict("小郭把芯片放进托盘。芯片在哪里？", capabilities)
+        structure = prediction.structure.linearize()
+
+        self.assertIn(
+            "INTENT subject=小郭,goal=让芯片进入托盘,belief=芯片还不在托盘里,strategy=把芯片放进托盘,evidence=小郭把芯片放进托盘,confidence=1.00,source=feedback",
+            structure,
+        )
+        self.assertIn("QUERY location(芯片)", structure)
+        self.assertEqual(prediction.answer, "芯片在托盘里。")
+
+    def test_intent_training_examples_can_be_loaded_from_jsonl(self) -> None:
+        record = {
+            "observation": "妈妈在找眼镜",
+            "intention": {
+                "subject": "妈妈",
+                "goal": "找到眼镜",
+                "belief": "妈妈不知道眼镜在哪里",
+                "strategy": "在可能的位置寻找眼镜",
+                "evidence": "妈妈在找眼镜",
+                "confidence": 0.75,
+                "source": "human_feedback",
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "intent_examples.jsonl"
+            path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+
+            analyzer = InMemoryIntentAnalyzer.from_jsonl(path)
+            capabilities = default_capabilities().with_intent_analyzers(analyzer)
+            prediction = predict("妈妈在找眼镜。你是谁？", capabilities)
+
+        structure = prediction.structure.linearize()
+        self.assertIn(
+            "INTENT subject=妈妈,goal=找到眼镜,belief=妈妈不知道眼镜在哪里,strategy=在可能的位置寻找眼镜,evidence=妈妈在找眼镜,confidence=1.00,source=human_feedback",
+            structure,
+        )
 
     def test_containment_move(self) -> None:
         prediction = predict("研究员把芯片放进托盘。托盘被带到实验室。芯片在哪里？")
