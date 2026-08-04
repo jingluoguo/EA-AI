@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import unittest
 
-from struct_llm.reasoner import predict
+from struct_llm.normalization import normalize_entity_slot
+from struct_llm.reasoner import default_capabilities, predict
+from struct_llm.structure import Entity, Query
 
 
 class ReasonerTest(unittest.TestCase):
@@ -37,6 +39,34 @@ class ReasonerTest(unittest.TestCase):
         self.assertNotIn("REL at(托盘,实验室)", structure)
         self.assertEqual(prediction.answer, "芯片在办公室的托盘里。")
 
+    def test_move_adverb_does_not_pollute_entity_slot(self) -> None:
+        prediction = predict(
+            "小郭把芯片放进托盘。小王把托盘带到了实验室。托盘又被带到办公室。"
+            "你知道吗？我想知道芯片现在在哪里，可以告诉我吗？"
+        )
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL at(托盘,办公室)", structure)
+        self.assertNotIn("托盘又", structure)
+        self.assertEqual(prediction.answer, "芯片在办公室的托盘里。")
+
+    def test_active_move_updates_object_location(self) -> None:
+        prediction = predict(
+            "小郭把芯片放进托盘。小王把托盘带到了实验室。"
+            "可以告诉我托盘在哪里吗，你了解嘛？你知道的话，给我说一下"
+        )
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL at(托盘,实验室)", structure)
+        self.assertIn("EVENT move(托盘,实验室) WITH by=小王", structure)
+        self.assertIn("FRAME f3 type=move time=3", structure)
+        self.assertIn("ROLE f3 actor=小王", structure)
+        self.assertIn("ROLE f3 theme=托盘", structure)
+        self.assertIn("ROLE f3 goal=实验室", structure)
+        self.assertIn("QUERY location(托盘)", structure)
+        self.assertIn("RULE object_at_place", structure)
+        self.assertEqual(prediction.answer, "托盘在实验室。")
+
     def test_ownership_transfer(self) -> None:
         prediction = predict("小红把药瓶交给医生。现在谁拥有药瓶？")
 
@@ -55,6 +85,21 @@ class ReasonerTest(unittest.TestCase):
         prediction = predict("小红把药瓶交给医生。药瓶是谁拥有的？")
 
         self.assertIn("QUERY owner(药瓶)", prediction.structure.linearize())
+        self.assertEqual(prediction.answer, "医生拥有药瓶。")
+
+    def test_query_capability_can_be_injected_without_changing_pipeline(self) -> None:
+        def parse_keeper_query(sentence: str, entities: tuple[Entity, ...]) -> Query | None:
+            if "保管者" not in sentence or "谁" not in sentence:
+                return None
+            target = sentence.replace("保管者", "").replace("谁", "").replace("是", "")
+            return Query("owner", normalize_entity_slot(target, entities))
+
+        capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
+        prediction = predict("小红把药瓶交给医生。药瓶保管者是谁？", capabilities)
+
+        structure = prediction.structure.linearize()
+        self.assertIn("QUERY owner(药瓶)", structure)
+        self.assertIn("RULE transfer_changes_owner", structure)
         self.assertEqual(prediction.answer, "医生拥有药瓶。")
 
     def test_color_change(self) -> None:
@@ -108,6 +153,9 @@ class ReasonerTest(unittest.TestCase):
             "芯片是谁放进托盘的？",
             "芯片被谁放进托盘的？",
             "芯片被谁放进托盘的了？",
+            "谁把芯片放到托盘里面的？",
+            "芯片是谁放到托盘里边的？",
+            "芯片被谁放入托盘里的？",
             "现在芯片被谁放进托盘的了？",
             "我想知道芯片被谁放进托盘了的？",
             "我想问芯片被谁放进托盘了的？",
@@ -135,7 +183,21 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("REL in(芯片,盒子)", structure)
         self.assertIn("EVENT put_in(小郭,芯片) WITH holder=托盘", structure)
         self.assertIn("EVENT put_in(小王,芯片) WITH holder=盒子", structure)
+        self.assertIn("FRAME f1 type=put_in time=1", structure)
+        self.assertIn("ROLE f1 actor=小郭", structure)
+        self.assertIn("ROLE f1 theme=芯片", structure)
+        self.assertIn("ROLE f1 goal=托盘", structure)
         self.assertEqual(prediction.answer, "小郭把芯片放进托盘。")
+
+    def test_put_in_statement_and_query_normalize_container_surface_forms(self) -> None:
+        prediction = predict("小郭把芯片放到托盘里面。小王把芯片放入盒子里。谁把芯片放到盒子里面的？")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL in(芯片,盒子)", structure)
+        self.assertIn("EVENT put_in(小郭,芯片) WITH holder=托盘", structure)
+        self.assertIn("EVENT put_in(小王,芯片) WITH holder=盒子", structure)
+        self.assertIn("QUERY actor_for_event(put_in,item=芯片,holder=盒子)", structure)
+        self.assertEqual(prediction.answer, "小王把芯片放进盒子。")
 
     def test_place_contents_question_uses_world_state_closure(self) -> None:
         questions = (
@@ -172,6 +234,39 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("REL in(芯片,盒子)", structure)
         self.assertIn("REL at(盒子,办公室)", structure)
         self.assertEqual(prediction.answer, "办公室里至少有盒子和芯片。")
+
+    def test_contents_query_target_uses_entity_boundary_correction(self) -> None:
+        prediction = predict(
+            "小郭把芯片放进托盘。小王把芯片放进盒子。盒子被带到仓库。"
+            "你可以告诉我仓库里有什么吗？"
+        )
+
+        structure = prediction.structure.linearize()
+        self.assertIn("QUERY contents(仓库)", structure)
+        self.assertEqual(prediction.answer, "仓库里至少有盒子和芯片。")
+
+    def test_complex_historical_event_query_after_current_state_changes(self) -> None:
+        prediction = predict(
+            "小郭把芯片放进托盘。小王把芯片放进盒子。盒子被带到仓库。"
+            "你知道吗？，你知道的话，可以告诉我芯片被谁放进托盘了的，我想知道下"
+        )
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL in(芯片,盒子)", structure)
+        self.assertIn("FRAME f1 type=put_in time=1", structure)
+        self.assertIn("QUERY actor_for_event(put_in,item=芯片,holder=托盘)", structure)
+        self.assertEqual(prediction.answer, "小郭把芯片放进托盘。")
+
+    def test_complex_contents_query_after_repeated_moves(self) -> None:
+        prediction = predict(
+            "小郭把芯片放进托盘。小王把托盘带到了实验室。托盘被带到办公室。"
+            "可以告诉我办公室里有什么吗？"
+        )
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL at(托盘,办公室)", structure)
+        self.assertIn("QUERY contents(办公室)", structure)
+        self.assertEqual(prediction.answer, "办公室里至少有托盘和芯片。")
 
 
 if __name__ == "__main__":
