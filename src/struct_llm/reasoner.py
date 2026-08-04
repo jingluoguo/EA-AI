@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from .capabilities import StructuralCapabilities
 from .errors import ParseError
 from .frame_parser import DEFAULT_STATEMENT_PARSERS, dedupe_entities, with_time
-from .inference import DEFAULT_ANSWERERS, DEFAULT_RULE_INFERERS, answer_from_structure
+from .inference import DEFAULT_ANSWERERS, DEFAULT_RULE_INFERERS, answer_from_structure, expand_conditionals
 from .query_parser import DEFAULT_QUERY_PARSERS, parse_query_candidates
+from .reference_resolution import resolve_references
 from .state_engine import (
     DEFAULT_STATE_PROJECTORS,
     DEFAULT_STATE_REDUCERS,
@@ -43,6 +44,7 @@ def parse_text(text: str, capabilities: StructuralCapabilities | None = None) ->
     next_time = 1
 
     for sentence, is_question in split_sentences(text):
+        sentence = resolve_references(sentence, dedupe_entities(entities))
         if is_question:
             query_candidates.append(sentence)
             continue
@@ -75,6 +77,7 @@ def parse_text(text: str, capabilities: StructuralCapabilities | None = None) ->
         frames=tuple(frames),
         states=tuple(states),
     )
+    structure = expand_conditionals(structure, active_capabilities)
     return Structure(
         entities=structure.entities,
         relations=structure.relations,

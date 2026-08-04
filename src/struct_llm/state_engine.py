@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .capabilities import StateProjector, StateReducer
+from .event_schema import states_for_frame_schema
 from .structure import Frame, State
 
 
@@ -14,36 +15,8 @@ def states_from_frame(
     return tuple(states)
 
 
-def put_in_state(frame: Frame) -> tuple[State, ...]:
-    if frame.frame_type == "put_in":
-        theme = frame.role("theme") or ""
-        goal = frame.role("goal") or ""
-        return (State("in", theme, goal, frame.frame_id),)
-    return ()
-
-
-def move_state(frame: Frame) -> tuple[State, ...]:
-    if frame.frame_type == "move":
-        theme = frame.role("theme") or ""
-        goal = frame.role("goal") or ""
-        return (State("at", theme, goal, frame.frame_id),)
-    return ()
-
-
-def give_state(frame: Frame) -> tuple[State, ...]:
-    if frame.frame_type == "give":
-        theme = frame.role("theme") or ""
-        recipient = frame.role("recipient") or ""
-        return (State("owner", theme, recipient, frame.frame_id),)
-    return ()
-
-
-def paint_state(frame: Frame) -> tuple[State, ...]:
-    if frame.frame_type == "paint":
-        theme = frame.role("theme") or ""
-        result = frame.role("result") or ""
-        return (State("color", theme, result, frame.frame_id),)
-    return ()
+def schema_state_projector(frame: Frame) -> tuple[State, ...]:
+    return states_for_frame_schema(frame)
 
 
 def apply_state(
@@ -58,11 +31,44 @@ def apply_state(
 
 
 def overwrite_current_state(states: list[State], state: State) -> bool:
-    if state.name in {"in", "at", "owner", "color"}:
+    if state.name == "exists" and state.right == "不存在":
         states[:] = [
             existing
             for existing in states
-            if not (existing.name == state.name and existing.left == state.left)
+            if existing.left != state.left and existing.right != state.left
+        ]
+        states.append(state)
+        return True
+
+    if state.name == "exists":
+        states[:] = [
+            existing
+            for existing in states
+            if not (existing.name == "exists" and existing.left == state.left)
+        ]
+        states.append(state)
+        return True
+
+    if state.name == "not_in":
+        states[:] = [
+            existing
+            for existing in states
+            if not (
+                existing.name == "in"
+                and existing.left == state.left
+                and (not state.right or existing.right == state.right)
+            )
+        ]
+        return True
+
+    if state.name in {"in", "at", "owner", "color", "access"}:
+        states[:] = [
+            existing
+            for existing in states
+            if not (
+                (existing.name == state.name and existing.left == state.left)
+                or (existing.name == "exists" and existing.left == state.left and existing.right == "不存在")
+            )
         ]
         states.append(state)
         return True
@@ -78,9 +84,6 @@ def materialize_events(frames: list[Frame]):
 
 
 DEFAULT_STATE_PROJECTORS: tuple[StateProjector, ...] = (
-    put_in_state,
-    move_state,
-    give_state,
-    paint_state,
+    schema_state_projector,
 )
 DEFAULT_STATE_REDUCERS: tuple[StateReducer, ...] = (overwrite_current_state,)

@@ -93,6 +93,7 @@ When adding a capability, first decide which layer owns it. Then add a small fun
 src/struct_llm/
   world.py              # Tiny world: people, items, containers, places, task templates
   structure.py          # Structure types: entity, relation, event, frame, state, query, rule
+  event_schema.py       # Event schemas: role aliases, state effects, and event-query matching
   dataset.py            # Dataset generation and compositional train/test split
   text_processing.py    # Sentence splitting and query candidate retention
   normalization.py      # Particles, question frames, and slot-boundary normalization
@@ -130,6 +131,8 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 
 `structure.py` defines all intermediate structures. Prefer extending this structural model instead of encoding semantics in strings.
 
+`event_schema.py` defines event role aliases and state effects. For example, `put_in` projects to `in(theme, goal)`, `move` projects to `at(theme, goal)`, `open/close` projects to `access(theme, result)`, and `create/destroy` projects to `exists(theme, result)`. Event-query matching and counterfactual event exclusion reuse the same role aliases.
+
 `normalization.py` removes surface variation. For example, it currently normalizes `放到/放入/放进` into the same containment action and normalizes `盒子里面/盒子里` into the container slot `盒子`.
 
 `frame_parser.py` extracts `FRAME/ROLE` from statements. New event types, such as "take out", "open", or "close", should start here as statement parsers.
@@ -155,6 +158,32 @@ When a new failing example appears, first identify the failing layer:
 - A rule is inferred, but the final answer wording is wrong: edit the answerers in `inference.py`.
 
 Every change should add an end-to-end test in `tests/test_reasoner.py`. For surface variation, the test should prove that multiple phrasings map to the same `FRAME/ROLE/STATE/QUERY`, not merely that one sentence can be answered.
+
+### Currently Supported Capabilities
+
+The symbolic baseline currently supports these structural capabilities:
+
+- Current-state tracking: putting in, moving, giving, and painting update current `STATE`.
+- Attribute-state tracking: object states such as open/closed can be queried, for example "what state is the box in?"
+- Existence tracking: creation and destruction events are represented as current state; destruction clears the object's current location, owner, color, and access state.
+- State invalidation: taking out and negated statements delete current containment, such as "托盘里没有芯片".
+- State correction: one statement can remove an old state and write a new one, such as "芯片不在托盘里而在盒子里".
+- Historical event retention: after the current state changes, the system can still answer who previously put an item into a container.
+- Temporal queries: "where was it at the beginning?", "where was it before someone's action?", and "what happened after an event?"
+- Conditional reasoning: "if ... then ..." and "as long as ..." style rules.
+- Causal explanation: "because ... so ..." and "why ..." queries.
+- Nested closure: multi-level containers and movement propagation, such as "the chip is in the small box inside the big box in the lab".
+- Set queries: contents of a holder, contents except X, and places visited.
+- Count queries: questions such as "how many things are in this place?" return the known lower bound from the current structural closure, filtering destroyed objects.
+- Count comparison: questions such as "which place has more things?" and "do these two places have the same amount?" compare the current known-content closures.
+- Polar yes/no queries: questions such as "does the chip exist?", "is the chip in the tray?", and "is there a chip in the lab?" reuse the same structural state checks.
+- Same-location queries: questions such as "are the chip and the bottle in the same place?" compare the current location keys of two targets.
+- Role queries: latest actor for an item, actions by each actor, and current inventories by owner.
+- Reference resolution: context-based follow-up phrases such as "this chip" and "here" are mapped back to known entities.
+- Source tracking: questions like "who said the chip is in the tray?" are separated from factual world state.
+- Belief worlds: personal-view queries such as "where does Xiao Wang think the chip is?" and "who believes the chip is in the box?", without rewriting factual world state.
+- Contradiction detection: questions such as "is there any contradiction?" compare claims or beliefs against the current factual state.
+- Counterfactual replay: questions such as "where would X be if someone had not done an event?" are answered by excluding the target event and replaying `FRAME -> STATE`.
 
 ## Setup
 

@@ -87,6 +87,36 @@ class Frame:
             goal = self.role("goal")
             qualifiers = (f"holder={goal}",) if goal else ()
             return Event("put_in", actor, theme, qualifiers)
+        if self.frame_type == "take_out":
+            actor = self.role("actor") or ""
+            theme = self.role("theme") or ""
+            source = self.role("source")
+            qualifiers = (f"source={source}",) if source else ()
+            return Event("take_out", actor, theme, qualifiers)
+        if self.frame_type == "if_then":
+            antecedent = self.role("antecedent") or ""
+            consequent = self.role("consequent") or ""
+            return Event("if_then", antecedent, consequent)
+        if self.frame_type == "because":
+            cause = self.role("cause") or ""
+            effect = self.role("effect") or ""
+            return Event("because", cause, effect)
+        if self.frame_type == "say":
+            speaker = self.role("speaker") or ""
+            proposition = self.role("proposition") or ""
+            return Event("say", speaker, proposition)
+        if self.frame_type == "believe":
+            person = self.role("person") or ""
+            proposition = self.role("proposition") or ""
+            return Event("believe", person, proposition)
+        if self.frame_type == "be_in":
+            theme = self.role("theme") or ""
+            goal = self.role("goal") or ""
+            return Event("be_in", theme, goal)
+        if self.frame_type == "not_in":
+            theme = self.role("theme") or ""
+            source = self.role("source") or ""
+            return Event("not_in", theme, source)
         if self.frame_type == "move":
             theme = self.role("theme") or ""
             goal = self.role("goal") or ""
@@ -101,6 +131,18 @@ class Frame:
             theme = self.role("theme") or ""
             color = self.role("result") or ""
             return Event("paint", theme, color)
+        if self.frame_type in {"open", "close"}:
+            actor = self.role("actor") or ""
+            theme = self.role("theme") or ""
+            result = self.role("result")
+            qualifiers = (f"result={result}",) if result else ()
+            return Event(self.frame_type, actor, theme, qualifiers)
+        if self.frame_type in {"create", "destroy"}:
+            actor = self.role("actor") or ""
+            theme = self.role("theme") or ""
+            result = self.role("result") or ""
+            qualifiers = (f"result={result}",) if result else ()
+            return Event(self.frame_type, actor, theme, qualifiers)
         if self.frame_type == "handle":
             actor = self.role("actor") or ""
             theme = self.role("theme") or ""
@@ -113,11 +155,16 @@ class Query:
     intent: str
     target: str
     qualifiers: tuple[str, ...] = ()
+    subqueries: tuple[Query, ...] = ()
 
     def linearize(self) -> str:
+        lines = []
         if self.qualifiers:
-            return f"QUERY {self.intent}({self.target},{','.join(self.qualifiers)})"
-        return f"QUERY {self.intent}({self.target})"
+            lines.append(f"QUERY {self.intent}({self.target},{','.join(self.qualifiers)})")
+        else:
+            lines.append(f"QUERY {self.intent}({self.target})")
+        lines.extend(subquery.linearize().replace("QUERY ", "SUBQUERY ", 1) for subquery in self.subqueries)
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True)
