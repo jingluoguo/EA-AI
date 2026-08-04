@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import re
-
-
 QUERY_HINTS = (
     "谁",
     "什么",
@@ -32,14 +29,16 @@ QUERY_HINTS = (
 def split_sentences(text: str) -> tuple[tuple[str, bool], ...]:
     stripped = text.strip()
     parts: list[tuple[str, bool]] = []
-    last_end = 0
-    for match in re.finditer(r"([^。？！?]+)([。？！?])", stripped):
-        sentence = match.group(1).strip(" ，,")
+    start = 0
+    for index, character in enumerate(stripped):
+        if character not in "。？！?":
+            continue
+        sentence = stripped[start:index].strip(" ，,")
         if sentence:
-            parts.append((sentence, match.group(2) in "？?"))
-        last_end = match.end()
+            parts.append((sentence, character in "？?"))
+        start = index + 1
 
-    tail = stripped[last_end:].strip(" ，,")
+    tail = stripped[start:].strip(" ，,")
     if tail:
         parts.append((tail, False))
 
@@ -48,14 +47,22 @@ def split_sentences(text: str) -> tuple[tuple[str, bool], ...]:
 
 def split_query_candidate(candidate: str) -> tuple[str, ...]:
     normalized = candidate.strip().rstrip("。！？!?")
-    parts = []
-    for raw in re.split(r"[，,；;]", normalized):
-        fragment = raw.strip()
+    parts: list[str] = []
+    start = 0
+    for index, character in enumerate(normalized):
+        if character not in "，,；;":
+            continue
+        fragment = normalized[start:index].strip()
         if not fragment:
+            start = index + 1
             continue
         fragment = fragment.strip("，,；;")
         if fragment:
             parts.append(fragment)
+        start = index + 1
+    tail = normalized[start:].strip("，,；;")
+    if tail:
+        parts.append(tail)
     if not parts:
         return (normalized,)
 

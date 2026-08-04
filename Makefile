@@ -1,6 +1,4 @@
-.PHONY: sync demo ask ask-neural chat chat-neural data test train
-
-TEXT ?= 小明把钥匙放进盒子。盒子被带到厨房。钥匙在哪里？
+.PHONY: sync demo ask ask-neural chat chat-neural data compile model check intent-example intent-eval query-eval statement-eval test train
 
 sync:
 	uv sync
@@ -22,6 +20,28 @@ chat-neural:
 
 data:
 	uv run struct-make-dataset
+
+compile: model
+
+model:
+	uv run struct-compile-query
+	uv run struct-compile-statement
+
+check: model
+	uv run struct-eval-query --query-data data/query_examples.jsonl --query-model data/query_model.json
+	uv run struct-eval-statement --statement-data data/statement_examples.jsonl --statement-model data/statement_model.json
+
+intent-example:
+	uv run struct-add-intent-example "$(OBSERVATION)" --subject "$(SUBJECT)" --goal "$(GOAL)"
+
+intent-eval:
+	uv run struct-eval-intent
+
+query-eval:
+	uv run struct-eval-query
+
+statement-eval:
+	uv run struct-eval-statement
 
 test:
 	uv run python -m unittest discover -q

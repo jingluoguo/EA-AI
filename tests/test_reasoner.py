@@ -8,13 +8,36 @@ from pathlib import Path
 from struct_llm.errors import ParseError
 from struct_llm.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, states_for_frame_schema
 from struct_llm.cognitive import CognitiveCapabilities
-from struct_llm.cognitive.frame_parser import frame_from_roles, with_time
-from struct_llm.cognitive.intent_learning import InMemoryIntentAnalyzer
-from struct_llm.cognitive.normalization import normalize_entity_slot
+from struct_llm.cognitive.structure_helpers import frame_from_roles, with_time
+from struct_llm.cognitive.intent_dataset import (
+    append_intent_record,
+    build_intent_record,
+    intent_record_from_dict,
+    load_intent_jsonl,
+)
+from struct_llm.cognitive.intent_learning import InMemoryIntentAnalyzer, evaluate_intent_analyzer
+from struct_llm.cognitive.query_learning import (
+    LearnedQueryParser,
+    compile_query_model_from_jsonl,
+    evaluate_query_parser,
+    load_query_jsonl,
+    load_query_model,
+    save_query_model,
+)
+from struct_llm.cognitive.statement_learning import (
+    LearnedStatementParser,
+    compile_statement_model_from_jsonl,
+    evaluate_statement_parser,
+    load_statement_jsonl,
+    load_statement_model,
+    normalize_statement_text,
+    save_statement_model,
+    statement_example_from_dict,
+)
 from struct_llm.modules import ModuleContext, default_module_registry
 from struct_llm.modules.cognitive import CognitiveKernelModule
 from struct_llm.reasoner import default_capabilities, parse_text, predict as _predict
-from struct_llm.structure import Entity, Intention, Query
+from struct_llm.structure import Entity, Intention
 
 
 def predict(text: str, capabilities: CognitiveCapabilities | None = None):
@@ -32,6 +55,95 @@ class ReasonerTest(unittest.TestCase):
         capabilities = default_capabilities()
 
         self.assertIsInstance(capabilities, CognitiveCapabilities)
+
+    def test_default_query_capability_uses_compiled_model(self) -> None:
+        capabilities = default_capabilities()
+
+        self.assertEqual(len(capabilities.query_parsers), 1)
+        self.assertIsInstance(capabilities.query_parsers[0], LearnedQueryParser)
+        parser = capabilities.query_parsers[0]
+        assert isinstance(parser, LearnedQueryParser)
+        self.assertGreater(len(parser.patterns), 0)
+        self.assertEqual(parser.examples, ())
+
+    def test_default_statement_capability_uses_compiled_model(self) -> None:
+        capabilities = default_capabilities()
+
+        self.assertEqual(len(capabilities.statement_parsers), 1)
+        self.assertIsInstance(capabilities.statement_parsers[0], LearnedStatementParser)
+        parser = capabilities.statement_parsers[0]
+        assert isinstance(parser, LearnedStatementParser)
+        self.assertGreater(len(parser.patterns), 0)
+        self.assertEqual(parser.examples, ())
+
+    def test_statement_examples_can_evaluate_learned_parser(self) -> None:
+        examples = load_statement_jsonl("data/statement_examples.jsonl")
+        result = evaluate_statement_parser(LearnedStatementParser.from_examples(examples), examples)
+
+        self.assertEqual(result.total, len(examples))
+        self.assertEqual(result.accuracy, 1.0)
+
+    def test_statement_examples_compile_to_runtime_model(self) -> None:
+        examples = load_statement_jsonl("data/statement_examples.jsonl")
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "statement_model.json"
+            model = compile_statement_model_from_jsonl("data/statement_examples.jsonl")
+            save_statement_model(model, model_path)
+            loaded_model = load_statement_model(model_path)
+            parser = LearnedStatementParser.from_model(model_path)
+            result = evaluate_statement_parser(parser, examples)
+
+        self.assertEqual(loaded_model.example_count, len(examples))
+        self.assertGreater(len(loaded_model.patterns), 0)
+        self.assertTrue(loaded_model.source_sha256)
+        self.assertEqual(result.accuracy, 1.0)
+
+    def test_statement_normalization_collapses_container_surface_forms(self) -> None:
+        self.assertEqual(
+            normalize_statement_text("小王把芯片从托盘里面拿出来"),
+            normalize_statement_text("小王把芯片从托盘里取出"),
+        )
+
+    def test_statement_dataset_rejects_missing_template(self) -> None:
+        with self.assertRaisesRegex(ValueError, "sentence and sentence_template"):
+            statement_example_from_dict(
+                {
+                    "sentence": "小王把芯片放进托盘",
+                    "entities": [],
+                    "frames": [{"frame_type": "put_in", "roles": {}}],
+                }
+            )
+
+    def test_learned_query_dataset_replaces_question_parser_stack(self) -> None:
+        parser = LearnedQueryParser.from_jsonl("data/query_examples.jsonl")
+
+        query = parser("盒子里有芯片吗", (Entity("container", "盒子"),))
+
+        self.assertIsNotNone(query)
+        assert query is not None
+        self.assertEqual(query.linearize(), "QUERY polar_contents(盒子,item=芯片)")
+
+    def test_query_examples_can_evaluate_learned_parser(self) -> None:
+        examples = load_query_jsonl("data/query_examples.jsonl")
+        result = evaluate_query_parser(LearnedQueryParser.from_examples(examples), examples)
+
+        self.assertEqual(result.total, len(examples))
+        self.assertEqual(result.accuracy, 1.0)
+
+    def test_query_examples_compile_to_runtime_model(self) -> None:
+        examples = load_query_jsonl("data/query_examples.jsonl")
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "query_model.json"
+            model = compile_query_model_from_jsonl("data/query_examples.jsonl")
+            save_query_model(model, model_path)
+            loaded_model = load_query_model(model_path)
+            parser = LearnedQueryParser.from_model(model_path)
+            result = evaluate_query_parser(parser, examples)
+
+        self.assertEqual(loaded_model.example_count, len(examples))
+        self.assertGreater(len(loaded_model.patterns), 0)
+        self.assertTrue(loaded_model.source_sha256)
+        self.assertEqual(result.accuracy, 1.0)
 
     def test_default_module_registry_exposes_outer_system_slots(self) -> None:
         registry = default_module_registry(default_capabilities())
@@ -157,6 +269,90 @@ class ReasonerTest(unittest.TestCase):
             structure,
         )
 
+    def test_intent_dataset_record_preserves_training_context(self) -> None:
+        record = {
+            "observation": "妈妈在找眼镜",
+            "context": ["眼镜平时放在桌上"],
+            "world_state": ["at(眼镜,桌上)"],
+            "belief_state": ["believes(妈妈,unknown_location(眼镜))"],
+            "answer": "妈妈想找到眼镜。",
+            "source": "human_feedback",
+            "split": "train",
+            "intention": {
+                "subject": "妈妈",
+                "goal": "找到眼镜",
+                "belief": "妈妈不知道眼镜在哪里",
+                "strategy": "在可能的位置寻找眼镜",
+                "confidence": 0.75,
+            },
+        }
+
+        parsed = intent_record_from_dict(record)
+
+        self.assertEqual(parsed.context, ("眼镜平时放在桌上",))
+        self.assertEqual(parsed.world_state, ("at(眼镜,桌上)",))
+        self.assertEqual(parsed.belief_state, ("believes(妈妈,unknown_location(眼镜))",))
+        self.assertEqual(parsed.answer, "妈妈想找到眼镜。")
+        self.assertEqual(parsed.intention.source, "human_feedback")
+
+    def test_intent_feedback_can_be_appended_and_reused_as_training_data(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "intent_examples.jsonl"
+            record = build_intent_record(
+                "孩子伸手去拿杯子",
+                "孩子",
+                "拿到杯子",
+                belief="孩子认为杯子在眼前",
+                strategy="伸手抓取杯子",
+                context=("杯子在桌上",),
+                world_state=("at(杯子,桌上)",),
+                answer="孩子想拿到杯子。",
+                source="human_feedback",
+            )
+
+            append_intent_record(path, record)
+            loaded_records = load_intent_jsonl(path)
+            analyzer = InMemoryIntentAnalyzer.from_jsonl(path)
+
+        self.assertEqual(len(loaded_records), 1)
+        self.assertEqual(loaded_records[0].context, ("杯子在桌上",))
+        self.assertEqual(loaded_records[0].answer, "孩子想拿到杯子。")
+        self.assertEqual(analyzer.examples[0].intention.goal, "拿到杯子")
+
+    def test_intent_examples_can_evaluate_an_analyzer(self) -> None:
+        analyzer = InMemoryIntentAnalyzer.from_records(
+            [
+                {
+                    "observation": "孩子伸手去拿杯子",
+                    "intention": {
+                        "subject": "孩子",
+                        "goal": "拿到杯子",
+                        "belief": "孩子认为杯子在眼前",
+                        "strategy": "伸手抓取杯子",
+                    },
+                }
+            ]
+        )
+
+        result = evaluate_intent_analyzer(analyzer, analyzer.examples)
+
+        self.assertEqual(result.total, 1)
+        self.assertEqual(result.matched, 1)
+        self.assertEqual(result.accuracy, 1.0)
+
+    def test_intent_dataset_rejects_invalid_confidence(self) -> None:
+        with self.assertRaisesRegex(ValueError, "confidence"):
+            intent_record_from_dict(
+                {
+                    "observation": "妈妈在找眼镜",
+                    "intention": {
+                        "subject": "妈妈",
+                        "goal": "找到眼镜",
+                        "confidence": 1.5,
+                    },
+                }
+            )
+
     def test_containment_move(self) -> None:
         prediction = predict("研究员把芯片放进托盘。托盘被带到实验室。芯片在哪里？")
 
@@ -234,21 +430,6 @@ class ReasonerTest(unittest.TestCase):
         prediction = predict("小红把药瓶交给医生。药瓶是谁拥有的？")
 
         self.assertIn("QUERY owner(药瓶)", prediction.structure.linearize())
-        self.assertEqual(prediction.answer, "医生拥有药瓶。")
-
-    def test_query_capability_can_be_injected_without_changing_pipeline(self) -> None:
-        def parse_keeper_query(sentence: str, entities: tuple[Entity, ...]) -> Query | None:
-            if "保管者" not in sentence or "谁" not in sentence:
-                return None
-            target = sentence.replace("保管者", "").replace("谁", "").replace("是", "")
-            return Query("owner", normalize_entity_slot(target, entities))
-
-        capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
-        prediction = predict("小红把药瓶交给医生。药瓶保管者是谁？", capabilities)
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY owner(药瓶)", structure)
-        self.assertIn("RULE transfer_changes_owner", structure)
         self.assertEqual(prediction.answer, "医生拥有药瓶。")
 
     def test_color_change(self) -> None:
@@ -1179,7 +1360,7 @@ class ReasonerTest(unittest.TestCase):
             "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要；你叫小王。",
         )
 
-    def test_surface_parser_uses_role_boundaries_instead_of_exact_sentence_regex(self) -> None:
+    def test_learned_statement_uses_role_boundaries_instead_of_exact_sentence_text(self) -> None:
         examples = (
             ("小红把药瓶交给了医生。药瓶是谁拥有的？", "REL owner(药瓶,医生)", "了医生", "医生拥有药瓶。"),
             ("小王把盒子关上了。盒子是什么状态？", "REL access(盒子,关闭)", "盒子了", "盒子是关闭状态。"),

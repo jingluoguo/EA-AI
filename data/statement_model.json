@@ -1,0 +1,1617 @@
+{
+  "schema": "struct_llm.statement_model.v1",
+  "source_sha256": "d2dedd2e103b848e2ac4fee95cbd8554457bab2ae76a9433b12d75838247df97",
+  "example_count": 69,
+  "pattern_count": 48,
+  "patterns": [
+    {
+      "sentence_template": "$person#1把$item#1放进$container#1",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "put_in",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "把放",
+        "放进"
+      ],
+      "support": 8
+    },
+    {
+      "sentence_template": "$container#1被带到$place#1",
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "",
+            "goal": "$place#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "带到",
+        "被带"
+      ],
+      "support": 5
+    },
+    {
+      "sentence_template": "$giver#1把$item#1交给$receiver#1",
+      "entities": [
+        {
+          "role": "giver",
+          "name": "$giver#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "receiver",
+          "name": "$receiver#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "give",
+          "roles": {
+            "actor": "$giver#1",
+            "recipient": "$receiver#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$giver#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "交给",
+        "把交"
+      ],
+      "support": 3
+    },
+    {
+      "sentence_template": "$person#1把$item#1涂成$color#1",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "color",
+          "name": "$color#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "paint",
+          "roles": {
+            "actor": "$person#1",
+            "result": "$color#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "把涂",
+        "涂成"
+      ],
+      "support": 3
+    },
+    {
+      "sentence_template": "$person#1把$container#1关上",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "close",
+          "roles": {
+            "actor": "$person#1",
+            "result": "关闭",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "关上",
+        "把关"
+      ],
+      "support": 2
+    },
+    {
+      "sentence_template": "$person#1把$item#1从$container#1里取出",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "actor": "$person#1",
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "从里",
+        "取出",
+        "把从",
+        "里取"
+      ],
+      "support": 2
+    },
+    {
+      "sentence_template": "$person#1把$item#1放进$container#1里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "put_in",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "把放",
+        "放进",
+        "进里"
+      ],
+      "support": 2
+    },
+    {
+      "sentence_template": "$person#1认为芯片在盒子里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片在盒子里"
+          }
+        }
+      ],
+      "feature_units": [
+        "为芯",
+        "在盒",
+        "子里",
+        "片在",
+        "盒子",
+        "芯片",
+        "认为"
+      ],
+      "support": 2
+    },
+    {
+      "sentence_template": "$person#1销毁$thing#1",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "destroy",
+          "roles": {
+            "actor": "$person#1",
+            "result": "不存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "销毁"
+      ],
+      "support": 2
+    },
+    {
+      "sentence_template": "$self#1叫$profile_value#1",
+      "entities": [
+        {
+          "role": "self",
+          "name": "$self#1"
+        },
+        {
+          "role": "profile_value",
+          "name": "$profile_value#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "profile_name",
+          "roles": {
+            "subject": "$self#1",
+            "value": "$profile_value#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "叫"
+      ],
+      "support": 2
+    },
+    {
+      "sentence_template": "$container#1被$person#1合上",
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "close",
+          "roles": {
+            "actor": "$person#1",
+            "result": "关闭",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "合上",
+        "被合"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$container#1被$person#1打开",
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "open",
+          "roles": {
+            "actor": "$person#1",
+            "result": "打开",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "打开",
+        "被打"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$container#1里没有$item#1",
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "not_in",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "没有",
+        "里没"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$giver#1把$item#1交给了$receiver#1",
+      "entities": [
+        {
+          "role": "giver",
+          "name": "$giver#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "receiver",
+          "name": "$receiver#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "give",
+          "roles": {
+            "actor": "$giver#1",
+            "recipient": "$receiver#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$giver#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "交给",
+        "把交",
+        "给了"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$item#1不在$container#1里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "not_in",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "不在",
+        "在里"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$item#1不在$container#1里而在$container#2里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#2"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "not_in",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "be_in",
+          "roles": {
+            "goal": "$container#2",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "不在",
+        "在里",
+        "而在",
+        "里而"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$item#1不是在$container#1里，是在$container#2里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#2"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "not_in",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "be_in",
+          "roles": {
+            "goal": "$container#2",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "不是",
+        "在里",
+        "是在",
+        "里，",
+        "，是"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$item#1从$container#1里被取出",
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "从里",
+        "取出",
+        "被取",
+        "里被"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$item#1在$container#1里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "be_in",
+          "roles": {
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "在里"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$item#1被$person#1从$container#1里取出",
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "actor": "$person#1",
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "从里",
+        "取出",
+        "被从",
+        "里取"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1从$container#1里取出$item#1",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "actor": "$person#1",
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "从里",
+        "取出",
+        "里取"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1以为芯片在托盘里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片在托盘里"
+          }
+        }
+      ],
+      "feature_units": [
+        "为芯",
+        "以为",
+        "在托",
+        "托盘",
+        "片在",
+        "盘里",
+        "芯片"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1以为芯片在盒子里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片在盒子里"
+          }
+        }
+      ],
+      "feature_units": [
+        "为芯",
+        "以为",
+        "在盒",
+        "子里",
+        "片在",
+        "盒子",
+        "芯片"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1关闭$container#1",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "close",
+          "roles": {
+            "actor": "$person#1",
+            "result": "关闭",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "关闭"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1制造$thing#1",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "create",
+          "roles": {
+            "actor": "$person#1",
+            "result": "存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "制造"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1后来认为芯片在盒子里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片在盒子里"
+          }
+        }
+      ],
+      "feature_units": [
+        "为芯",
+        "后来",
+        "在盒",
+        "子里",
+        "来认",
+        "片在",
+        "盒子",
+        "芯片",
+        "认为"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1打开$container#1",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "open",
+          "roles": {
+            "actor": "$person#1",
+            "result": "打开",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "打开"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1把$container#1带到$place#1",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$place#1",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "带到",
+        "把带"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1把$container#1带到了$place#1",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$place#1",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "到了",
+        "带到",
+        "把带"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1把$container#1打开",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "open",
+          "roles": {
+            "actor": "$person#1",
+            "result": "打开",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "打开",
+        "把打"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1把$thing#1制造出来",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "create",
+          "roles": {
+            "actor": "$person#1",
+            "result": "存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "出来",
+        "制造",
+        "把制",
+        "造出"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1把$thing#1销毁",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "destroy",
+          "roles": {
+            "actor": "$person#1",
+            "result": "不存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "把销",
+        "销毁"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1把这个$item#1从$container#1里取出",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "actor": "$person#1",
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "个从",
+        "从里",
+        "取出",
+        "把这",
+        "这个",
+        "里取"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1相信芯片在盒子里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片在盒子里"
+          }
+        }
+      ],
+      "feature_units": [
+        "信芯",
+        "在盒",
+        "子里",
+        "片在",
+        "盒子",
+        "相信",
+        "芯片"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1认为芯片在托盘里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片在托盘里"
+          }
+        }
+      ],
+      "feature_units": [
+        "为芯",
+        "在托",
+        "托盘",
+        "片在",
+        "盘里",
+        "芯片",
+        "认为"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1说芯片不存在",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片不存在",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "不存",
+        "存在",
+        "片不",
+        "芯片",
+        "说芯"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1说芯片在托盘里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片在托盘里",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "在托",
+        "托盘",
+        "片在",
+        "盘里",
+        "芯片",
+        "说芯"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1说芯片在盒子里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片在盒子里",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "在盒",
+        "子里",
+        "片在",
+        "盒子",
+        "芯片",
+        "说芯"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1说芯片存在",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片存在",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "存在",
+        "片存",
+        "芯片",
+        "说芯"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$person#1说这个芯片在托盘里",
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片在托盘里",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "个芯",
+        "在托",
+        "托盘",
+        "片在",
+        "盘里",
+        "芯片",
+        "说这",
+        "这个"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$self#1不喜欢$profile_value#1",
+      "entities": [
+        {
+          "role": "self",
+          "name": "$self#1"
+        },
+        {
+          "role": "profile_value",
+          "name": "$profile_value#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "profile_dislike",
+          "roles": {
+            "subject": "$self#1",
+            "value": "$profile_value#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "不喜",
+        "喜欢"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$self#1喜欢$profile_value#1",
+      "entities": [
+        {
+          "role": "self",
+          "name": "$self#1"
+        },
+        {
+          "role": "profile_value",
+          "name": "$profile_value#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "profile_like",
+          "roles": {
+            "subject": "$self#1",
+            "value": "$profile_value#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "喜欢"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$thing#1又被带到$place#1",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "",
+            "goal": "$place#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "又被",
+        "带到",
+        "被带"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$thing#1在$place#1",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "goal": "$place#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "在"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$thing#1被$person#1制造出来",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "create",
+          "roles": {
+            "actor": "$person#1",
+            "result": "存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "出来",
+        "制造",
+        "被制",
+        "造出"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$thing#1被$person#1销毁",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "destroy",
+          "roles": {
+            "actor": "$person#1",
+            "result": "不存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "被销",
+        "销毁"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "因为小王把$container#1带到$place#1，所以$item#1在$place#1的$container#1里",
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "小王把$container#1带到$place#1",
+            "effect": "$item#1在$place#1的$container#1里"
+          }
+        },
+        {
+          "frame_type": "move",
+          "roles": {
+            "goal": "$place#1",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "be_in",
+          "roles": {
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "为小",
+        "以在",
+        "到，",
+        "因为",
+        "在的",
+        "小王",
+        "带到",
+        "所以",
+        "把带",
+        "王把",
+        "的里",
+        "，所"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "如果小郭把芯片放进托盘，小王就把托盘带到实验室",
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小郭把芯片放进托盘",
+            "consequent": "小王把托盘带到实验室"
+          }
+        }
+      ],
+      "feature_units": [
+        "到实",
+        "如果",
+        "实验",
+        "小王",
+        "小郭",
+        "就把",
+        "带到",
+        "托盘",
+        "把托",
+        "把芯",
+        "放进",
+        "果小",
+        "片放",
+        "王就",
+        "盘带",
+        "盘，",
+        "芯片",
+        "进托",
+        "郭把",
+        "验室",
+        "，小"
+      ],
+      "support": 1
+    }
+  ]
+}

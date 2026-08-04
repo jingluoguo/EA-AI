@@ -13,7 +13,7 @@ The project currently has two layers:
 
 ## Design Philosophy
 
-The goal is structural intelligence, not enumerating every possible natural-language phrasing with end-to-end regex templates. Every new capability should follow this chain:
+The goal is structural intelligence, with no wording tables, regex parsers, or string fallbacks in the runtime. Future work is centered on training data and replaceable learned capabilities. Every new capability should follow this chain:
 
 ```text
 Observe phenomenon -> Remove secondary factors -> Build ideal model -> Mathematical expression -> Experimental verification
@@ -22,10 +22,11 @@ Observe phenomenon -> Remove secondary factors -> Build ideal model -> Mathemati
 In code, this means:
 
 - Observe phenomenon: inspect the failed input, current structure output, and expected answer. Decide whether the failure is in sentence splitting, normalization, statement parsing, Query parsing, state updates, rule inference, or answer generation.
+- Training first: write the failure as data first, including observation, context, world_state, belief_state, expected structures, or answer. Run evaluation before changing code; change parser, state, query, or inference code only when the data shows that structure labels or model slots are missing.
 - Remove secondary factors: normalize surface variation such as `放进/放到/放入`, `盒子里/盒子里面`, active/passive voice, particles, and conversational filler before these details pollute entity slots.
 - Build ideal model: map natural language into intermediate structures such as `ENTITY`, `FRAME/ROLE`, `STATE`, and `QUERY`.
 - Mathematical expression: make reasoning depend on computable mechanisms: frame-role matching, current-state lookup, relation closure, and state overwrite.
-- Experimental verification: every new capability needs tests showing that different surface forms map to the same structural model.
+- Experimental verification: every new capability needs tests showing that different surface forms map to the same structural model. Training-related changes also need tests for data loading, feedback writing, and schema validation.
 
 ### Core Structures
 
@@ -47,9 +48,9 @@ In code, this means:
 raw text
   -> text_processing.split_sentences
   -> normalization: surface cleanup and slot normalization
-  -> frame_parser: statements -> Entity + FRAME/ROLE
+  -> statement_learning: load statement_model.json -> Entity + FRAME/ROLE
   -> state_engine: FRAME -> current STATE
-  -> query_parser: query candidates -> QUERY
+  -> query_learning: load query_model.json -> QUERY
   -> intent_analyzers: complete Structure + learned examples -> INTENT
   -> inference: QUERY + FRAME/STATE -> RULE + answer
   -> reasoner: orchestration and Prediction
@@ -59,24 +60,117 @@ Order matters. Statements are processed in source order. Later `put_in`, `move`,
 
 ### Capability Composition
 
-To prevent `reasoner.py` from growing back into a large if/regex file, the cognitive kernel is composed with `CognitiveCapabilities`:
+The cognitive kernel composes learned, state, reasoning, and answer capabilities through `CognitiveCapabilities`:
 
 ```python
-capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
+capabilities = default_capabilities()
 prediction = predict(text, capabilities)
 ```
 
 There are seven pluggable capability types:
 
-- `statement_parsers`: parse a statement into `Entity + Frame`.
+- `statement_parsers`: learn a statement mapping into `Entity + Frame`.
 - `state_projectors`: project a `Frame` into `State`.
 - `state_reducers`: decide how a new state updates the current world.
-- `query_parsers`: parse a normalized question candidate into `Query`.
+- `query_parsers`: learn a query mapping from a candidate into `Query`.
 - `rule_inferers`: infer a rule name from a complete `Structure`.
 - `answerers`: generate natural-language answers from a ruled `Structure`.
 - `intent_analyzers`: learnable intent-analysis capabilities that take the raw text and complete `Structure`, then emit `Intention` hypotheses.
 
-When adding a capability, first decide which layer owns it. Then add a small function to the corresponding module and register it in the default capability list. Use `.with_query_parsers(...)` and similar methods only when an external caller wants to inject a temporary extension.
+When adding a capability, add the corresponding JSONL training and evaluation examples first, then replace the relevant learned capability. Do not extend the runtime with wording-specific functions.
+
+### Training-First Workflow
+
+When a new failure appears, use this sequence:
+
+1. Record the example: keep the raw observation, context, current structure output, and expected `INTENT/QUERY/STATE` or answer.
+2. Write the dataset record: store it as JSONL training or feedback data before expanding wording-specific matching.
+3. Evaluate the current learned capability to identify whether the gap is a label, a structural slot, or a model capability.
+4. Train or replace the capability: prefer updating the dataset or relevant analyzer/learner/projector/inferer.
+5. Verify the loop: add tests for loaders, schema validation, feedback writing, evaluation, and the end-to-end behavior.
+
+### Query Training And Compilation
+
+The Query flow is just three steps:
+
+1. Put examples into `data/query_examples.jsonl`.
+2. Run the compile command to produce `data/query_model.json`.
+3. `struct-ask` reads the model file by default, not the raw training set.
+
+```json
+{"question":"芯片在哪里","entities":[{"role":"item","name":"芯片"}],"query":{"intent":"location","target":"$item#1","qualifiers":[]},"source":"training","split":"train"}
+```
+
+`$item#1`, `$container#1`, and `$place#1` are structural slots, not regexes. Compilation compresses many examples into one loadable `QUERY` model artifact.
+
+```bash
+uv run struct-compile-query \
+  --query-data data/query_examples.jsonl \
+  --output data/query_model.json
+```
+
+Use this to check the result:
+
+```bash
+uv run struct-eval-query \
+  --query-data data/query_examples.jsonl \
+  --query-model data/query_model.json
+```
+
+`struct-ask` uses `data/query_model.json` by default. You can also pass an artifact explicitly while debugging:
+
+```bash
+uv run struct-ask \
+  --query-model data/query_model.json \
+  "研究员把芯片放进托盘。托盘被带到实验室。芯片在哪里？"
+```
+
+In short: write examples, compile a model, then load the model at runtime.
+
+### Statement Training And Compilation
+
+Statement flow is the same:
+
+1. Put examples into `data/statement_examples.jsonl`.
+2. Run the compile command to produce `data/statement_model.json`.
+3. `struct-ask` reads the model file by default, not the raw training set.
+
+```json
+{"sentence":"小张认为芯片在托盘里","sentence_template":"$person#1认为芯片在托盘里","entities":[{"role":"person","name":"$person#1"}],"frames":[{"frame_type":"believe","roles":{"person":"$person#1","proposition":"芯片在托盘里"}}],"source":"human_feedback","split":"train"}
+```
+
+Active/passive voice, reordered phrases, and surface variants such as `里面/里边/里头` are normalized first, then collapsed into the same `FRAME/ROLE` model.
+
+```bash
+uv run struct-compile-statement \
+  --statement-data data/statement_examples.jsonl \
+  --output data/statement_model.json
+```
+
+Use this to check the result:
+
+```bash
+uv run struct-eval-statement \
+  --statement-data data/statement_examples.jsonl \
+  --statement-model data/statement_model.json
+```
+
+`struct-ask` uses `data/statement_model.json` by default. You can also pass an artifact explicitly while debugging:
+
+```bash
+uv run struct-ask \
+  --statement-model data/statement_model.json \
+  "小王把芯片从托盘里面拿出来。芯片在哪里？"
+```
+
+In short: write examples, compile a model, then load the model at runtime.
+
+You can also just run:
+
+```bash
+make model
+make check
+```
 
 ### Feeding Intent Data
 
@@ -84,6 +178,31 @@ Intent analysis should not keep growing by matching more user phrasings. Feed "b
 
 ```json
 {"observation":"妈妈在找眼镜","intention":{"subject":"妈妈","goal":"找到眼镜","belief":"妈妈不知道眼镜在哪里","strategy":"在可能的位置寻找眼镜","evidence":"妈妈在找眼镜","confidence":0.75,"source":"human_feedback"}}
+```
+
+The full JSONL schema can also carry training context and evaluation targets:
+
+```json
+{"observation":"孩子伸手去拿杯子","context":["杯子在桌上"],"world_state":["at(杯子,桌上)"],"belief_state":["believes(孩子,visible(杯子))"],"answer":"孩子想拿到杯子。","source":"human_feedback","split":"train","intention":{"subject":"孩子","goal":"拿到杯子","belief":"孩子认为杯子在眼前","strategy":"伸手抓取杯子","evidence":"孩子伸手去拿杯子","confidence":0.85,"source":"human_feedback"}}
+```
+
+You can append feedback examples from the CLI:
+
+```bash
+uv run struct-add-intent-example "孩子伸手去拿杯子" \
+  --subject "孩子" \
+  --goal "拿到杯子" \
+  --belief "孩子认为杯子在眼前" \
+  --strategy "伸手抓取杯子" \
+  --context "杯子在桌上" \
+  --world-state "at(杯子,桌上)" \
+  --answer "孩子想拿到杯子。"
+```
+
+Then run the smallest evaluation loop:
+
+```bash
+uv run struct-eval-intent --train-data data/intent_examples.jsonl
 ```
 
 Save examples as JSONL, then inject them in code:
@@ -130,6 +249,10 @@ See [docs/modular_architecture.md](docs/modular_architecture.md) for the rollout
   data/
     train.jsonl        # symbolic/neural training data
     test.jsonl         # test data
+    query_examples.jsonl  # Query-parsing training examples
+    query_model.json      # compiled Query model loaded by default at runtime
+    statement_examples.jsonl  # Statement-parsing training examples
+    statement_model.json      # compiled statement model loaded by default at runtime
     intent_examples.jsonl # optional intent-analysis training/feedback examples
     tiny_model.pt      # tiny Transformer artifact, if trained
 src/struct_llm/
@@ -142,9 +265,11 @@ src/struct_llm/
     kernel.py           # Single cognitive-kernel pipeline that connects parsing, state, query, and inference modules
     text_processing.py  # Sentence splitting and query candidate retention
     normalization.py    # Particles, question frames, and slot-boundary normalization
-    frame_parser.py     # Statement -> Entity + FRAME/ROLE
     state_engine.py     # FRAME -> current STATE
-    query_parser.py     # query candidates -> QUERY
+    statement_learning.py # compiles statement examples and loads statement_model.json
+    query_learning.py   # compiles Query examples and loads query_model.json
+    structure_helpers.py # Pure structure construction and entity deduplication helpers
+    intent_dataset.py   # Intent training/feedback JSONL schema, validation, and append-only writing
     intent_learning.py  # observation examples -> INTENT; replaceable by trained models
     inference.py        # QUERY + FRAME/STATE -> rules and answers
   reasoner.py           # Lightweight orchestration layer
@@ -169,6 +294,12 @@ tests/
 struct-demo = struct_llm.cli:run_symbolic_demo
 struct-ask = struct_llm.cli:ask_symbolic
 struct-ask-neural = struct_llm.cli:ask_neural
+struct-add-intent-example = struct_llm.cli:add_intent_example
+struct-eval-intent = struct_llm.cli:eval_intent_examples
+struct-eval-query = struct_llm.cli:eval_query_examples
+struct-eval-statement = struct_llm.cli:eval_statement_examples
+struct-compile-query = struct_llm.cli:compile_query_model
+struct-compile-statement = struct_llm.cli:compile_statement_model
 struct-make-dataset = struct_llm.cli:make_dataset
 struct-train-tiny = struct_llm.cli:train_tiny_model
 ```
@@ -177,17 +308,19 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 
 `structure.py` defines all intermediate structures. Prefer extending this structural model instead of encoding semantics in strings.
 
+`cognitive/intent_dataset.py` owns the JSONL schema, validation, and append-only writing for intent training and feedback data.
+
 `cognitive/intent_learning.py` owns learnable intent analysis. It maps behavior observations into `Intention(subject, goal, belief, strategy, evidence, confidence)`. The default implementation consumes training/feedback examples and does not embed wording rules.
 
 `event_schema.py` defines event role aliases and state effects. For example, `put_in` projects to `in(theme, goal)`, `move` projects to `at(theme, goal)`, `open/close` projects to `access(theme, result)`, and `create/destroy` projects to `exists(theme, result)`. Event-query matching and counterfactual event exclusion reuse the same role aliases.
 
 `cognitive/normalization.py` removes surface variation. For example, it currently normalizes `放到/放入/放进` into the same containment action and normalizes `盒子里面/盒子里` into the container slot `盒子`.
 
-`cognitive/frame_parser.py` extracts `FRAME/ROLE` from statements. New event types, such as "take out", "open", or "close", should start here as statement parsers.
+`cognitive/statement_learning.py` owns the default learned statement path. It compiles `data/statement_examples.jsonl` into `data/statement_model.json`; at runtime it loads that model artifact and instantiates `FRAME/ROLE` structures through entity slots. Later this can be replaced with a classifier, generator, or online learning model.
 
 `cognitive/state_engine.py` projects historical events into the current world state. If a new event changes the world, add a state projector or state reducer here.
 
-`cognitive/query_parser.py` abstracts user questions into `QUERY`. A new phrasing should not answer directly; it should first normalize into a structure such as `location(芯片)` or `actor_for_event(...)`.
+`cognitive/query_learning.py` owns the default learned Query path. It compiles `data/query_examples.jsonl` into `data/query_model.json`; at runtime it loads abstract question patterns and `QUERY` templates from that artifact. Later this can be replaced with a classifier, generator, or online learning model.
 
 `cognitive/inference.py` owns rule inference and answer generation. New reasoning behavior usually adds both a `rule_inferer` and an `answerer`.
 
@@ -199,9 +332,9 @@ When a new failing example appears, first identify the failing layer:
 
 - Punctuation, tails, or conversational question fragments are not preserved: edit `cognitive/text_processing.py`.
 - Particles, synonym actions, or slot boundaries are polluted: edit `cognitive/normalization.py`.
-- A new event is not extracted, such as "take out", "open", or "close": edit `cognitive/frame_parser.py`.
+- A statement expression does not map to an existing `FRAME/ROLE`: add examples to `data/statement_examples.jsonl`, then run `struct-compile-statement` and `struct-eval-statement --statement-model data/statement_model.json`.
 - A new event changes the current world, such as taking something out of a container: edit `cognitive/state_engine.py`.
-- The user changed the wording but the meaning is the same: edit `cognitive/query_parser.py`.
+- The user changed the wording but the meaning is the same: add examples to `data/query_examples.jsonl`, then run `struct-compile-query` and `struct-eval-query --query-model data/query_model.json`.
 - `QUERY` and `FRAME/STATE` already exist, but no rule is inferred: edit the rule inferers in `cognitive/inference.py`.
 - A rule is inferred, but the final answer wording is wrong: edit the answerers in `cognitive/inference.py`.
 

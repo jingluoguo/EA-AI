@@ -13,7 +13,7 @@
 
 ## 设计思想
 
-这个项目要验证的是“结构智能”，不是用大段正则去穷举自然语言问法。每次新增能力时，都遵循这条链：
+这个项目要验证的是“结构智能”，不保留问法表、正则 parser 或字符串 fallback。后续演进以训练数据和可替换学习能力为中心，每次新增能力都遵循这条链：
 
 ```text
 观察现象 -> 剥离次要因素 -> 构建理想模型 -> 数学表达 -> 实验验证
@@ -22,10 +22,11 @@
 它对应到代码里的含义是：
 
 - 观察现象：先看失败输入、当前结构输出、期望答案，判断问题发生在切句、归一化、陈述解析、Query 解析、状态更新、规则推导还是答案生成。
+- 训练优先：先把失败样例写成数据，补齐 observation、context、world_state、belief_state、期望结构或答案，再跑评估；只有数据证明结构标签或模型槽位不足时，才改代码。
 - 剥离次要因素：把“放进/放到/放入”、“盒子里/盒子里面”、主动句、被动句、语气词、寒暄话术等先归一化，不让它们污染实体槽位。
 - 构建理想模型：把自然语言变成 `ENTITY`、`FRAME/ROLE`、`STATE`、`QUERY` 这些中间结构。
 - 数学表达：推理只依赖 frame 角色匹配、当前状态查询、关系闭包、状态覆盖等可计算规则。
-- 实验验证：新增能力必须配测试，证明不同表层表达会落到同一个结构模型。
+- 实验验证：新增能力必须配测试，证明不同表层表达会落到同一个结构模型；训练相关改动还要测试数据 loader、反馈写入和 schema 校验。
 
 ### 核心结构
 
@@ -47,9 +48,9 @@
 原始文本
   -> text_processing.split_sentences
   -> normalization 表层剥离和槽位归一
-  -> frame_parser 陈述句抽取 Entity + FRAME/ROLE
+  -> statement_learning 加载 statement_model.json，实例化 Entity + FRAME/ROLE
   -> state_engine FRAME 投影为当前 STATE
-  -> query_parser 查询候选抽象为 QUERY
+  -> query_learning 加载 query_model.json，把查询候选抽象为 QUERY
   -> intent_analyzers 从完整结构和训练样本推断 INTENT
   -> inference 根据 QUERY + FRAME/STATE 推导 RULE 和答案
   -> reasoner 编排并返回 Prediction
@@ -59,24 +60,117 @@
 
 ### 能力组合
 
-为了避免 `reasoner.py` 重新膨胀成大 if/regex 文件，当前认知内核用 `CognitiveCapabilities` 组合能力：
+当前认知内核用 `CognitiveCapabilities` 组合学习、状态、推理和答案能力：
 
 ```python
-capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
+capabilities = default_capabilities()
 prediction = predict(text, capabilities)
 ```
 
 可插拔能力分成七类：
 
-- `statement_parsers`：陈述解析能力，输入句子，输出 `Entity + Frame`。
+- `statement_parsers`：陈述学习能力，输入句子，输出 `Entity + Frame`。
 - `state_projectors`：状态投影能力，输入 `Frame`，输出 `State`。
 - `state_reducers`：状态覆盖能力，决定新状态如何更新当前世界。
-- `query_parsers`：问题抽象能力，输入归一后的候选问题，输出 `Query`。
+- `query_parsers`：Query 学习能力，输入候选问题，输出 `Query`。
 - `rule_inferers`：规则推导能力，输入完整 `Structure`，输出命中的规则名。
 - `answerers`：答案生成能力，输入带规则的 `Structure`，输出自然语言答案。
 - `intent_analyzers`：可学习意图分析能力，输入原文和完整 `Structure`，输出 `Intention` 假设。
 
-新增能力时，先判断它属于哪一层，再在对应模块新增小函数并注册到默认能力列表。只有当外部调用想临时扩展某种表达时，才通过 `.with_query_parsers(...)` 这类方法注入。
+新增能力时，先补对应 JSONL 数据集和评估样本，再替换相应学习能力；不通过新增问法函数扩展。
+
+### 训练优先工作流
+
+遇到新失败样例时，推荐顺序是：
+
+1. 记录样例：保存原始 observation、上下文、当前结构输出、期望 `INTENT/QUERY/STATE` 或答案。
+2. 写入数据集：用 JSONL 沉淀成训练/反馈样本，而不是先扩展问法匹配。
+3. 评估当前学习能力，定位缺的是标签、结构槽位还是模型能力。
+4. 训练或替换能力：优先更新数据集或对应 analyzer/learner/projector/inferer。
+5. 回归验证：补 loader、schema、评估和端到端测试，确认能力来自数据闭环，而不是单句特殊分支。
+
+### Query 训练与编译
+
+Query 的流程很简单：
+
+1. 把样本写进 `data/query_examples.jsonl`。
+2. 运行编译命令，生成 `data/query_model.json`。
+3. `struct-ask` 默认读这个模型文件，不直接扫训练集。
+
+```json
+{"question":"芯片在哪里","entities":[{"role":"item","name":"芯片"}],"query":{"intent":"location","target":"$item#1","qualifiers":[]},"source":"training","split":"train"}
+```
+
+样本里的 `$item#1`、`$container#1`、`$place#1` 是结构槽位，不是正则。编译时会把多条样本压成一个可加载的 `QUERY` 模型产物。
+
+```bash
+uv run struct-compile-query \
+  --query-data data/query_examples.jsonl \
+  --output data/query_model.json
+```
+
+需要检查效果时，跑这条：
+
+```bash
+uv run struct-eval-query \
+  --query-data data/query_examples.jsonl \
+  --query-model data/query_model.json
+```
+
+`struct-ask` 默认使用 `data/query_model.json`。调试时可以显式指定模型：
+
+```bash
+uv run struct-ask \
+  --query-model data/query_model.json \
+  "研究员把芯片放进托盘。托盘被带到实验室。芯片在哪里？"
+```
+
+一句话：先喂样本，再编译成模型，运行时只加载模型。
+
+### 陈述训练与编译
+
+陈述句也是同样的三步：
+
+1. 把样本写进 `data/statement_examples.jsonl`。
+2. 运行编译命令，生成 `data/statement_model.json`。
+3. `struct-ask` 默认读这个模型文件，不直接扫训练集。
+
+```json
+{"sentence":"小张认为芯片在托盘里","sentence_template":"$person#1认为芯片在托盘里","entities":[{"role":"person","name":"$person#1"}],"frames":[{"frame_type":"believe","roles":{"person":"$person#1","proposition":"芯片在托盘里"}}],"source":"human_feedback","split":"train"}
+```
+
+主动句、被动句、换序和“里面/里边/里头”等表层差异先在 normalization 层归一，再压成同一类 `FRAME/ROLE` 模型。
+
+```bash
+uv run struct-compile-statement \
+  --statement-data data/statement_examples.jsonl \
+  --output data/statement_model.json
+```
+
+需要检查效果时，跑这条：
+
+```bash
+uv run struct-eval-statement \
+  --statement-data data/statement_examples.jsonl \
+  --statement-model data/statement_model.json
+```
+
+`struct-ask` 默认使用 `data/statement_model.json`。调试时也可以显式指定模型：
+
+```bash
+uv run struct-ask \
+  --statement-model data/statement_model.json \
+  "小王把芯片从托盘里面拿出来。芯片在哪里？"
+```
+
+一句话：先喂样本，再编译成模型，运行时只加载模型。
+
+也可以直接用：
+
+```bash
+make model
+make check
+```
 
 ### 喂意图数据
 
@@ -84,6 +178,31 @@ prediction = predict(text, capabilities)
 
 ```json
 {"observation":"妈妈在找眼镜","intention":{"subject":"妈妈","goal":"找到眼镜","belief":"妈妈不知道眼镜在哪里","strategy":"在可能的位置寻找眼镜","evidence":"妈妈在找眼镜","confidence":0.75,"source":"human_feedback"}}
+```
+
+完整 JSONL schema 可以带训练上下文和评估目标：
+
+```json
+{"observation":"孩子伸手去拿杯子","context":["杯子在桌上"],"world_state":["at(杯子,桌上)"],"belief_state":["believes(孩子,visible(杯子))"],"answer":"孩子想拿到杯子。","source":"human_feedback","split":"train","intention":{"subject":"孩子","goal":"拿到杯子","belief":"孩子认为杯子在眼前","strategy":"伸手抓取杯子","evidence":"孩子伸手去拿杯子","confidence":0.85,"source":"human_feedback"}}
+```
+
+也可以直接用 CLI 追加反馈样本：
+
+```bash
+uv run struct-add-intent-example "孩子伸手去拿杯子" \
+  --subject "孩子" \
+  --goal "拿到杯子" \
+  --belief "孩子认为杯子在眼前" \
+  --strategy "伸手抓取杯子" \
+  --context "杯子在桌上" \
+  --world-state "at(杯子,桌上)" \
+  --answer "孩子想拿到杯子。"
+```
+
+追加后可以跑一个最小评估闭环：
+
+```bash
+uv run struct-eval-intent --train-data data/intent_examples.jsonl
 ```
 
 保存为 JSONL 后，可以在代码里注入：
@@ -129,6 +248,10 @@ uv run struct-ask --intent-data data/intent_examples.jsonl "妈妈在找眼镜�
   data/
     train.jsonl        # symbolic/neural 训练数据
     test.jsonl         # 测试数据
+    query_examples.jsonl  # Query 解析训练样本
+    query_model.json      # Query 编译模型，默认运行时加载
+    statement_examples.jsonl  # 陈述解析训练样本
+    statement_model.json      # 陈述编译模型，默认运行时加载
     intent_examples.jsonl # 可选：意图分析训练/反馈样本
     tiny_model.pt      # tiny Transformer 训练产物，如果已训练
 src/struct_llm/
@@ -141,9 +264,11 @@ src/struct_llm/
     kernel.py           # 认知内核唯一流水线，串起现有解析、状态、查询和推理模块
     text_processing.py  # 切句和查询候选保留
     normalization.py    # 语气词、外层话术、槽位边界归一化
-    frame_parser.py     # 陈述句 -> Entity + FRAME/ROLE
     state_engine.py     # FRAME -> 当前 STATE
-    query_parser.py     # 查询候选 -> QUERY
+    statement_learning.py # 编译陈述样本并加载 statement_model.json
+    query_learning.py   # 编译 Query 样本并加载 query_model.json
+    structure_helpers.py # 纯结构构造和实体去重工具
+    intent_dataset.py   # 意图训练/反馈 JSONL schema、校验、追加写入
     intent_learning.py  # 观察样本 -> INTENT，可替换为训练模型
     inference.py        # QUERY + FRAME/STATE -> 规则和答案
   reasoner.py           # 轻量编排层
@@ -168,6 +293,12 @@ tests/
 struct-demo = struct_llm.cli:run_symbolic_demo
 struct-ask = struct_llm.cli:ask_symbolic
 struct-ask-neural = struct_llm.cli:ask_neural
+struct-add-intent-example = struct_llm.cli:add_intent_example
+struct-eval-intent = struct_llm.cli:eval_intent_examples
+struct-eval-query = struct_llm.cli:eval_query_examples
+struct-eval-statement = struct_llm.cli:eval_statement_examples
+struct-compile-query = struct_llm.cli:compile_query_model
+struct-compile-statement = struct_llm.cli:compile_statement_model
 struct-make-dataset = struct_llm.cli:make_dataset
 struct-train-tiny = struct_llm.cli:train_tiny_model
 ```
@@ -176,17 +307,19 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 
 `structure.py` 定义所有中间结构。优先扩展这里的结构模型，而不是把语义塞进字符串。
 
+`cognitive/intent_dataset.py` 负责意图训练/反馈样本的 JSONL schema、校验和追加写入。
+
 `cognitive/intent_learning.py` 负责可学习意图分析。它把行为观察映射到 `Intention(subject, goal, belief, strategy, evidence, confidence)`；默认实现只消费训练/反馈样本，不内置文案规则。
 
 `event_schema.py` 定义事件的角色别名和状态效果。例如 `put_in` 投影为 `in(theme, goal)`，`move` 投影为 `at(theme, goal)`，`open/close` 投影为 `access(theme, result)`，`create/destroy` 投影为 `exists(theme, result)`。事件查询匹配和反事实事件排除也复用这里的角色别名。
 
 `cognitive/normalization.py` 负责剥离表层因素。例如当前会把 `放到/放入/放进` 归一为同一类容器放入动作，并把 `盒子里面/盒子里` 归一为 `盒子`。
 
-`cognitive/frame_parser.py` 负责陈述句到 `FRAME/ROLE` 的抽取。新增事件类型，例如“取出”“打开”“关闭”，应在这里新增 statement parser。
+`cognitive/statement_learning.py` 负责默认陈述学习路径。它把 `data/statement_examples.jsonl` 编译为 `data/statement_model.json`，运行时从模型产物加载结构模板并通过实体槽位实例化 `FRAME/ROLE`；后续可以替换为分类器、生成模型或在线学习模型。
 
 `cognitive/state_engine.py` 负责把历史事件投影成当前世界状态。新增事件如果会改变世界状态，应在这里新增 state projector 或 state reducer。
 
-`cognitive/query_parser.py` 负责把问题抽象成 `QUERY`。新增问法时，不要直接回答；先归一成类似 `location(芯片)` 或 `actor_for_event(...)` 的结构。
+`cognitive/query_learning.py` 负责默认 Query 学习路径。它把 `data/query_examples.jsonl` 编译为 `data/query_model.json`，运行时从模型产物加载抽象问题模式和 `QUERY` 结构模板。后续可以替换为分类器、生成模型或在线学习模型。
 
 `cognitive/inference.py` 负责规则推导和答案生成。新增规则时，通常要成对新增 `rule_inferer` 和 `answerer`。
 
@@ -198,9 +331,9 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 
 - 标点、尾句、寒暄问题没有被保留：改 `cognitive/text_processing.py`。
 - 语气词、同义动作、槽位边界污染：改 `cognitive/normalization.py`。
-- 新事件没有抽出来，例如“取出”“打开”“关闭”：改 `cognitive/frame_parser.py`。
+- 陈述表达没有映射到已有 `FRAME/ROLE`：先追加 `data/statement_examples.jsonl`，再跑 `struct-compile-statement` 和 `struct-eval-statement --statement-model data/statement_model.json`。
 - 新事件会改变当前世界，例如取出后不再在容器里：改 `cognitive/state_engine.py`。
-- 用户换了问法但语义相同：改 `cognitive/query_parser.py`。
+- 用户换了问法但语义相同：先追加 `data/query_examples.jsonl`，再跑 `struct-compile-query` 和 `struct-eval-query --query-model data/query_model.json`。
 - 已经有 `QUERY` 和 `FRAME/STATE`，但没有命中规则：改 `cognitive/inference.py` 的 rule inferer。
 - 已经命中规则，但答案表达不对：改 `cognitive/inference.py` 的 answerer。
 

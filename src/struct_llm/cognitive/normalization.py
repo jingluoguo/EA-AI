@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from ..structure import Entity
 
 
@@ -43,9 +41,16 @@ QUESTION_FILLERS = (
 CONTAINMENT_VERBS = ("放到", "放入", "放进")
 TAKE_OUT_VERBS = ("取出来", "拿出来", "取出", "拿出", "取走", "拿走")
 CONTAINER_SUFFIXES = ("里面", "里边", "里头", "内部", "里", "内", "中")
+CONTAINER_SURFACE_SUFFIXES = ("里面", "里边", "里头", "内部")
 DEMONSTRATIVE_PREFIXES = ("这个", "这件", "那个", "那件")
-QUESTION_NOISE_RE = re.compile(
-    r"^(?:你|您)?(?:知道|了解|明白)(?:吗|嘛)?(?:的话)?$|^(?:请问|告诉我|帮我看看|给我说一下|想知道|想了解|想问)$"
+QUESTION_NOISE_PHRASES = (
+    "请问",
+    "告诉我",
+    "帮我看看",
+    "给我说一下",
+    "想知道",
+    "想了解",
+    "想问",
 )
 CHAT_EXPRESSION_HINTS = (
     "你好",
@@ -127,6 +132,13 @@ def normalize_container_slot(value: str) -> str:
     return normalized
 
 
+def normalize_container_surface(sentence: str) -> str:
+    normalized = sentence
+    for suffix in CONTAINER_SURFACE_SUFFIXES:
+        normalized = normalized.replace(suffix, "里")
+    return normalized
+
+
 def normalize_entity_slot(value: str, entities: tuple[Entity, ...]) -> str:
     normalized = normalize_slot_value(value)
     matches = [entity.name for entity in entities if entity.name in normalized]
@@ -155,7 +167,44 @@ def is_question_noise(sentence: str) -> bool:
         return True
     if any(hint in normalized for hint in CHAT_EXPRESSION_HINTS):
         return False
-    if QUESTION_NOISE_RE.match(normalized):
+    if normalized in QUESTION_NOISE_PHRASES or normalized in {
+        "知道",
+        "知道吗",
+        "知道嘛",
+        "知道的话",
+        "了解",
+        "了解吗",
+        "了解嘛",
+        "了解的话",
+        "明白",
+        "明白吗",
+        "明白嘛",
+        "明白的话",
+        "你知道",
+        "你知道吗",
+        "你知道嘛",
+        "你知道的话",
+        "你了解",
+        "你了解吗",
+        "你了解嘛",
+        "你了解的话",
+        "你明白",
+        "你明白吗",
+        "你明白嘛",
+        "你明白的话",
+        "您知道",
+        "您知道吗",
+        "您知道嘛",
+        "您知道的话",
+        "您了解",
+        "您了解吗",
+        "您了解嘛",
+        "您了解的话",
+        "您明白",
+        "您明白吗",
+        "您明白嘛",
+        "您明白的话",
+    }:
         return True
     if len(normalized) <= 3 and not any(
         word in normalized for word in ("谁", "什么", "哪里", "哪儿", "哪", "有", "在", "是", "几", "多", "最", "前", "后")

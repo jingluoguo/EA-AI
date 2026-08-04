@@ -1,2 +1,2 @@
-{"observation":"妈妈在找眼镜","intention":{"subject":"妈妈","goal":"找到眼镜","belief":"妈妈不知道眼镜在哪里","strategy":"在可能的位置寻找眼镜","evidence":"妈妈在找眼镜","confidence":0.75,"source":"human_feedback"}}
-{"observation":"小郭把芯片放进托盘","intention":{"subject":"小郭","goal":"让芯片进入托盘","belief":"芯片还不在托盘里","strategy":"把芯片放进托盘","evidence":"小郭把芯片放进托盘","confidence":0.8,"source":"human_feedback"}}
+{"observation":"妈妈在找眼镜","context":["眼镜可能在家里的某个位置"],"belief_state":["unknown_location(妈妈,眼镜)"],"answer":"妈妈想找到眼镜。","source":"human_feedback","split":"train","intention":{"subject":"妈妈","goal":"找到眼镜","belief":"妈妈不知道眼镜在哪里","strategy":"在可能的位置寻找眼镜","evidence":"妈妈在找眼镜","confidence":0.75,"source":"human_feedback"}}
+{"observation":"小郭把芯片放进托盘","world_state":["not_in(芯片,托盘)"],"answer":"小郭想让芯片进入托盘。","source":"human_feedback","split":"train","intention":{"subject":"小郭","goal":"让芯片进入托盘","belief":"芯片还不在托盘里","strategy":"把芯片放进托盘","evidence":"小郭把芯片放进托盘","confidence":0.8,"source":"human_feedback"}}

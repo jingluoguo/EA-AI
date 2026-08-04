@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cognitive import CognitiveCapabilities
-from .cognitive.frame_parser import DEFAULT_STATEMENT_PARSERS
 from .cognitive.inference import DEFAULT_ANSWERERS, DEFAULT_RULE_INFERERS
 from .cognitive.kernel import parse_text_with_capabilities
 from .errors import ParseError
 from .modules import ModuleContext, default_module_registry
-from .cognitive.query_parser import DEFAULT_QUERY_PARSERS
+from .cognitive.query_learning import default_learned_query_parser
+from .cognitive.statement_learning import default_learned_statement_parser
 from .cognitive.state_engine import (
     DEFAULT_STATE_PROJECTORS,
     DEFAULT_STATE_REDUCERS,
@@ -24,10 +24,10 @@ class Prediction:
 
 def default_capabilities() -> CognitiveCapabilities:
     return CognitiveCapabilities(
-        statement_parsers=DEFAULT_STATEMENT_PARSERS,
+        statement_parsers=(default_learned_statement_parser(),),
         state_projectors=DEFAULT_STATE_PROJECTORS,
         state_reducers=DEFAULT_STATE_REDUCERS,
-        query_parsers=DEFAULT_QUERY_PARSERS,
+        query_parsers=(default_learned_query_parser(),),
         rule_inferers=DEFAULT_RULE_INFERERS,
         answerers=DEFAULT_ANSWERERS,
     )

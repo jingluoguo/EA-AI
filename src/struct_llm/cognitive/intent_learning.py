@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ..structure import Intention, Structure
+from .intent_dataset import intent_record_from_dict, load_intent_jsonl
 from .normalization import normalize_question
 
 
@@ -13,6 +13,16 @@ from .normalization import normalize_question
 class IntentTrainingExample:
     observation: str
     intention: Intention
+
+
+@dataclass(frozen=True)
+class IntentEvaluationResult:
+    total: int
+    matched: int
+
+    @property
+    def accuracy(self) -> float:
+        return self.matched / self.total if self.total else 0.0
 
 
 @dataclass(frozen=True)
@@ -64,53 +74,29 @@ def intention_with_source(intention: Intention, score: float) -> Intention:
 
 
 def from_jsonl(path: str | Path) -> tuple[IntentTrainingExample, ...]:
-    records: list[dict[str, Any]] = []
-    with Path(path).open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"Invalid intent JSONL at line {line_number}: {error}") from error
-            if not isinstance(record, dict):
-                raise ValueError(f"Invalid intent JSONL at line {line_number}: expected object")
-            records.append(record)
-    return tuple(example_from_record(record) for record in records)
+    return tuple(IntentTrainingExample(record.observation, record.intention) for record in load_intent_jsonl(path))
 
 
 def example_from_record(record: dict[str, Any]) -> IntentTrainingExample:
-    observation = str(record.get("observation") or record.get("text") or "").strip()
-    if not observation:
-        raise ValueError("Intent example requires an observation or text field.")
+    dataset_record = intent_record_from_dict(record)
+    return IntentTrainingExample(dataset_record.observation, dataset_record.intention)
 
-    raw_intention = record.get("intention", record)
-    if not isinstance(raw_intention, dict):
-        raise ValueError("Intent example intention field must be an object.")
 
-    subject = str(raw_intention.get("subject") or "").strip()
-    goal = str(raw_intention.get("goal") or "").strip()
-    if not subject or not goal:
-        raise ValueError("Intent example requires intention.subject and intention.goal.")
+def evaluate_intent_analyzer(
+    analyzer: InMemoryIntentAnalyzer,
+    examples: tuple[IntentTrainingExample, ...],
+) -> IntentEvaluationResult:
+    matched = 0
+    empty_structure = Structure(entities=(), rules=())
+    for example in examples:
+        predictions = analyzer(example.observation, empty_structure)
+        if any(intent_matches(prediction, example.intention) for prediction in predictions):
+            matched += 1
+    return IntentEvaluationResult(total=len(examples), matched=matched)
 
-    confidence = raw_intention.get("confidence", 1.0)
-    try:
-        parsed_confidence = float(confidence)
-    except (TypeError, ValueError) as error:
-        raise ValueError("Intent example confidence must be numeric.") from error
 
-    return IntentTrainingExample(
-        observation=observation,
-        intention=Intention(
-            subject=subject,
-            goal=goal,
-            belief=str(raw_intention.get("belief") or "").strip(),
-            strategy=str(raw_intention.get("strategy") or "").strip(),
-            evidence=str(raw_intention.get("evidence") or observation).strip(),
-            confidence=parsed_confidence,
-            source=str(raw_intention.get("source") or record.get("source") or "jsonl").strip(),
-        ),
-    )
+def intent_matches(predicted: Intention, expected: Intention) -> bool:
+    return predicted.subject == expected.subject and predicted.goal == expected.goal
 
 
 def observation_score(example: str, text: str) -> float:

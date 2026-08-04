@@ -73,9 +73,9 @@ class CognitiveCapabilities:
                 return answer
         return None
 
-    def with_statement_parsers(self, *parsers: StatementParser) -> CognitiveCapabilities:
+    def replace_statement_parsers(self, *parsers: StatementParser) -> CognitiveCapabilities:
         return CognitiveCapabilities(
-            statement_parsers=(*self.statement_parsers, *parsers),
+            statement_parsers=parsers,
             state_projectors=self.state_projectors,
             state_reducers=self.state_reducers,
             query_parsers=self.query_parsers,
@@ -106,12 +106,12 @@ class CognitiveCapabilities:
             intent_analyzers=self.intent_analyzers,
         )
 
-    def with_query_parsers(self, *parsers: QueryParser) -> CognitiveCapabilities:
+    def replace_query_parsers(self, *parsers: QueryParser) -> CognitiveCapabilities:
         return CognitiveCapabilities(
             statement_parsers=self.statement_parsers,
             state_projectors=self.state_projectors,
             state_reducers=self.state_reducers,
-            query_parsers=(*self.query_parsers, *parsers),
+            query_parsers=parsers,
             rule_inferers=self.rule_inferers,
             answerers=self.answerers,
             intent_analyzers=self.intent_analyzers,

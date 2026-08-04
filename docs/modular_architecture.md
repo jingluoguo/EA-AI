@@ -13,9 +13,9 @@
 ```text
 text_processing
   -> normalization
-  -> frame_parser
+  -> statement_learning 加载 statement_model.json
   -> state_engine
-  -> query_parser
+  -> query_learning 加载 query_model.json
   -> inference
   -> reasoner
 ```
@@ -59,9 +59,10 @@ src/struct_llm/cognitive/
   kernel.py            # 唯一认知内核流水线，调用现有解析、状态、查询、推理模块
   text_processing.py   # 切句和查询候选保留
   normalization.py     # 表层剥离和槽位归一化
-  frame_parser.py      # 陈述句 -> Entity + FRAME/ROLE
+  statement_learning.py # 编译陈述样本并加载 statement_model.json
   state_engine.py      # FRAME -> 当前 STATE
-  query_parser.py      # 查询候选 -> QUERY
+  query_learning.py    # 编译 Query 样本并加载 query_model.json
+  structure_helpers.py # 纯结构构造和实体去重工具
   inference.py         # QUERY + FRAME/STATE -> 规则和答案
 ```
 
@@ -70,7 +71,7 @@ src/struct_llm/cognitive/
 - `CognitiveCapabilities`：一句话怎么解析成 `FRAME/STATE/QUERY`，以及怎么推理出答案。
 - `ModuleRegistry`：一次 agent 运行有哪些外围系统参与，例如记忆、规划、对齐、学习。
 
-现有的 `text_processing.py`、`normalization.py`、`frame_parser.py`、`state_engine.py`、`query_parser.py`、`inference.py` 已经移动到 `struct_llm/cognitive/` 并通过 `cognitive/kernel.py` 融入认知内核。`modules/cognitive.py` 只是把认知内核挂载到外层 `ModuleRegistry`，不能另起一套 query/parser 规则。
+现有的 `text_processing.py`、`normalization.py`、`statement_learning.py`、`state_engine.py`、`query_learning.py`、`inference.py` 已经通过 `cognitive/kernel.py` 融入认知内核。运行时默认加载 `data/statement_model.json` 和 `data/query_model.json` 这些编译后的能力产物，不把 JSONL 训练集当作运行时主索引，也不保留独立的问法 parser 或正则规则集合。`modules/cognitive.py` 只是把认知内核挂载到外层 `ModuleRegistry`，不能另起一套 query/parser 规则。
 
 ## 接口方向
 

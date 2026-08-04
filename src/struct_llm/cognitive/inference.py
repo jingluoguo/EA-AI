@@ -1181,21 +1181,6 @@ def belief_states(structure: Structure, person: str) -> list[State]:
 
 
 def states_from_proposition(structure: Structure, proposition: str) -> tuple[State, ...]:
-    from .frame_parser import parse_effect_clause
-
-    parsed = parse_effect_clause(proposition)
-    if parsed is None:
-        return fallback_states_from_proposition(structure, proposition)
-
-    states: list[State] = []
-    _, frames = parsed
-    for frame in frames:
-        for state in states_from_frame(frame):
-            apply_state(states, state)
-    return tuple(states)
-
-
-def fallback_states_from_proposition(structure: Structure, proposition: str) -> tuple[State, ...]:
     normalized = proposition.strip().rstrip("。！？!?")
     if normalized.endswith("不存在"):
         return (State("exists", normalized.removesuffix("不存在"), "不存在"),)
@@ -1209,7 +1194,22 @@ def fallback_states_from_proposition(structure: Structure, proposition: str) -> 
     right = right.strip().rstrip("。！？!?")
     if not left or not right:
         return ()
+
+    if "的" in right:
+        place, container = right.split("的", 1)
+        container = container.removesuffix("里面").removesuffix("里边").removesuffix("里头")
+        container = container.removesuffix("内部").removesuffix("里").removesuffix("内").removesuffix("中")
+        if place and container:
+            return (
+                State("at", container, place),
+                State("in", left, container),
+            )
+
     place_names = {entity.name for entity in structure.entities if entity.role == "place"}
+    for suffix in ("里面", "里边", "里头", "内部", "里", "内", "中"):
+        if right.endswith(suffix) and len(right) > len(suffix):
+            right = right[: -len(suffix)]
+            return (State("in", left, right),)
     state_name = "at" if right in place_names else "in"
     return (State(state_name, left, right),)
 
