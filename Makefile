@@ -24,7 +24,7 @@ data:
 	uv run struct-make-dataset
 
 test:
-	uv run python -m unittest discover
+	uv run python -m unittest discover -q
 
 train:
 	uv run --extra neural struct-train-tiny

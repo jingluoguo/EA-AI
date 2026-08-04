@@ -1,6 +1,6 @@
-from __future__ import annotations
+"""Cognitive kernel registration and orchestration."""
 
-from .cognitive.capabilities import (
+from .capabilities import (
     Answerer,
     CognitiveCapabilities,
     QueryParser,

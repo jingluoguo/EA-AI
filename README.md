@@ -57,7 +57,7 @@
 
 ### 能力组合
 
-为了避免 `reasoner.py` 重新膨胀成大 if/regex 文件，当前 pipeline 用 `StructuralCapabilities` 组合能力：
+为了避免 `reasoner.py` 重新膨胀成大 if/regex 文件，当前认知内核用 `CognitiveCapabilities` 组合能力。`StructuralCapabilities` 仍作为兼容旧调用的别名保留：
 
 ```python
 capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
@@ -75,6 +75,14 @@ prediction = predict(text, capabilities)
 
 新增能力时，先判断它属于哪一层，再在对应模块新增小函数并注册到默认能力列表。只有当外部调用想临时扩展某种表达时，才通过 `.with_query_parsers(...)` 这类方法注入。
 
+### 模块化扩展原则
+
+模块先有边界，再有能力；先能插拔，再谈增强。
+
+在这个项目里，`CognitiveCapabilities` 承担内部结构推理内核。规划、具身、情感、自我认知、持续学习先都可以是空实现的可替换槽位，后续再逐步长出具体算法，而不要把这些逻辑直接堆进 `reasoner.py`。
+
+更完整的代码路线图见 [docs/modular_architecture.md](docs/modular_architecture.md)。
+
 ## 项目结构与文件配置
 
 ```text
@@ -85,6 +93,8 @@ prediction = predict(text, capabilities)
   pyproject.toml       # Python 包元数据、依赖、CLI entry points
   uv.toml              # uv 配置
   uv.lock              # uv 锁文件
+  docs/
+    modular_architecture.md  # 可插拔模块架构和落代码路线图
   data/
     train.jsonl        # symbolic/neural 训练数据
     test.jsonl         # 测试数据
@@ -94,14 +104,24 @@ src/struct_llm/
   structure.py          # 结构表示：实体、关系、事件、规则、线性化格式
   event_schema.py       # 事件 schema：角色别名、状态效果、事件查询匹配
   dataset.py            # 数据生成：训练/测试组合泛化切分
-  text_processing.py    # 切句和查询候选保留
-  normalization.py      # 语气词、外层话术、槽位边界归一化
-  capabilities.py       # 可插拔能力接口：parser/projector/inferer/answerer
-  frame_parser.py       # 陈述句 -> Entity + FRAME/ROLE
-  state_engine.py       # FRAME -> 当前 STATE
-  query_parser.py       # 查询候选 -> QUERY
-  inference.py          # QUERY + FRAME/STATE -> 规则和答案
+  cognitive/
+    capabilities.py     # 认知内核可插拔能力注册：陈述、状态、查询、规则、答案
+    kernel.py           # 认知内核唯一流水线，串起现有解析、状态、查询和推理模块
+    text_processing.py  # 切句和查询候选保留
+    normalization.py    # 语气词、外层话术、槽位边界归一化
+    frame_parser.py     # 陈述句 -> Entity + FRAME/ROLE
+    state_engine.py     # FRAME -> 当前 STATE
+    query_parser.py     # 查询候选 -> QUERY
+    inference.py        # QUERY + FRAME/STATE -> 规则和答案
+  capabilities.py       # 兼容导出，实际能力注册在 cognitive/capabilities.py
+  text_processing.py    # 兼容导出，实际实现位于 cognitive/
+  normalization.py      # 兼容导出，实际实现位于 cognitive/
+  frame_parser.py       # 兼容导出，实际实现位于 cognitive/
+  state_engine.py       # 兼容导出，实际实现位于 cognitive/
+  query_parser.py       # 兼容导出，实际实现位于 cognitive/
+  inference.py          # 兼容导出，实际实现位于 cognitive/
   reasoner.py           # 轻量编排层
+  modules/              # 外层可插拔模块；cognitive 模块挂载认知内核，不另起第二套解析系统
   vocab.py              # 神经模型用的字符级词表
   model.py              # PyTorch tiny Transformer，可选依赖
 scripts/
@@ -132,15 +152,15 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 
 `event_schema.py` 定义事件的角色别名和状态效果。例如 `put_in` 投影为 `in(theme, goal)`，`move` 投影为 `at(theme, goal)`，`open/close` 投影为 `access(theme, result)`，`create/destroy` 投影为 `exists(theme, result)`。事件查询匹配和反事实事件排除也复用这里的角色别名。
 
-`normalization.py` 负责剥离表层因素。例如当前会把 `放到/放入/放进` 归一为同一类容器放入动作，并把 `盒子里面/盒子里` 归一为 `盒子`。
+`cognitive/normalization.py` 负责剥离表层因素。例如当前会把 `放到/放入/放进` 归一为同一类容器放入动作，并把 `盒子里面/盒子里` 归一为 `盒子`。
 
-`frame_parser.py` 负责陈述句到 `FRAME/ROLE` 的抽取。新增事件类型，例如“取出”“打开”“关闭”，应在这里新增 statement parser。
+`cognitive/frame_parser.py` 负责陈述句到 `FRAME/ROLE` 的抽取。新增事件类型，例如“取出”“打开”“关闭”，应在这里新增 statement parser。
 
-`state_engine.py` 负责把历史事件投影成当前世界状态。新增事件如果会改变世界状态，应在这里新增 state projector 或 state reducer。
+`cognitive/state_engine.py` 负责把历史事件投影成当前世界状态。新增事件如果会改变世界状态，应在这里新增 state projector 或 state reducer。
 
-`query_parser.py` 负责把问题抽象成 `QUERY`。新增问法时，不要直接回答；先归一成类似 `location(芯片)` 或 `actor_for_event(...)` 的结构。
+`cognitive/query_parser.py` 负责把问题抽象成 `QUERY`。新增问法时，不要直接回答；先归一成类似 `location(芯片)` 或 `actor_for_event(...)` 的结构。
 
-`inference.py` 负责规则推导和答案生成。新增规则时，通常要成对新增 `rule_inferer` 和 `answerer`。
+`cognitive/inference.py` 负责规则推导和答案生成。新增规则时，通常要成对新增 `rule_inferer` 和 `answerer`。
 
 `reasoner.py` 只做编排：切句、调用能力、组装结构、返回答案。业务规则不应该写回这个文件。
 
@@ -148,13 +168,13 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 
 遇到新失败样例时，先判断它属于哪个层级：
 
-- 标点、尾句、寒暄问题没有被保留：改 `text_processing.py`。
-- 语气词、同义动作、槽位边界污染：改 `normalization.py`。
-- 新事件没有抽出来，例如“取出”“打开”“关闭”：改 `frame_parser.py`。
-- 新事件会改变当前世界，例如取出后不再在容器里：改 `state_engine.py`。
-- 用户换了问法但语义相同：改 `query_parser.py`。
-- 已经有 `QUERY` 和 `FRAME/STATE`，但没有命中规则：改 `inference.py` 的 rule inferer。
-- 已经命中规则，但答案表达不对：改 `inference.py` 的 answerer。
+- 标点、尾句、寒暄问题没有被保留：改 `cognitive/text_processing.py`。
+- 语气词、同义动作、槽位边界污染：改 `cognitive/normalization.py`。
+- 新事件没有抽出来，例如“取出”“打开”“关闭”：改 `cognitive/frame_parser.py`。
+- 新事件会改变当前世界，例如取出后不再在容器里：改 `cognitive/state_engine.py`。
+- 用户换了问法但语义相同：改 `cognitive/query_parser.py`。
+- 已经有 `QUERY` 和 `FRAME/STATE`，但没有命中规则：改 `cognitive/inference.py` 的 rule inferer。
+- 已经命中规则，但答案表达不对：改 `cognitive/inference.py` 的 answerer。
 
 每次修改都要在 `tests/test_reasoner.py` 加端到端测试。对于表层差异，测试重点不是“某句能答”，而是多个不同表述能落到同一个 `FRAME/ROLE/STATE/QUERY`。
 

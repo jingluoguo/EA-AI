@@ -4,13 +4,71 @@ import unittest
 
 from struct_llm.errors import ParseError
 from struct_llm.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, states_for_frame_schema
-from struct_llm.frame_parser import frame_from_roles, with_time
-from struct_llm.normalization import normalize_entity_slot
-from struct_llm.reasoner import default_capabilities, predict
+from struct_llm.cognitive import CognitiveCapabilities
+from struct_llm.cognitive.frame_parser import frame_from_roles, with_time
+from struct_llm.cognitive.normalization import normalize_entity_slot
+from struct_llm.capabilities import StructuralCapabilities
+from struct_llm.modules import ModuleContext, default_module_registry
+from struct_llm.modules.cognitive import CognitiveKernelModule
+from struct_llm.reasoner import default_capabilities, parse_text, predict as _predict
 from struct_llm.structure import Entity, Query
 
 
+def predict(text: str, capabilities: CognitiveCapabilities | None = None):
+    try:
+        prediction = _predict(text, capabilities)
+    except Exception as error:
+        print(f"{text} -> ERROR: {error}", flush=True)
+        raise
+    print(f"{text} -> {prediction.answer}", flush=True)
+    return prediction
+
+
 class ReasonerTest(unittest.TestCase):
+    def test_default_capabilities_are_registered_as_cognitive_kernel(self) -> None:
+        capabilities = default_capabilities()
+
+        self.assertIsInstance(capabilities, CognitiveCapabilities)
+        self.assertIs(StructuralCapabilities, CognitiveCapabilities)
+
+    def test_default_module_registry_exposes_outer_system_slots(self) -> None:
+        registry = default_module_registry(default_capabilities())
+
+        self.assertEqual(
+            registry.module_names(),
+            (
+                "alignment",
+                "memory",
+                "knowledge",
+                "cognitive_kernel",
+                "generation",
+                "planning",
+                "embodiment",
+                "emotion",
+                "self_model",
+                "learning",
+            ),
+        )
+
+    def test_noop_outer_modules_preserve_cognitive_kernel_result(self) -> None:
+        text = "研究员把芯片放进托盘。托盘被带到实验室。芯片在哪里？"
+        capabilities = default_capabilities()
+
+        parsed = parse_text(text, capabilities)
+        direct = CognitiveKernelModule(capabilities).run(ModuleContext(text=text))
+        modular = default_module_registry(capabilities).run(ModuleContext(text=text))
+
+        self.assertEqual(modular.notes, ())
+        direct_structure = direct.context.structure
+        modular_structure = modular.context.structure
+        self.assertIsNotNone(direct_structure)
+        self.assertIsNotNone(modular_structure)
+        assert direct_structure is not None
+        assert modular_structure is not None
+        self.assertEqual(parsed.linearize(), direct_structure.linearize())
+        self.assertEqual(direct_structure.linearize(), modular_structure.linearize())
+        self.assertEqual(direct.context.answer, modular.context.answer)
+
     def test_event_schema_projects_registered_state_effects(self) -> None:
         examples = (
             (frame_from_roles("put_in", actor="小郭", theme="芯片", goal="托盘"), "in", "芯片", "托盘"),

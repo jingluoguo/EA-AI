@@ -189,8 +189,9 @@ class Structure:
         lines.extend(event.linearize() for event in events)
         lines.extend(frame.linearize() for frame in frames)
         lines.extend(f"RULE {rule}" for rule in self.rules)
-        if self.query is not None:
-            lines.append(self.query.linearize())
+        query = self.query
+        if query is not None:
+            lines.append(query.linearize())
         return "\n".join(lines)
 
 

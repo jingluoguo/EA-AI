@@ -2,20 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .capabilities import StructuralCapabilities
+from .cognitive import CognitiveCapabilities
+from .cognitive.frame_parser import DEFAULT_STATEMENT_PARSERS
+from .cognitive.inference import DEFAULT_ANSWERERS, DEFAULT_RULE_INFERERS
+from .cognitive.kernel import parse_text_with_capabilities
 from .errors import ParseError
-from .frame_parser import DEFAULT_STATEMENT_PARSERS, dedupe_entities, with_time
-from .inference import DEFAULT_ANSWERERS, DEFAULT_RULE_INFERERS, answer_from_structure, expand_conditionals
-from .query_parser import DEFAULT_QUERY_PARSERS, parse_query_candidates
-from .reference_resolution import resolve_references
-from .state_engine import (
+from .modules import ModuleContext, default_module_registry
+from .cognitive.query_parser import DEFAULT_QUERY_PARSERS
+from .cognitive.state_engine import (
     DEFAULT_STATE_PROJECTORS,
     DEFAULT_STATE_REDUCERS,
-    materialize_events,
-    materialize_relations,
 )
-from .structure import Entity, Frame, State, Structure
-from .text_processing import split_sentences
+from .structure import Structure
 
 
 @dataclass(frozen=True)
@@ -24,8 +22,8 @@ class Prediction:
     answer: str
 
 
-def default_capabilities() -> StructuralCapabilities:
-    return StructuralCapabilities(
+def default_capabilities() -> CognitiveCapabilities:
+    return CognitiveCapabilities(
         statement_parsers=DEFAULT_STATEMENT_PARSERS,
         state_projectors=DEFAULT_STATE_PROJECTORS,
         state_reducers=DEFAULT_STATE_REDUCERS,
@@ -35,64 +33,19 @@ def default_capabilities() -> StructuralCapabilities:
     )
 
 
-def parse_text(text: str, capabilities: StructuralCapabilities | None = None) -> Structure:
+def parse_text(text: str, capabilities: CognitiveCapabilities | None = None) -> Structure:
     active_capabilities = capabilities or default_capabilities()
-    entities: list[Entity] = []
-    frames: list[Frame] = []
-    states: list[State] = []
-    query_candidates: list[str] = []
-    next_time = 1
-
-    for sentence, is_question in split_sentences(text):
-        sentence = resolve_references(sentence, dedupe_entities(entities))
-        if is_question:
-            query_candidates.append(sentence)
-            continue
-
-        extracted = active_capabilities.parse_statement(sentence)
-        if extracted is None:
-            query_candidates.append(sentence)
-            continue
-
-        new_entities, new_frames = extracted
-        entities.extend(new_entities)
-        for frame in new_frames:
-            timed_frame = with_time(frame, next_time)
-            next_time += 1
-            frames.append(timed_frame)
-            for state in active_capabilities.states_from_frame(timed_frame):
-                active_capabilities.apply_state(states, state)
-
-    if not entities and not states and not frames:
-        raise ParseError(f"Cannot extract structure from text: {text}")
-
-    deduped_entities = dedupe_entities(entities)
-    query = parse_query_candidates(query_candidates, deduped_entities, active_capabilities.query_parsers)
-    structure = Structure(
-        entities=deduped_entities,
-        relations=materialize_relations(states),
-        events=materialize_events(frames),
-        rules=(),
-        query=query,
-        frames=tuple(frames),
-        states=tuple(states),
-    )
-    structure = expand_conditionals(structure, active_capabilities)
-    return Structure(
-        entities=structure.entities,
-        relations=structure.relations,
-        events=structure.events,
-        rules=active_capabilities.infer_rules(structure),
-        query=structure.query,
-        frames=structure.frames,
-        states=structure.states,
-    )
+    return parse_text_with_capabilities(text, active_capabilities)
 
 
-def predict(text: str, capabilities: StructuralCapabilities | None = None) -> Prediction:
+def predict(text: str, capabilities: CognitiveCapabilities | None = None) -> Prediction:
     active_capabilities = capabilities or default_capabilities()
-    structure = parse_text(text, active_capabilities)
+    result = default_module_registry(active_capabilities).run(ModuleContext(text=text))
+    structure = result.context.structure
+    answer = result.context.answer
+    if structure is None or answer is None:
+        raise ParseError(f"Module registry did not produce a prediction for text: {text}")
     return Prediction(
         structure=structure,
-        answer=answer_from_structure(structure, active_capabilities.answerers),
+        answer=answer,
     )

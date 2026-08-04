@@ -2,6 +2,8 @@
 
 __all__ = [
     "dataset",
+    "cognitive",
+    "modules",
     "reasoner",
     "structure",
     "world",

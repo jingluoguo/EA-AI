@@ -57,7 +57,7 @@ Order matters. Statements are processed in source order. Later `put_in`, `move`,
 
 ### Capability Composition
 
-To prevent `reasoner.py` from growing back into a large if/regex file, the symbolic pipeline is composed with `StructuralCapabilities`:
+To prevent `reasoner.py` from growing back into a large if/regex file, the cognitive kernel is composed with `CognitiveCapabilities`. `StructuralCapabilities` remains as a compatibility alias for older callers:
 
 ```python
 capabilities = default_capabilities().with_query_parsers(parse_keeper_query)
@@ -75,6 +75,14 @@ There are six pluggable capability types:
 
 When adding a capability, first decide which layer owns it. Then add a small function to the corresponding module and register it in the default capability list. Use `.with_query_parsers(...)` and similar methods only when an external caller wants to inject a temporary extension.
 
+### Modular Extension Principle
+
+Modules should have boundaries before they have power; they should be pluggable before they become stronger.
+
+In this project, `CognitiveCapabilities` is the inner structural-reasoning kernel. Planning, embodiment, emotion, self-modeling, and continual learning should first exist as empty but swappable slots, then grow concrete implementations without pushing that logic into `reasoner.py`.
+
+See [docs/modular_architecture.md](docs/modular_architecture.md) for the rollout plan.
+
 ## Project Structure And Configuration
 
 ```text
@@ -86,6 +94,8 @@ When adding a capability, first decide which layer owns it. Then add a small fun
   pyproject.toml       # Python package metadata, dependencies, and CLI entry points
   uv.toml              # uv configuration
   uv.lock              # uv lockfile
+  docs/
+    modular_architecture.md  # Pluggable module architecture and rollout plan
   data/
     train.jsonl        # symbolic/neural training data
     test.jsonl         # test data
@@ -95,14 +105,24 @@ src/struct_llm/
   structure.py          # Structure types: entity, relation, event, frame, state, query, rule
   event_schema.py       # Event schemas: role aliases, state effects, and event-query matching
   dataset.py            # Dataset generation and compositional train/test split
-  text_processing.py    # Sentence splitting and query candidate retention
-  normalization.py      # Particles, question frames, and slot-boundary normalization
-  capabilities.py       # Pluggable capability interfaces
-  frame_parser.py       # Statement -> Entity + FRAME/ROLE
-  state_engine.py       # FRAME -> current STATE
-  query_parser.py       # query candidates -> QUERY
-  inference.py          # QUERY + FRAME/STATE -> rules and answers
+  cognitive/
+    capabilities.py     # Cognitive kernel capability registry: statements, states, queries, rules, and answers
+    kernel.py           # Single cognitive-kernel pipeline that connects parsing, state, query, and inference modules
+    text_processing.py  # Sentence splitting and query candidate retention
+    normalization.py    # Particles, question frames, and slot-boundary normalization
+    frame_parser.py     # Statement -> Entity + FRAME/ROLE
+    state_engine.py     # FRAME -> current STATE
+    query_parser.py     # query candidates -> QUERY
+    inference.py        # QUERY + FRAME/STATE -> rules and answers
+  capabilities.py       # Compatibility exports; real capability registration lives in cognitive/capabilities.py
+  text_processing.py    # Compatibility exports; real implementation lives in cognitive/
+  normalization.py      # Compatibility exports; real implementation lives in cognitive/
+  frame_parser.py       # Compatibility exports; real implementation lives in cognitive/
+  state_engine.py       # Compatibility exports; real implementation lives in cognitive/
+  query_parser.py       # Compatibility exports; real implementation lives in cognitive/
+  inference.py          # Compatibility exports; real implementation lives in cognitive/
   reasoner.py           # Lightweight orchestration layer
+  modules/              # Outer pluggable modules; cognitive mounts the kernel and is not a second parser system
   vocab.py              # Character-level vocabulary for the neural model
   model.py              # Optional PyTorch tiny Transformer
 scripts/
@@ -133,15 +153,15 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 
 `event_schema.py` defines event role aliases and state effects. For example, `put_in` projects to `in(theme, goal)`, `move` projects to `at(theme, goal)`, `open/close` projects to `access(theme, result)`, and `create/destroy` projects to `exists(theme, result)`. Event-query matching and counterfactual event exclusion reuse the same role aliases.
 
-`normalization.py` removes surface variation. For example, it currently normalizes `放到/放入/放进` into the same containment action and normalizes `盒子里面/盒子里` into the container slot `盒子`.
+`cognitive/normalization.py` removes surface variation. For example, it currently normalizes `放到/放入/放进` into the same containment action and normalizes `盒子里面/盒子里` into the container slot `盒子`.
 
-`frame_parser.py` extracts `FRAME/ROLE` from statements. New event types, such as "take out", "open", or "close", should start here as statement parsers.
+`cognitive/frame_parser.py` extracts `FRAME/ROLE` from statements. New event types, such as "take out", "open", or "close", should start here as statement parsers.
 
-`state_engine.py` projects historical events into the current world state. If a new event changes the world, add a state projector or state reducer here.
+`cognitive/state_engine.py` projects historical events into the current world state. If a new event changes the world, add a state projector or state reducer here.
 
-`query_parser.py` abstracts user questions into `QUERY`. A new phrasing should not answer directly; it should first normalize into a structure such as `location(芯片)` or `actor_for_event(...)`.
+`cognitive/query_parser.py` abstracts user questions into `QUERY`. A new phrasing should not answer directly; it should first normalize into a structure such as `location(芯片)` or `actor_for_event(...)`.
 
-`inference.py` owns rule inference and answer generation. New reasoning behavior usually adds both a `rule_inferer` and an `answerer`.
+`cognitive/inference.py` owns rule inference and answer generation. New reasoning behavior usually adds both a `rule_inferer` and an `answerer`.
 
 `reasoner.py` only orchestrates: split text, call capabilities, assemble structures, and return answers. Business rules should not be placed here.
 
@@ -149,13 +169,13 @@ struct-train-tiny = struct_llm.cli:train_tiny_model
 
 When a new failing example appears, first identify the failing layer:
 
-- Punctuation, tails, or conversational question fragments are not preserved: edit `text_processing.py`.
-- Particles, synonym actions, or slot boundaries are polluted: edit `normalization.py`.
-- A new event is not extracted, such as "take out", "open", or "close": edit `frame_parser.py`.
-- A new event changes the current world, such as taking something out of a container: edit `state_engine.py`.
-- The user changed the wording but the meaning is the same: edit `query_parser.py`.
-- `QUERY` and `FRAME/STATE` already exist, but no rule is inferred: edit the rule inferers in `inference.py`.
-- A rule is inferred, but the final answer wording is wrong: edit the answerers in `inference.py`.
+- Punctuation, tails, or conversational question fragments are not preserved: edit `cognitive/text_processing.py`.
+- Particles, synonym actions, or slot boundaries are polluted: edit `cognitive/normalization.py`.
+- A new event is not extracted, such as "take out", "open", or "close": edit `cognitive/frame_parser.py`.
+- A new event changes the current world, such as taking something out of a container: edit `cognitive/state_engine.py`.
+- The user changed the wording but the meaning is the same: edit `cognitive/query_parser.py`.
+- `QUERY` and `FRAME/STATE` already exist, but no rule is inferred: edit the rule inferers in `cognitive/inference.py`.
+- A rule is inferred, but the final answer wording is wrong: edit the answerers in `cognitive/inference.py`.
 
 Every change should add an end-to-end test in `tests/test_reasoner.py`. For surface variation, the test should prove that multiple phrasings map to the same `FRAME/ROLE/STATE/QUERY`, not merely that one sentence can be answered.
 
