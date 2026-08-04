@@ -1,5 +1,7 @@
 # Structural LLM Minimal Lab
 
+[中文](README.md) | [English](README_EN.md)
+
 This repository is a minimal experimental skeleton for a "structural intelligence" LLM. It does not start by scaling up a large neural model. Instead, it first asks a smaller question:
 
 > Can a model extract entities, relations, events, and rules from text, then reason over those structures to produce an answer?

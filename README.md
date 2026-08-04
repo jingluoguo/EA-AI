@@ -1,5 +1,7 @@
 # Structural LLM Minimal Lab
 
+[中文](README.md) | [English](README_EN.md)
+
 这是一个最小的“结构智能型 LLM”实验骨架。它不从堆大模型开始，而是先验证一个更小的问题：
 
 > 模型能否从句子里抽取实体、关系、事件和规则，再基于这些结构推理出答案？
