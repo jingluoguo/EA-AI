@@ -182,9 +182,11 @@ def load_statement_model(path: str | Path) -> CompiledStatementModel:
 def save_statement_model(model: CompiledStatementModel, path: str | Path) -> None:
     model_path = Path(path)
     model_path.parent.mkdir(parents=True, exist_ok=True)
-    with model_path.open("w", encoding="utf-8") as file:
+    temporary_path = model_path.with_name(f"{model_path.name}.tmp")
+    with temporary_path.open("w", encoding="utf-8") as file:
         json.dump(statement_model_to_dict(model), file, ensure_ascii=False, indent=2)
         file.write("\n")
+    temporary_path.replace(model_path)
 
 
 def statement_model_from_dict(record: dict[str, Any]) -> CompiledStatementModel:

@@ -175,9 +175,11 @@ def load_query_model(path: str | Path) -> CompiledQueryModel:
 def save_query_model(model: CompiledQueryModel, path: str | Path) -> None:
     model_path = Path(path)
     model_path.parent.mkdir(parents=True, exist_ok=True)
-    with model_path.open("w", encoding="utf-8") as file:
+    temporary_path = model_path.with_name(f"{model_path.name}.tmp")
+    with temporary_path.open("w", encoding="utf-8") as file:
         json.dump(query_model_to_dict(model), file, ensure_ascii=False, indent=2)
         file.write("\n")
+    temporary_path.replace(model_path)
 
 
 def query_model_from_dict(record: dict[str, Any]) -> CompiledQueryModel:
@@ -248,13 +250,13 @@ def resolve_query_candidates(
     errors: list[ParseError] = []
 
     for candidate in candidates:
-        if is_question_noise(candidate):
-            continue
-
         full_query = resolve_query_candidate(candidate, entities, parsers)
         fragments = split_query_candidate(candidate)
         if full_query is not None and (len(fragments) == 1 or query_candidate_is_learned_unit(candidate, entities, parsers)):
             parsed_queries.append(full_query)
+            continue
+
+        if is_question_noise(candidate):
             continue
 
         for fragment in fragments:

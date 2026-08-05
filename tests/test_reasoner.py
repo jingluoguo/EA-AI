@@ -1300,6 +1300,16 @@ class ReasonerTest(unittest.TestCase):
                 "QUERY dialog_act(capabilities)",
                 "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要。",
             ),
+            (
+                "你能干嘛",
+                "QUERY dialog_act(capabilities)",
+                "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要。",
+            ),
+            (
+                "你好，你能干嘛",
+                "QUERY dialog_act(capabilities)",
+                "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要。",
+            ),
         )
 
         for text, query_line, answer in examples:

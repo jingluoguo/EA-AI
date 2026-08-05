@@ -1,8 +1,8 @@
 {
   "schema": "struct_llm.query_model.v1",
-  "source_sha256": "cbad501ffad58c275b33aa70b419bb59861629952cc66515f1bcd55b2c3f47f2",
-  "example_count": 116,
-  "pattern_count": 110,
+  "source_sha256": "beb74ddad7e6ed4ac0b6a840517a2e8f34b08b5ce7737366a53e91dd9e7fd0bb",
+  "example_count": 118,
+  "pattern_count": 112,
   "patterns": [
     {
       "abstract_question": "<container>在哪里",
@@ -3162,6 +3162,21 @@
       "support": 1
     },
     {
+      "abstract_question": "你会干",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "capabilities",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "会干",
+        "你会"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "你好",
       "entities": [],
       "query": {
@@ -3204,6 +3219,21 @@
         "你能",
         "做什",
         "能做"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你能干",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "capabilities",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "你能",
+        "能干"
       ],
       "support": 1
     },

@@ -47,6 +47,8 @@
 {"entities": [], "query": {"intent": "dialog_act", "qualifiers": [], "target": "greeting"}, "question": "你好", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "芯片", "role": "item"}], "query": {"intent": "location", "qualifiers": [], "target": "$item#1"}, "question": "我想知道芯片在哪里", "source": "migrated_training", "split": "train"}
 {"entities": [], "query": {"intent": "dialog_act", "qualifiers": [], "target": "capabilities"}, "question": "你能做什么", "source": "migrated_training", "split": "train"}
+{"entities": [], "query": {"intent": "dialog_act", "qualifiers": [], "target": "capabilities"}, "question": "你能干嘛", "source": "human_feedback", "split": "train"}
+{"entities": [], "query": {"intent": "dialog_act", "qualifiers": [], "target": "capabilities"}, "question": "你会干嘛", "source": "human_feedback", "split": "train"}
 {"entities": [], "query": {"intent": "location", "qualifiers": [], "target": "芯片"}, "question": "芯片在哪里", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "芯片", "role": "item"}, {"name": "实验室", "role": "place"}, {"name": "托盘", "role": "container"}], "query": {"intent": "why", "qualifiers": [], "target": "$item#1在$place#1的$container#1里"}, "question": "为什么芯片在实验室的托盘里", "source": "migrated_training", "split": "train"}
 {"entities": [], "query": {"intent": "claim_source", "qualifiers": [], "target": "芯片在托盘里"}, "question": "谁说芯片在托盘里", "source": "migrated_training", "split": "train"}
