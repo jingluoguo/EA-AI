@@ -52,7 +52,7 @@
   -> state_engine FRAME 投影为当前 STATE
   -> query_learning 加载 query_model.json，把查询候选抽象为 QUERY
   -> intent_analyzers 从完整结构和训练样本推断 INTENT
-  -> inference 根据 QUERY + FRAME/STATE 推导 RULE 和答案
+  -> inference 根据 QUERY + FRAME/STATE 推导 RULE；dialog_answer_learning 补充已学习的回答能力
   -> reasoner 编排并返回 Prediction
 ```
 
@@ -64,10 +64,10 @@
 
 | 阶段 | 做什么 | 用到的方法 / 技术 | 主要代码 / 产物 |
 | --- | --- | --- | --- |
-| 1. 收集样本 | 保存用户输入、失败案例和人工反馈 | JSONL 追加式数据集；训练样本 schema；人工确认反馈 | `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl` |
+| 1. 收集样本 | 保存用户输入、失败案例和人工反馈 | JSONL 追加式数据集；训练样本 schema；人工确认反馈 | `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl`、`data/dialog_answer_examples.jsonl` |
 | 2. 样本校验 | 确认样本字段完整、结构合法 | 结构化 schema 校验；`dataclass` 样本对象；槽位字段检查 | `query_learning.py`、`statement_learning.py`、`intent_dataset.py` |
-| 3. 编译模型产物 | 把训练样本沉淀成运行时能力文件 | 结构模板聚合；抽象问题模式；字符 bigram 特征；源数据 `sha256` 指纹；原子写入 JSON | `make model`、`struct-compile-query`、`struct-compile-statement`、`data/query_model.json`、`data/statement_model.json` |
-| 4. 运行时加载 | 启动时加载编译后的能力，而不是扫描训练集 | 模型 artifact 加载；能力函数注册；可替换 learner 接口 | `reasoner.default_capabilities()`、`LearnedQueryParser.from_model()`、`LearnedStatementParser.from_model()`、`CognitiveCapabilities` |
+| 3. 编译模型产物 | 把训练样本沉淀成运行时能力文件 | 结构模板聚合；抽象问题模式；回答结构聚合；源数据 `sha256` 指纹；原子写入 JSON | `data/query_model.json`、`data/statement_model.json`、`data/dialog_answer_model.json` |
+| 4. 运行时加载 | 启动时加载编译后的能力，而不是扫描训练集 | 模型 artifact 加载；能力函数注册；可替换 learner 接口 | `reasoner.default_capabilities()`、`LearnedQueryParser`、`LearnedStatementParser`、`LearnedDialogActAnswerer` |
 | 5. 文本切分 | 把输入拆成陈述片段和查询候选 | 标点切句；逗号/分号候选拆分；聊天片段保留；尾句保留 | `text_processing.py` |
 | 6. 表层归一化 | 剥离不影响语义的表层差异 | 语气词清理；提问外壳清理；同义动作归一；容器后缀归一；`啥 -> 什么` | `normalization.py` |
 | 7. 陈述理解 | 把陈述句变成实体和历史事件 | 句子模板槽位抽取；实体角色实例化；`FRAME/ROLE` 结构模板实例化 | `statement_learning.py`、`ENTITY`、`FRAME`、`ROLE` |
@@ -75,7 +75,7 @@
 | 9. 状态投影 | 从历史事件得到当前世界状态 | 事件 schema；状态 projector；状态 reducer；后发生事件覆盖旧状态 | `state_engine.py`、`event_schema.py`、`STATE` |
 | 10. 结构推理 | 根据结构推导规则和答案 | frame 角色匹配；状态查询；关系闭包；事件约束；反事实重放；答案生成器 | `inference.py`、`RULE`、answerer |
 | 11. 不确定性决策 | 按置信度决定回答、确认或学习 | 置信度分段；`>=0.90` 直接回答；`0.50-0.90` 询问确认；`<0.50` 引导学习 | `uncertainty.py`、`feedback_learning.py` |
-| 12. 自学习反馈 | 未命中时让用户确认相似含义并沉淀 | 中置信相似结构召回；中文确认式交互；确认后写回 JSONL；重新编译；立即重试 | `feedback_learning.py`、`struct-ask --learn-on-fail`、`assess_query_uncertainty()`、`accept_query_suggestion()` |
+| 12. 自学习反馈 | 未命中时确认相似含义或创建新聊天能力 | 中置信相似结构召回；新能力名只写入 Query；回答只加载可信来源；重新编译；立即重试 | `feedback_learning.py`、`dialog_answer_learning.py`、`struct-ask --learn-on-fail` |
 | 13. 实验验证 | 验证训练集、模型产物和端到端行为 | 数据集评估；unittest 回归；结构线性化断言；端到端答案断言 | `make check`、`uv run python -m unittest discover -q -b` |
 
 这里的“模型产物”目前不是神经网络权重，而是由训练样本编译出的结构能力文件。它保存抽象后的问题模式、句子模板、槽位角色、结构模板、特征单元、样本数量和数据指纹。后续如果替换成分类器、向量检索、生成模型或真正的神经模型，只需要替换 `query_learning.py`、`statement_learning.py` 里的学习能力实现，不需要把逻辑堆回 `reasoner.py`。
@@ -85,8 +85,8 @@
 当前实现刻意保持轻量，核心路径只依赖 Python 标准库：
 
 - Python `dataclass`：定义 `Entity`、`Frame`、`Role`、`State`、`Query`、`Intention`、训练样本和编译模型结构。
-- JSONL 数据集：用 `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl` 保存可增量追加的训练/反馈样本。
-- 编译 JSON 模型：用 `data/query_model.json`、`data/statement_model.json` 保存从训练集中沉淀出的运行时能力。
+- JSONL 数据集：用 `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl`、`data/dialog_answer_examples.jsonl` 保存可增量追加的训练/反馈样本。
+- 编译 JSON 模型：用 `data/query_model.json`、`data/statement_model.json`、`data/dialog_answer_model.json` 保存从训练集中沉淀出的运行时能力。
 - 结构槽位：用 `$item#1`、`$container#1`、`$person#1` 这类槽位表达实体角色和出现顺序。
 - 表层归一化：在 `normalization.py` 中统一语气词、同义动作、容器后缀、提问外壳和“啥/什么”等表层差异。
 - 抽象特征匹配：Query 编译后使用抽象问题和字符 bigram 特征寻找相似结构；未命中时也用同一套相似度给用户推荐可能含义。
@@ -95,7 +95,7 @@
 - 状态投影：`state_engine.py` 把历史 `FRAME` 转成当前 `STATE`，并处理后发生事件覆盖旧状态。
 - 结构推理：`inference.py` 基于 frame 角色匹配、状态查询、关系闭包、事件约束和反事实重放生成 `RULE` 和答案。
 - 能力注册：`CognitiveCapabilities` 把陈述学习、Query 学习、状态投影、状态覆盖、规则推导和答案生成组合为可替换能力。
-- 反馈学习服务：`feedback_learning.py` 封装相似建议、用户确认后的写回和模型重编译；CLI 只负责交互展示。
+- 反馈学习服务：`feedback_learning.py` 和 `dialog_answer_learning.py` 封装相似建议、新聊天能力、可信回答样本加载和模型重编译；CLI 只负责交互展示。
 - CLI 与 Makefile：`struct-ask`、`struct-compile-*`、`struct-eval-*` 提供命令入口；`make model`、`make check`、`make ask` 是日常使用入口。
 - unittest 回归：`tests/test_reasoner.py` 覆盖数据 loader、反馈写入、模型编译、运行时加载、结构推理和端到端回答。
 - 可选 tiny Transformer：`model.py`、`vocab.py`、`struct-train-tiny` 预留神经模型入口，目前不参与默认结构推理路径。
@@ -232,6 +232,8 @@ make ask TEXT="你擅长什么"
 
 所以如果一句话没有直接命中现有模型，它会先拿模型产物找相似含义，例如问你“它是不是在询问我能做什么”。你确认后，它会把原句按相同结构写入 JSONL，并重新编译模型；只有低置信或你否认时，才进入手动引导。
 
+如果这不是已有结构，而是一个新的聊天能力，终端可以先补“理解能力”：你只需要给出能力名，系统会写入 Query 样本并重新编译。回答不会从这次交互里直接生成；只有 `training`、`teacher`、`self_model`、`knowledge`、`curated`、`human_verified` 这些可信来源的回答样本会编译进 `data/dialog_answer_model.json`。没有可信回答时，系统会承认“已经理解问题，但还没有经过验证的相关回答”。
+
 ### 喂意图数据
 
 意图分析不要继续靠“匹配用户怎么问”。推荐喂的是“行为观察 -> 心智假设”数据，让系统逐步学习 `Goal + Belief + Strategy`：
@@ -359,6 +361,7 @@ struct-eval-query = struct_llm.cli:eval_query_examples
 struct-eval-statement = struct_llm.cli:eval_statement_examples
 struct-compile-query = struct_llm.cli:compile_query_model
 struct-compile-statement = struct_llm.cli:compile_statement_model
+struct-compile-dialog-answer = struct_llm.cli:compile_dialog_answer_model
 struct-make-dataset = struct_llm.cli:make_dataset
 struct-train-tiny = struct_llm.cli:train_tiny_model
 ```

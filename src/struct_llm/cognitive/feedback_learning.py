@@ -37,6 +37,8 @@ class LearningPaths:
     query_model: Path = Path("data/query_model.json")
     statement_data: Path = Path("data/statement_examples.jsonl")
     statement_model: Path = Path("data/statement_model.json")
+    dialog_answer_data: Path = Path("data/dialog_answer_examples.jsonl")
+    dialog_answer_model: Path = Path("data/dialog_answer_model.json")
 
 
 @dataclass(frozen=True)
@@ -147,6 +149,22 @@ def save_manual_query_feedback(
         model_path=paths.query_model,
         example_count=model.example_count,
         pattern_count=len(model.patterns),
+    )
+
+
+def save_new_dialog_capability_feedback(
+    question: str,
+    capability_name: str,
+    paths: LearningPaths,
+    *,
+    source: str = "human_feedback",
+) -> LearningWriteResult:
+    return save_manual_query_feedback(
+        question,
+        "dialog_act",
+        capability_name,
+        paths,
+        source=source,
     )
 
 

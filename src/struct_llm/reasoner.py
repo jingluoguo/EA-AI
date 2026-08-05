@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cognitive import CognitiveCapabilities
+from .cognitive.dialog_answer_learning import default_learned_dialog_answerer
 from .cognitive.inference import DEFAULT_ANSWERERS, DEFAULT_RULE_INFERERS
 from .cognitive.kernel import parse_text_with_capabilities
 from .errors import ParseError
@@ -29,7 +30,7 @@ def default_capabilities() -> CognitiveCapabilities:
         state_reducers=DEFAULT_STATE_REDUCERS,
         query_parsers=(default_learned_query_parser(),),
         rule_inferers=DEFAULT_RULE_INFERERS,
-        answerers=DEFAULT_ANSWERERS,
+        answerers=(*DEFAULT_ANSWERERS, default_learned_dialog_answerer()),
     )
 
 

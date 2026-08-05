@@ -13,6 +13,12 @@ from .cognitive.feedback_learning import (
     assess_query_uncertainty,
     save_manual_query_feedback,
     save_manual_statement_feedback,
+    save_new_dialog_capability_feedback,
+)
+from .cognitive.dialog_answer_learning import (
+    LearnedDialogActAnswerer,
+    compile_dialog_answer_model_from_jsonl,
+    save_dialog_answer_model,
 )
 from .cognitive.query_learning import (
     EntityExample,
@@ -32,7 +38,7 @@ from .cognitive.statement_learning import (
     save_statement_model,
 )
 from .dataset import generate_examples, write_jsonl
-from .reasoner import default_capabilities, predict
+from .reasoner import default_capabilities, parse_text, predict
 
 
 QUESTIONS = (
@@ -59,6 +65,8 @@ def ask_symbolic() -> None:
     parser.add_argument("--statement-data", help="JSONL file with learned statement examples.")
     parser.add_argument("--statement-model", help="Compiled statement model artifact.")
     parser.add_argument("--statement-min-score", type=float, default=0.58)
+    parser.add_argument("--dialog-answer-data", help="JSONL file with learned dialog answer examples.")
+    parser.add_argument("--dialog-answer-model", help="Compiled dialog answer model artifact.")
     parser.add_argument("--learn-on-fail", action="store_true", help="Prompt for feedback when structure extraction fails.")
     args = parser.parse_args()
     capabilities = default_capabilities()
@@ -81,6 +89,14 @@ def ask_symbolic() -> None:
     if args.intent_data:
         analyzer = InMemoryIntentAnalyzer.from_jsonl(Path(args.intent_data), min_score=args.intent_min_score)
         capabilities = capabilities.with_intent_analyzers(analyzer)
+    if args.dialog_answer_model and Path(args.dialog_answer_model).exists():
+        capabilities = capabilities.with_answerers(
+            LearnedDialogActAnswerer.from_model(Path(args.dialog_answer_model))
+        )
+    elif args.dialog_answer_data and Path(args.dialog_answer_data).exists():
+        capabilities = capabilities.with_answerers(
+            LearnedDialogActAnswerer.from_jsonl(Path(args.dialog_answer_data))
+        )
 
     if args.text:
         print_prediction_with_learning(args.text, capabilities, args)
@@ -223,6 +239,17 @@ def compile_statement_model() -> None:
     print(f"已生成陈述模型：样本={model.example_count} 模式={len(model.patterns)} 输出={args.output}")
 
 
+def compile_dialog_answer_model() -> None:
+    parser = argparse.ArgumentParser(description="Compile verified dialog answer examples into a runtime model artifact.")
+    parser.add_argument("--dialog-answer-data", default="data/dialog_answer_examples.jsonl")
+    parser.add_argument("--output", default="data/dialog_answer_model.json")
+    args = parser.parse_args()
+
+    model = compile_dialog_answer_model_from_jsonl(Path(args.dialog_answer_data))
+    save_dialog_answer_model(model, Path(args.output))
+    print(f"已生成回答模型：样本={model.example_count} 模式={len(model.patterns)} 输出={args.output}")
+
+
 def print_prediction(question: str, capabilities=None) -> None:
     prediction = predict(question, capabilities)
     print("=" * 60)
@@ -237,6 +264,13 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
     try:
         print_prediction(question, capabilities)
     except ParseError:
+        try:
+            structure = parse_text(question, capabilities)
+        except ParseError:
+            structure = None
+        if structure is not None and structure.query is not None:
+            print_unanswered_structure(question, structure)
+            return
         if not getattr(args, "learn_on_fail", False):
             raise
         learned = prompt_learning_feedback(question, args)
@@ -248,7 +282,14 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
         try:
             print_prediction(question, refreshed)
         except ParseError:
-            print("样本已经保存，不过当前还不能完整回答。后续补更多同类样本后会更稳。")
+            try:
+                structure = parse_text(question, refreshed)
+            except ParseError:
+                structure = None
+            if structure is not None and structure.query is not None:
+                print_unanswered_structure(question, structure)
+            else:
+                print("样本已经保存，不过当前还不能完整理解。后续补充训练样本后再试。")
 
 
 def prompt_learning_feedback(text: str, args) -> bool:
@@ -258,9 +299,12 @@ def prompt_learning_feedback(text: str, args) -> bool:
     if similar_result is None:
         print("我确实还没懂这句话。")
         print("没有找到足够相近的已学结构，我们一步步来。")
+        if prompt_new_dialog_capability_feedback(text, args):
+            return True
     else:
         print("好，那我不按刚才的猜测处理。")
-        print("我们一步步来，你告诉我它该沉淀成什么结构。")
+    if similar_result is not None:
+        print("我们也可以继续做更细的结构标注。")
     choice = choose_from_menu(
         "这句话更像哪一类？",
         (
@@ -336,6 +380,34 @@ def prompt_query_feedback(text: str, args) -> bool:
     return True
 
 
+def prompt_new_dialog_capability_feedback(text: str, args) -> bool:
+    print("如果这是一个新的聊天能力，不用填写实体和事件。")
+    capability_name = input("它想问什么能力（例如：情绪状态，留空进入其他学习方式）> ").strip()
+    if not capability_name:
+        return False
+    result = save_new_dialog_capability_feedback(
+        text,
+        capability_name,
+        learning_paths_from_args(args),
+    )
+    print(
+        f"新聊天能力“{capability_name}”已经写入训练集，"
+        f"问题样本现在有 {result.example_count} 条。"
+    )
+    print("这里只学习问题结构，不会把临时输入直接当成答案。")
+    return True
+
+
+def print_unanswered_structure(question: str, structure) -> None:
+    print("=" * 60)
+    print(question)
+    print()
+    print(structure.linearize())
+    print()
+    print("我已经理解你的问题，但还没有经过验证的相关回答。")
+    print("我不会把刚才的输入直接当成答案。")
+
+
 def describe_query(target: str, intent: str, qualifiers: tuple[str, ...]) -> str:
     if intent == "dialog_act":
         if target == "capabilities":
@@ -350,6 +422,7 @@ def describe_query(target: str, intent: str, qualifiers: tuple[str, ...]) -> str
             return "告别"
         if target == "summary":
             return "让总结一下"
+        return f"询问{target}"
     if intent == "location":
         return f"询问{target}在哪里"
     if intent == "contents":
@@ -405,6 +478,8 @@ def learning_paths_from_args(args) -> LearningPaths:
         query_model=Path(getattr(args, "query_model", None) or "data/query_model.json"),
         statement_data=Path(getattr(args, "statement_data", None) or "data/statement_examples.jsonl"),
         statement_model=Path(getattr(args, "statement_model", None) or "data/statement_model.json"),
+        dialog_answer_data=Path(getattr(args, "dialog_answer_data", None) or "data/dialog_answer_examples.jsonl"),
+        dialog_answer_model=Path(getattr(args, "dialog_answer_model", None) or "data/dialog_answer_model.json"),
     )
 
 
@@ -466,10 +541,13 @@ def capabilities_after_recompile(args):
     capabilities = default_capabilities()
     query_model = getattr(args, "query_model", None)
     statement_model = getattr(args, "statement_model", None)
+    dialog_answer_model = getattr(args, "dialog_answer_model", None)
     if statement_model and Path(statement_model).exists():
         capabilities = capabilities.replace_statement_parsers(LearnedStatementParser.from_model(Path(statement_model)))
     if query_model and Path(query_model).exists():
         capabilities = capabilities.replace_query_parsers(LearnedQueryParser.from_model(Path(query_model)))
+    if dialog_answer_model and Path(dialog_answer_model).exists():
+        capabilities = capabilities.with_answerers(LearnedDialogActAnswerer.from_model(Path(dialog_answer_model)))
     return capabilities
 
 

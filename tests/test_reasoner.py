@@ -22,8 +22,10 @@ from struct_llm.cognitive.feedback_learning import (
     confidence_band,
     save_manual_query_feedback,
     save_manual_statement_feedback,
+    save_new_dialog_capability_feedback,
     suggest_query_feedback,
 )
+from struct_llm.cognitive.dialog_answer_learning import LearnedDialogActAnswerer, save_manual_dialog_answer_feedback
 from struct_llm.cognitive.intent_learning import InMemoryIntentAnalyzer, evaluate_intent_analyzer
 from struct_llm.cognitive.query_learning import (
     LearnedQueryParser,
@@ -49,7 +51,7 @@ from struct_llm.cognitive.statement_learning import (
 from struct_llm.modules import ModuleContext, default_module_registry
 from struct_llm.modules.cognitive import CognitiveKernelModule
 from struct_llm.reasoner import default_capabilities, parse_text, predict as _predict
-from struct_llm.structure import Entity, Intention
+from struct_llm.structure import Entity, Intention, Query, Structure
 
 
 def predict(text: str, capabilities: CognitiveCapabilities | None = None):
@@ -251,6 +253,66 @@ class ReasonerTest(unittest.TestCase):
         self.assertIsNotNone(query)
         assert query is not None
         self.assertEqual(query.linearize(), "QUERY dialog_act(capabilities)")
+
+    def test_verified_dialog_answer_feedback_compiles_new_capability(self) -> None:
+        query = Query("dialog_act", "emotion_status")
+        structure = Structure(entities=(), rules=(), query=query)
+        answer = "我没有人类意义上的情绪，但可以和你讨论情绪。"
+        with tempfile.TemporaryDirectory() as directory:
+            data_path = Path(directory) / "dialog_answer_examples.jsonl"
+            model_path = Path(directory) / "dialog_answer_model.json"
+            example, model = save_manual_dialog_answer_feedback(
+                "你有情绪吗",
+                query,
+                answer,
+                data_path,
+                model_path,
+                source="self_model",
+            )
+            answerer = LearnedDialogActAnswerer.from_model(model_path)
+
+        self.assertEqual(example.answer, answer)
+        self.assertEqual(model.example_count, 1)
+        self.assertEqual(answerer(structure), answer)
+
+    def test_candidate_dialog_answer_feedback_is_not_runtime_answer(self) -> None:
+        query = Query("dialog_act", "emotion_status")
+        structure = Structure(entities=(), rules=(), query=query)
+        with tempfile.TemporaryDirectory() as directory:
+            data_path = Path(directory) / "dialog_answer_examples.jsonl"
+            model_path = Path(directory) / "dialog_answer_model.json"
+            example, model = save_manual_dialog_answer_feedback(
+                "你有情绪吗",
+                query,
+                "按你现在的状态",
+                data_path,
+                model_path,
+            )
+            answerer = LearnedDialogActAnswerer.from_model(model_path)
+
+        self.assertEqual(example.source, "candidate")
+        self.assertEqual(model.example_count, 0)
+        self.assertIsNone(answerer(structure))
+
+    def test_new_dialog_capability_compiles_query_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            paths = LearningPaths(
+                query_data=Path(directory) / "query_examples.jsonl",
+                query_model=Path(directory) / "query_model.json",
+                dialog_answer_data=Path(directory) / "dialog_answer_examples.jsonl",
+                dialog_answer_model=Path(directory) / "dialog_answer_model.json",
+            )
+            result = save_new_dialog_capability_feedback(
+                "你有情绪吗",
+                "emotion_status",
+                paths,
+            )
+            query = LearnedQueryParser.from_model(paths.query_model)("你有情绪吗", ())
+            self.assertIsNotNone(query)
+            assert query is not None
+
+        self.assertEqual(result.example_count, 1)
+        self.assertFalse(paths.dialog_answer_model.exists())
 
     def test_default_module_registry_exposes_outer_system_slots(self) -> None:
         registry = default_module_registry(default_capabilities())

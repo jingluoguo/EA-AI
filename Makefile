@@ -26,6 +26,7 @@ compile: model
 model:
 	uv run struct-compile-query
 	uv run struct-compile-statement
+	uv run struct-compile-dialog-answer
 
 check: model
 	uv run struct-eval-query --query-data data/query_examples.jsonl --query-model data/query_model.json

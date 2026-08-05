@@ -12,11 +12,19 @@ from .capabilities import (
     StatementParseResult,
 )
 from .intent_dataset import IntentDatasetRecord
+from .dialog_answer_learning import (
+    CompiledDialogActAnswerModel,
+    DialogActAnswerTrainingExample,
+    LearnedDialogActAnswerer,
+    default_learned_dialog_answerer,
+    save_manual_dialog_answer_feedback,
+)
 from .feedback_learning import (
     LearningPaths,
     LearningWriteResult,
     QuerySuggestion,
     QueryUncertaintyAssessment,
+    save_new_dialog_capability_feedback,
 )
 from .intent_learning import InMemoryIntentAnalyzer, IntentEvaluationResult, IntentTrainingExample
 from .query_learning import LearnedQueryParser, QueryEvaluationResult, QueryTrainingExample
@@ -32,9 +40,11 @@ from .uncertainty import (
 __all__ = [
     "Answerer",
     "CognitiveCapabilities",
+    "CompiledDialogActAnswerModel",
     "CONFIRM_CONFIDENCE_THRESHOLD",
     "DEFAULT_UNCERTAINTY_POLICY",
     "DIRECT_CONFIDENCE_THRESHOLD",
+    "DialogActAnswerTrainingExample",
     "InMemoryIntentAnalyzer",
     "IntentAnalyzer",
     "IntentDatasetRecord",
@@ -42,6 +52,7 @@ __all__ = [
     "IntentTrainingExample",
     "LearningPaths",
     "LearningWriteResult",
+    "LearnedDialogActAnswerer",
     "LearnedQueryParser",
     "LearnedStatementParser",
     "QuerySuggestion",
@@ -58,4 +69,7 @@ __all__ = [
     "StatementTrainingExample",
     "UncertaintyPolicy",
     "confidence_band",
+    "default_learned_dialog_answerer",
+    "save_manual_dialog_answer_feedback",
+    "save_new_dialog_capability_feedback",
 ]

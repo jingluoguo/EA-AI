@@ -52,7 +52,7 @@ raw text
   -> state_engine: FRAME -> current STATE
   -> query_learning: load query_model.json -> QUERY
   -> intent_analyzers: complete Structure + learned examples -> INTENT
-  -> inference: QUERY + FRAME/STATE -> RULE + answer
+  -> inference: QUERY + FRAME/STATE -> RULE; dialog_answer_learning supplies learned replies
   -> reasoner: orchestration and Prediction
 ```
 
@@ -64,10 +64,10 @@ The project works as "training data distills capability; runtime loads the compi
 
 | Stage | Purpose | Method / Technology | Main Code / Artifact |
 | --- | --- | --- | --- |
-| 1. Collect examples | Save user inputs, failures, and human feedback | Append-only JSONL datasets; training schemas; human-confirmed feedback | `data/query_examples.jsonl`, `data/statement_examples.jsonl`, `data/intent_examples.jsonl` |
+| 1. Collect examples | Save user inputs, failures, and human feedback | Append-only JSONL datasets; training schemas; human-confirmed feedback | `data/query_examples.jsonl`, `data/statement_examples.jsonl`, `data/intent_examples.jsonl`, `data/dialog_answer_examples.jsonl` |
 | 2. Validate examples | Ensure records are complete and structurally valid | Structured schema validation; `dataclass` sample objects; slot-field checks | `query_learning.py`, `statement_learning.py`, `intent_dataset.py` |
-| 3. Compile model artifacts | Distill training examples into runtime capability files | Structure-template aggregation; abstract question patterns; character bigram features; source-data `sha256`; atomic JSON writes | `make model`, `struct-compile-query`, `struct-compile-statement`, `data/query_model.json`, `data/statement_model.json` |
-| 4. Load at runtime | Load compiled capabilities instead of scanning training data | Model artifact loading; capability-function registration; replaceable learner interfaces | `reasoner.default_capabilities()`, `LearnedQueryParser.from_model()`, `LearnedStatementParser.from_model()`, `CognitiveCapabilities` |
+| 3. Compile model artifacts | Distill training examples into runtime capability files | Structure-template aggregation; abstract question patterns; learned reply aggregation; source-data `sha256`; atomic JSON writes | `data/query_model.json`, `data/statement_model.json`, `data/dialog_answer_model.json` |
+| 4. Load at runtime | Load compiled capabilities instead of scanning training data | Model artifact loading; capability-function registration; replaceable learner interfaces | `reasoner.default_capabilities()`, `LearnedQueryParser`, `LearnedStatementParser`, `LearnedDialogActAnswerer` |
 | 5. Split text | Separate statements from query candidates | Punctuation sentence splitting; comma/semicolon candidate splitting; chat-fragment retention; tail retention | `text_processing.py` |
 | 6. Normalize surface form | Remove wording differences that do not change meaning | Particle cleanup; question-wrapper cleanup; synonym action normalization; container-suffix normalization; `啥 -> 什么` | `normalization.py` |
 | 7. Understand statements | Convert statements into entities and historical events | Sentence-template slot extraction; entity-role instantiation; `FRAME/ROLE` template instantiation | `statement_learning.py`, `ENTITY`, `FRAME`, `ROLE` |
@@ -75,7 +75,7 @@ The project works as "training data distills capability; runtime loads the compi
 | 9. Project state | Derive current world state from historical events | Event schemas; state projectors; state reducers; later events overwrite earlier state | `state_engine.py`, `event_schema.py`, `STATE` |
 | 10. Reason structurally | Infer rules and answers from structure | Frame-role matching; state lookup; relation closure; event constraints; counterfactual replay; answerers | `inference.py`, `RULE`, answerer |
 | 11. Uncertainty decision | Choose direct answer, confirmation, or learning by confidence | Confidence bands; `>=0.90` answers directly; `0.50-0.90` asks for confirmation; `<0.50` starts guided learning | `uncertainty.py`, `feedback_learning.py` |
-| 12. Self-learning feedback | Confirm similar meanings and save missed examples | Mid-confidence similar-structure recall; Chinese confirmation prompt; JSONL write-back; recompilation; immediate retry | `feedback_learning.py`, `struct-ask --learn-on-fail`, `assess_query_uncertainty()`, `accept_query_suggestion()` |
+| 12. Self-learning feedback | Confirm similar meanings or create a new dialog capability | Mid-confidence recall; capability names write Query only; answers load from trusted sources; recompilation; immediate retry | `feedback_learning.py`, `dialog_answer_learning.py`, `struct-ask --learn-on-fail` |
 | 13. Verify experimentally | Validate datasets, artifacts, and end-to-end behavior | Dataset evaluation; unittest regression; structure linearization assertions; answer assertions | `make check`, `uv run python -m unittest discover -q -b` |
 
 The current "model artifact" is not neural-network weights. It is a structural capability file compiled from training examples. It stores abstract question patterns, sentence templates, slot roles, structure templates, feature units, example counts, and source-data fingerprints. Later, a classifier, vector retriever, generator, or real neural model can replace the learner internals in `query_learning.py` and `statement_learning.py` without pushing logic back into `reasoner.py`.
@@ -85,8 +85,8 @@ The current "model artifact" is not neural-network weights. It is a structural c
 The default implementation is intentionally lightweight and uses only the Python standard library on the main path:
 
 - Python `dataclass`: defines `Entity`, `Frame`, `Role`, `State`, `Query`, `Intention`, training examples, and compiled model structures.
-- JSONL datasets: `data/query_examples.jsonl`, `data/statement_examples.jsonl`, and `data/intent_examples.jsonl` store appendable training and feedback records.
-- Compiled JSON models: `data/query_model.json` and `data/statement_model.json` store runtime capabilities distilled from training examples.
+- JSONL datasets: `data/query_examples.jsonl`, `data/statement_examples.jsonl`, `data/intent_examples.jsonl`, and `data/dialog_answer_examples.jsonl` store appendable training and feedback records.
+- Compiled JSON models: `data/query_model.json`, `data/statement_model.json`, and `data/dialog_answer_model.json` store runtime capabilities distilled from training examples.
 - Structural slots: `$item#1`, `$container#1`, `$person#1` encode entity roles and occurrence order.
 - Surface normalization: `normalization.py` unifies particles, synonym actions, container suffixes, question wrappers, and surface variants such as `啥/什么`.
 - Abstract feature matching: compiled Query models use abstract questions and character bigram features to find similar structures; missed inputs use the same similarity path to ask the user for confirmation.
@@ -95,7 +95,7 @@ The default implementation is intentionally lightweight and uses only the Python
 - State projection: `state_engine.py` turns historical `FRAME` values into current `STATE` values and handles later events overwriting earlier state.
 - Structural inference: `inference.py` produces `RULE` and answers from frame-role matching, state lookup, relation closure, event constraints, and counterfactual replay.
 - Capability registration: `CognitiveCapabilities` composes statement learning, Query learning, state projection, state reduction, rule inference, and answer generation as replaceable capabilities.
-- Feedback-learning service: `feedback_learning.py` encapsulates similar-meaning suggestions, confirmed write-back, and model recompilation; the CLI only handles interaction.
+- Feedback-learning service: `feedback_learning.py` and `dialog_answer_learning.py` encapsulate similar-meaning suggestions, new dialog capabilities, trusted answer loading, and model recompilation; the CLI only handles interaction.
 - CLI and Makefile: `struct-ask`, `struct-compile-*`, and `struct-eval-*` expose commands; `make model`, `make check`, and `make ask` are daily entry points.
 - unittest regression: `tests/test_reasoner.py` covers loaders, feedback writes, model compilation, runtime loading, structural reasoning, and end-to-end answers.
 - Optional tiny Transformer: `model.py`, `vocab.py`, and `struct-train-tiny` reserve a neural-model path, but it is not part of the default structural reasoning pipeline.
@@ -232,6 +232,8 @@ Runtime behavior follows one confidence policy:
 
 If the model cannot answer directly, it first searches the compiled model artifact for a similar meaning, for example asking whether the sentence means "asking what I can do." Confirmed feedback is saved with that structure and recompiled; only low-confidence or rejected suggestions fall back to manual guidance.
 
+If the input is not an existing structure but a new dialog capability, the terminal can first fill the understanding gap: provide only the capability name, and the system will write a Query example and recompile. Answers are not generated from that interaction. Only trusted answer sources such as `training`, `teacher`, `self_model`, `knowledge`, `curated`, or `human_verified` are compiled into `data/dialog_answer_model.json`. Without a trusted answer, the system says it understands the question but does not yet have a verified reply.
+
 ### Feeding Intent Data
 
 Intent analysis should not keep growing by matching more user phrasings. Feed "behavior observation -> mental-state hypothesis" data instead, so the system can learn `Goal + Belief + Strategy`:
@@ -360,6 +362,7 @@ struct-eval-query = struct_llm.cli:eval_query_examples
 struct-eval-statement = struct_llm.cli:eval_statement_examples
 struct-compile-query = struct_llm.cli:compile_query_model
 struct-compile-statement = struct_llm.cli:compile_statement_model
+struct-compile-dialog-answer = struct_llm.cli:compile_dialog_answer_model
 struct-make-dataset = struct_llm.cli:make_dataset
 struct-train-tiny = struct_llm.cli:train_tiny_model
 ```

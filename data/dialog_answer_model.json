@@ -1,0 +1,18 @@
+{
+  "schema": "struct_llm.dialog_answer_model.v1",
+  "source_sha256": "5d03646040274a86436f061cb3c81d1ea56dc7670cb442b74b649292f9ab97f0",
+  "example_count": 1,
+  "pattern_count": 1,
+  "patterns": [
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "情绪状态",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "我没有人类意义上的情绪，但可以理解和讨论情绪，也可以根据对话表现出合适的回应风格。",
+      "support": 1
+    }
+  ]
+}

@@ -27,6 +27,7 @@ struct-eval-query = "struct_llm.cli:eval_query_examples"
 struct-eval-statement = "struct_llm.cli:eval_statement_examples"
 struct-compile-query = "struct_llm.cli:compile_query_model"
 struct-compile-statement = "struct_llm.cli:compile_statement_model"
+struct-compile-dialog-answer = "struct_llm.cli:compile_dialog_answer_model"
 struct-make-dataset = "struct_llm.cli:make_dataset"
 struct-train-tiny = "struct_llm.cli:train_tiny_model"
 

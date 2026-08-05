@@ -1,8 +1,8 @@
 {
   "schema": "struct_llm.query_model.v1",
-  "source_sha256": "c3519883a351468ff1d963df66eaca8f805f3da0de5f46345282ba1ffe8b0606",
-  "example_count": 121,
-  "pattern_count": 112,
+  "source_sha256": "5c37909e89cfd0b93cb448917f2f8e525335830c62d447939ea959f5a1862b39",
+  "example_count": 123,
+  "pattern_count": 114,
   "patterns": [
     {
       "abstract_question": "<item>在哪里",
@@ -3167,6 +3167,22 @@
       "support": 1
     },
     {
+      "abstract_question": "你有情绪",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "情绪状态",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "你有",
+        "情绪",
+        "有情"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "你能做什么",
       "entities": [],
       "query": {
@@ -4004,6 +4020,23 @@
         "谁把",
         "近谁",
         "里取"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "有情绪么你",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "情绪状态",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "么你",
+        "情绪",
+        "有情",
+        "绪么"
       ],
       "support": 1
     },

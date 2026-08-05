@@ -119,3 +119,5 @@
 {"question": "你擅长啥", "entities": [], "query": {"intent": "dialog_act", "target": "capabilities", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
 {"question": "你是啥呀", "entities": [], "query": {"intent": "dialog_act", "target": "identity", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
 {"question": "你是干啥的", "entities": [], "query": {"intent": "dialog_act", "target": "identity", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "你有情绪吗", "entities": [], "query": {"intent": "dialog_act", "target": "情绪状态", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "有情绪么你", "entities": [], "query": {"intent": "dialog_act", "target": "情绪状态", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
