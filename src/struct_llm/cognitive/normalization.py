@@ -38,6 +38,18 @@ QUESTION_FILLERS = (
     "呢",
     "下",
 )
+QUESTION_INNER_FILLERS = (
+    "现在",
+    "目前",
+    "实际",
+    "事实上",
+    "请问",
+    "到底",
+    "其实",
+)
+QUESTION_SURFACE_SYNONYMS = (
+    ("物品", "东西"),
+)
 CONTAINMENT_VERBS = ("放到", "放入", "放进")
 TAKE_OUT_VERBS = ("取出来", "拿出来", "取出", "拿出", "取走", "拿走")
 CONTAINER_SUFFIXES = ("里面", "里边", "里头", "内部", "里", "内", "中")
@@ -80,6 +92,7 @@ CHAT_EXPRESSION_HINTS = (
 def normalize_question(sentence: str) -> str:
     normalized = sentence.strip().replace("？", "").replace("?", "")
     normalized = normalized.replace("啥", "什么")
+    normalized = normalize_question_surface_words(normalized)
     changed = True
     while changed:
         previous = normalized
@@ -87,6 +100,15 @@ def normalize_question(sentence: str) -> str:
             normalize_containment_expression(strip_question_frames(normalize_slot_value(normalized)))
         )
         changed = normalized != previous
+    return normalized
+
+
+def normalize_question_surface_words(sentence: str) -> str:
+    normalized = sentence
+    for source, target in QUESTION_SURFACE_SYNONYMS:
+        normalized = normalized.replace(source, target)
+    for word in QUESTION_INNER_FILLERS:
+        normalized = normalized.replace(word, "")
     return normalized
 
 

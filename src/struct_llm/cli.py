@@ -10,13 +10,14 @@ from .cognitive.intent_learning import InMemoryIntentAnalyzer, evaluate_intent_a
 from .cognitive.feedback_learning import (
     LearningPaths,
     accept_query_suggestion,
+    assess_query_uncertainty,
     save_manual_query_feedback,
     save_manual_statement_feedback,
-    suggest_query_feedback,
 )
 from .cognitive.query_learning import (
     EntityExample,
     LearnedQueryParser,
+    QUERY_DIRECT_CONFIDENCE,
     evaluate_query_parser,
     load_query_jsonl,
 )
@@ -54,7 +55,7 @@ def ask_symbolic() -> None:
     parser.add_argument("--intent-min-score", type=float, default=0.6)
     parser.add_argument("--query-data", help="JSONL file with learned query examples.")
     parser.add_argument("--query-model", help="Compiled query model artifact.")
-    parser.add_argument("--query-min-score", type=float, default=0.72)
+    parser.add_argument("--query-min-score", type=float, default=QUERY_DIRECT_CONFIDENCE)
     parser.add_argument("--statement-data", help="JSONL file with learned statement examples.")
     parser.add_argument("--statement-model", help="Compiled statement model artifact.")
     parser.add_argument("--statement-min-score", type=float, default=0.58)
@@ -170,7 +171,7 @@ def eval_query_examples() -> None:
     parser = argparse.ArgumentParser(description="Evaluate the learned query parser against JSONL examples.")
     parser.add_argument("--query-data", default="data/query_examples.jsonl")
     parser.add_argument("--query-model", default="")
-    parser.add_argument("--query-min-score", type=float, default=0.72)
+    parser.add_argument("--query-min-score", type=float, default=QUERY_DIRECT_CONFIDENCE)
     args = parser.parse_args()
 
     examples = load_query_jsonl(Path(args.query_data))
@@ -238,7 +239,6 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
     except ParseError:
         if not getattr(args, "learn_on_fail", False):
             raise
-        print("这句话我还没有学会。")
         learned = prompt_learning_feedback(question, args)
         if not learned:
             print("已跳过，不写入训练集。")
@@ -252,9 +252,15 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
 
 
 def prompt_learning_feedback(text: str, args) -> bool:
-    print("你愿意教我一下吗？我会把它沉淀到训练集里。")
-    if prompt_similar_query_feedback(text, args):
+    similar_result = prompt_similar_query_feedback(text, args)
+    if similar_result is True:
         return True
+    if similar_result is None:
+        print("我确实还没懂这句话。")
+        print("没有找到足够相近的已学结构，我们一步步来。")
+    else:
+        print("好，那我不按刚才的猜测处理。")
+        print("我们一步步来，你告诉我它该沉淀成什么结构。")
     choice = choose_from_menu(
         "这句话更像哪一类？",
         (
@@ -273,14 +279,15 @@ def prompt_learning_feedback(text: str, args) -> bool:
     return False
 
 
-def prompt_similar_query_feedback(text: str, args) -> bool:
+def prompt_similar_query_feedback(text: str, args) -> bool | None:
     capabilities = capabilities_after_recompile(args)
-    suggestion = suggest_query_feedback(text, capabilities.query_parsers)
+    assessment = assess_query_uncertainty(text, capabilities.query_parsers)
+    suggestion = assessment.suggestion
     if suggestion is None:
-        return False
+        return None
     description = describe_query(suggestion.query.target, suggestion.query.intent, suggestion.query.qualifiers)
     choice = choose_from_menu(
-        f"我猜它的意思是：{description}。对吗？",
+        f"我有点把握，但还不想直接答。它是不是在{description}？",
         (
             ("1", "是这个意思", "把这句话按这个结构沉淀到训练集。"),
             ("2", "不是", "继续手动教我。"),
@@ -288,7 +295,7 @@ def prompt_similar_query_feedback(text: str, args) -> bool:
     )
     if choice == "1":
         result = accept_query_suggestion(suggestion, learning_paths_from_args(args))
-        print(f"已按相似样本学习，匹配置信度约 {suggestion.score:.2f}，问题样本现在有 {result.example_count} 条。")
+        print(f"明白了。这个判断的置信度约 {assessment.score:.2f}，问题样本现在有 {result.example_count} 条。")
         return True
     return False
 

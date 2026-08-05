@@ -11,11 +11,13 @@ from ..structure import Entity, Query
 from .capabilities import QueryParser
 from .normalization import is_question_noise, normalize_question
 from .text_processing import split_query_candidate
+from .uncertainty import DIRECT_CONFIDENCE_THRESHOLD
 
 
 QUERY_DATA_PATH = Path(__file__).resolve().parents[3] / "data" / "query_examples.jsonl"
 QUERY_MODEL_PATH = Path(__file__).resolve().parents[3] / "data" / "query_model.json"
 QUERY_MODEL_SCHEMA = "struct_llm.query_model.v1"
+QUERY_DIRECT_CONFIDENCE = DIRECT_CONFIDENCE_THRESHOLD
 UNRESOLVED_REFERENCE_WORDS = ("前者", "后者", "前一个", "后一个", "它", "他", "她", "这个", "那个")
 QUESTION_MARKER_WORDS = ("谁", "什么", "哪里", "哪儿", "哪", "几个", "多少", "几")
 
@@ -66,7 +68,7 @@ class QueryEvaluationResult:
 @dataclass(frozen=True)
 class LearnedQueryParser:
     examples: tuple[QueryTrainingExample, ...] = ()
-    min_score: float = 0.72
+    min_score: float = QUERY_DIRECT_CONFIDENCE
     patterns: tuple[CompiledQueryPattern, ...] = ()
 
     def __post_init__(self) -> None:
@@ -75,19 +77,19 @@ class LearnedQueryParser:
             object.__setattr__(self, "patterns", model.patterns)
 
     @classmethod
-    def from_jsonl(cls, path: str | Path, min_score: float = 0.72) -> LearnedQueryParser:
+    def from_jsonl(cls, path: str | Path, min_score: float = QUERY_DIRECT_CONFIDENCE) -> LearnedQueryParser:
         return cls.from_examples(load_query_jsonl(path), min_score=min_score)
 
     @classmethod
     def from_examples(
         cls,
         examples: tuple[QueryTrainingExample, ...],
-        min_score: float = 0.72,
+        min_score: float = QUERY_DIRECT_CONFIDENCE,
     ) -> LearnedQueryParser:
         return cls((), min_score=min_score, patterns=compile_query_examples(examples).patterns)
 
     @classmethod
-    def from_model(cls, path: str | Path, min_score: float = 0.72) -> LearnedQueryParser:
+    def from_model(cls, path: str | Path, min_score: float = QUERY_DIRECT_CONFIDENCE) -> LearnedQueryParser:
         return cls((), min_score=min_score, patterns=load_query_model(path).patterns)
 
     def __call__(self, sentence: str, entities: tuple[Entity, ...]) -> Query | None:
@@ -597,11 +599,7 @@ def query_example_score(example: str, sentence: str) -> float:
         return 1.0
     if not example or not sentence:
         return 0.0
-    example_units = character_bigrams(example)
-    sentence_units = character_bigrams(sentence)
-    if not example_units or not sentence_units:
-        return 0.0
-    return len(example_units & sentence_units) / len(example_units | sentence_units)
+    return max(character_bigram_similarity(example, sentence), character_set_similarity(example, sentence))
 
 
 def query_pattern_score(pattern: CompiledQueryPattern, sentence: str) -> float:
@@ -613,9 +611,24 @@ def query_pattern_score(pattern: CompiledQueryPattern, sentence: str) -> float:
         return 0.95
     sentence_units = character_bigrams(sentence)
     feature_units = set(pattern.feature_units)
-    if not sentence_units or not feature_units:
+    bigram_score = 0.0 if not sentence_units or not feature_units else len(feature_units & sentence_units) / len(feature_units | sentence_units)
+    return max(bigram_score, character_set_similarity(pattern.abstract_question, sentence))
+
+
+def character_bigram_similarity(left: str, right: str) -> float:
+    left_units = character_bigrams(left)
+    right_units = character_bigrams(right)
+    if not left_units or not right_units:
         return 0.0
-    return len(feature_units & sentence_units) / len(feature_units | sentence_units)
+    return len(left_units & right_units) / len(left_units | right_units)
+
+
+def character_set_similarity(left: str, right: str) -> float:
+    left_units = set(left)
+    right_units = set(right)
+    if not left_units or not right_units:
+        return 0.0
+    return len(left_units & right_units) / len(left_units | right_units)
 
 
 def character_bigrams(text: str) -> set[str]:

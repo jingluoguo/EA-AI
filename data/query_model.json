@@ -2,8 +2,34 @@
   "schema": "struct_llm.query_model.v1",
   "source_sha256": "c3519883a351468ff1d963df66eaca8f805f3da0de5f46345282ba1ffe8b0606",
   "example_count": 121,
-  "pattern_count": 115,
+  "pattern_count": 112,
   "patterns": [
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 5
+    },
     {
       "abstract_question": "<container>在哪里",
       "entities": [
@@ -36,32 +62,6 @@
       "support": 3
     },
     {
-      "abstract_question": "<item>在哪里",
-      "entities": [
-        {
-          "role": "item",
-          "name": "芯片"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$item#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">在",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "哪里",
-        "在哪"
-      ],
-      "support": 2
-    },
-    {
       "abstract_question": "<item>是谁拿",
       "entities": [
         {
@@ -84,34 +84,6 @@
         "te",
         "是谁",
         "谁拿"
-      ],
-      "support": 2
-    },
-    {
-      "abstract_question": "<item>现在在哪里",
-      "entities": [
-        {
-          "role": "item",
-          "name": "芯片"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$item#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">现",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "哪里",
-        "在哪",
-        "在在",
-        "现在"
       ],
       "support": 2
     },
@@ -139,6 +111,36 @@
         "pl",
         "什么",
         "有什",
+        "里有"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<place>里有几个东西",
+      "entities": [
+        {
+          "role": "place",
+          "name": "实验室"
+        }
+      ],
+      "query": {
+        "intent": "count",
+        "target": "$place#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">里",
+        "ac",
+        "ce",
+        "e>",
+        "la",
+        "pl",
+        "东西",
+        "个东",
+        "几个",
+        "有几",
         "里有"
       ],
       "support": 2
@@ -211,7 +213,7 @@
       "support": 1
     },
     {
-      "abstract_question": "<container>现在是什么状态",
+      "abstract_question": "<container>是什么状态",
       "entities": [
         {
           "role": "container",
@@ -228,7 +230,7 @@
       },
       "feature_units": [
         "<c",
-        ">现",
+        ">是",
         "ai",
         "co",
         "er",
@@ -240,10 +242,8 @@
         "ta",
         "么状",
         "什么",
-        "在是",
         "是什",
-        "状态",
-        "现在"
+        "状态"
       ],
       "support": 1
     },
@@ -425,56 +425,6 @@
         "后发",
         "生了",
         "里取"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<item>到底被谁放进了<container>里面",
-      "entities": [
-        {
-          "role": "item",
-          "name": "芯片"
-        },
-        {
-          "role": "container",
-          "name": "托盘"
-        }
-      ],
-      "query": {
-        "intent": "actor_for_event",
-        "target": "put_in",
-        "qualifiers": [
-          "item=$item#1",
-          "holder=$container#1"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<c",
-        "<i",
-        ">到",
-        ">里",
-        "ai",
-        "co",
-        "em",
-        "er",
-        "in",
-        "it",
-        "m>",
-        "ne",
-        "nt",
-        "on",
-        "r>",
-        "ta",
-        "te",
-        "了<",
-        "到底",
-        "底被",
-        "放进",
-        "被谁",
-        "谁放",
-        "进了",
-        "里面"
       ],
       "support": 1
     },
@@ -906,34 +856,6 @@
         "m>",
         "te",
         "存在"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<item>实际在哪里",
-      "entities": [
-        {
-          "role": "item",
-          "name": "芯片"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$item#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">实",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "哪里",
-        "在哪",
-        "实际",
-        "际在"
       ],
       "support": 1
     },
@@ -1747,6 +1669,54 @@
         "被谁",
         "谁放",
         "进<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>被谁放进了<container>里面",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        },
+        {
+          "role": "container",
+          "name": "托盘"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_event",
+        "target": "put_in",
+        "qualifiers": [
+          "item=$item#1",
+          "holder=$container#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">被",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "了<",
+        "放进",
+        "被谁",
+        "谁放",
+        "进了",
+        "里面"
       ],
       "support": 1
     },
@@ -2648,7 +2618,7 @@
       "support": 1
     },
     {
-      "abstract_question": "<place>和<place>里的已知物品一样多",
+      "abstract_question": "<place>和<place>里的已知东西一样多",
       "entities": [
         {
           "role": "place",
@@ -2678,13 +2648,13 @@
         "la",
         "pl",
         "一样",
+        "东西",
         "和<",
-        "品一",
         "已知",
         "样多",
-        "物品",
         "的已",
-        "知物",
+        "知东",
+        "西一",
         "里的"
       ],
       "support": 1
@@ -2836,66 +2806,6 @@
         "pl",
         "什么",
         "有什",
-        "里有"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<place>里有几个东西",
-      "entities": [
-        {
-          "role": "place",
-          "name": "实验室"
-        }
-      ],
-      "query": {
-        "intent": "count",
-        "target": "$place#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">里",
-        "ac",
-        "ce",
-        "e>",
-        "la",
-        "pl",
-        "东西",
-        "个东",
-        "几个",
-        "有几",
-        "里有"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<place>里有几个物品",
-      "entities": [
-        {
-          "role": "place",
-          "name": "实验室"
-        }
-      ],
-      "query": {
-        "intent": "count",
-        "target": "$place#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">里",
-        "ac",
-        "ce",
-        "e>",
-        "la",
-        "pl",
-        "个物",
-        "几个",
-        "有几",
-        "物品",
         "里有"
       ],
       "support": 1

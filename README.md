@@ -74,8 +74,9 @@
 | 8. Query 理解 | 把问题变成可计算查询 | 抽象问题匹配；字符 bigram 相似度；角色槽位实例化；复合查询组合 | `query_learning.py`、`QUERY` |
 | 9. 状态投影 | 从历史事件得到当前世界状态 | 事件 schema；状态 projector；状态 reducer；后发生事件覆盖旧状态 | `state_engine.py`、`event_schema.py`、`STATE` |
 | 10. 结构推理 | 根据结构推导规则和答案 | frame 角色匹配；状态查询；关系闭包；事件约束；反事实重放；答案生成器 | `inference.py`、`RULE`、answerer |
-| 11. 自学习反馈 | 未命中时让用户确认相似含义并沉淀 | 低阈值相似结构召回；中文确认式交互；确认后写回 JSONL；重新编译；立即重试 | `feedback_learning.py`、`struct-ask --learn-on-fail`、`suggest_query_feedback()`、`accept_query_suggestion()` |
-| 12. 实验验证 | 验证训练集、模型产物和端到端行为 | 数据集评估；unittest 回归；结构线性化断言；端到端答案断言 | `make check`、`uv run python -m unittest discover -q -b` |
+| 11. 不确定性决策 | 按置信度决定回答、确认或学习 | 置信度分段；`>=0.90` 直接回答；`0.50-0.90` 询问确认；`<0.50` 引导学习 | `uncertainty.py`、`feedback_learning.py` |
+| 12. 自学习反馈 | 未命中时让用户确认相似含义并沉淀 | 中置信相似结构召回；中文确认式交互；确认后写回 JSONL；重新编译；立即重试 | `feedback_learning.py`、`struct-ask --learn-on-fail`、`assess_query_uncertainty()`、`accept_query_suggestion()` |
+| 13. 实验验证 | 验证训练集、模型产物和端到端行为 | 数据集评估；unittest 回归；结构线性化断言；端到端答案断言 | `make check`、`uv run python -m unittest discover -q -b` |
 
 这里的“模型产物”目前不是神经网络权重，而是由训练样本编译出的结构能力文件。它保存抽象后的问题模式、句子模板、槽位角色、结构模板、特征单元、样本数量和数据指纹。后续如果替换成分类器、向量检索、生成模型或真正的神经模型，只需要替换 `query_learning.py`、`statement_learning.py` 里的学习能力实现，不需要把逻辑堆回 `reasoner.py`。
 
@@ -89,6 +90,7 @@
 - 结构槽位：用 `$item#1`、`$container#1`、`$person#1` 这类槽位表达实体角色和出现顺序。
 - 表层归一化：在 `normalization.py` 中统一语气词、同义动作、容器后缀、提问外壳和“啥/什么”等表层差异。
 - 抽象特征匹配：Query 编译后使用抽象问题和字符 bigram 特征寻找相似结构；未命中时也用同一套相似度给用户推荐可能含义。
+- 不确定性策略：`uncertainty.py` 统一管理置信度阈值，避免在 CLI 或推理层写散落判断。
 - 模板实例化：Statement 编译后使用句子模板抽取槽位，再实例化为 `ENTITY + FRAME/ROLE`。
 - 状态投影：`state_engine.py` 把历史 `FRAME` 转成当前 `STATE`，并处理后发生事件覆盖旧状态。
 - 结构推理：`inference.py` 基于 frame 角色匹配、状态查询、关系闭包、事件约束和反事实重放生成 `RULE` 和答案。
@@ -220,7 +222,15 @@ make check
 make ask TEXT="你擅长什么"
 ```
 
-如果没有命中现有模型，它会先拿现有训练模型找相似含义，例如问你“是不是在问我能做什么”。你确认后，它会把原句按相同结构写入 JSONL，并重新编译模型；只有猜不到或你否认时，才进入手动引导。
+运行时会按同一套模型相似度做不确定性决策：
+
+| 置信度 | 行为 |
+| --- | --- |
+| `>= 0.90` | 认为结构足够确定，直接回答。 |
+| `0.50 - 0.90` | 不直接猜答案，先问用户“是不是这个意思”。确认后写回 JSONL、重新编译模型，再重试回答。 |
+| `< 0.50` | 承认没有找到足够相近的已学结构，进入引导式标注。 |
+
+所以如果一句话没有直接命中现有模型，它会先拿模型产物找相似含义，例如问你“它是不是在询问我能做什么”。你确认后，它会把原句按相同结构写入 JSONL，并重新编译模型；只有低置信或你否认时，才进入手动引导。
 
 ### 喂意图数据
 

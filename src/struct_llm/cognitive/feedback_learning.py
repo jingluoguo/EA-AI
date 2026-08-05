@@ -24,6 +24,11 @@ from .statement_learning import (
     compile_statement_model_from_jsonl,
     save_statement_model,
 )
+from .uncertainty import (
+    CONFIRM_CONFIDENCE_THRESHOLD,
+    DIRECT_CONFIDENCE_THRESHOLD,
+    confidence_band,
+)
 
 
 @dataclass(frozen=True)
@@ -46,6 +51,14 @@ class QuerySuggestion:
 
 
 @dataclass(frozen=True)
+class QueryUncertaintyAssessment:
+    text: str
+    score: float
+    band: str
+    suggestion: QuerySuggestion | None = None
+
+
+@dataclass(frozen=True)
 class LearningWriteResult:
     kind: str
     data_path: Path
@@ -57,13 +70,26 @@ class LearningWriteResult:
 def suggest_query_feedback(
     text: str,
     query_parsers: tuple[QueryParser, ...],
-    min_score: float = 0.12,
+    min_score: float = CONFIRM_CONFIDENCE_THRESHOLD,
 ) -> QuerySuggestion | None:
     suggested = suggest_query_pattern(text, (), query_parsers, min_score=min_score)
     if suggested is None:
         return None
     score, pattern = suggested
     return QuerySuggestion(text=text, score=score, pattern=pattern)
+
+
+def assess_query_uncertainty(
+    text: str,
+    query_parsers: tuple[QueryParser, ...],
+) -> QueryUncertaintyAssessment:
+    suggested = suggest_query_pattern(text, (), query_parsers, min_score=0.0)
+    if suggested is None:
+        return QueryUncertaintyAssessment(text=text, score=0.0, band="unknown")
+    score, pattern = suggested
+    band = confidence_band(score)
+    suggestion = QuerySuggestion(text=text, score=score, pattern=pattern) if band != "unknown" else None
+    return QueryUncertaintyAssessment(text=text, score=score, band=band, suggestion=suggestion)
 
 
 def accept_query_suggestion(

@@ -74,8 +74,9 @@ The project works as "training data distills capability; runtime loads the compi
 | 8. Understand Query | Convert questions into computable queries | Abstract question matching; character bigram similarity; role-slot instantiation; compound-query composition | `query_learning.py`, `QUERY` |
 | 9. Project state | Derive current world state from historical events | Event schemas; state projectors; state reducers; later events overwrite earlier state | `state_engine.py`, `event_schema.py`, `STATE` |
 | 10. Reason structurally | Infer rules and answers from structure | Frame-role matching; state lookup; relation closure; event constraints; counterfactual replay; answerers | `inference.py`, `RULE`, answerer |
-| 11. Self-learning feedback | Confirm similar meanings and save missed examples | Low-threshold similar-structure recall; Chinese confirmation prompt; JSONL write-back; recompilation; immediate retry | `feedback_learning.py`, `struct-ask --learn-on-fail`, `suggest_query_feedback()`, `accept_query_suggestion()` |
-| 12. Verify experimentally | Validate datasets, artifacts, and end-to-end behavior | Dataset evaluation; unittest regression; structure linearization assertions; answer assertions | `make check`, `uv run python -m unittest discover -q -b` |
+| 11. Uncertainty decision | Choose direct answer, confirmation, or learning by confidence | Confidence bands; `>=0.90` answers directly; `0.50-0.90` asks for confirmation; `<0.50` starts guided learning | `uncertainty.py`, `feedback_learning.py` |
+| 12. Self-learning feedback | Confirm similar meanings and save missed examples | Mid-confidence similar-structure recall; Chinese confirmation prompt; JSONL write-back; recompilation; immediate retry | `feedback_learning.py`, `struct-ask --learn-on-fail`, `assess_query_uncertainty()`, `accept_query_suggestion()` |
+| 13. Verify experimentally | Validate datasets, artifacts, and end-to-end behavior | Dataset evaluation; unittest regression; structure linearization assertions; answer assertions | `make check`, `uv run python -m unittest discover -q -b` |
 
 The current "model artifact" is not neural-network weights. It is a structural capability file compiled from training examples. It stores abstract question patterns, sentence templates, slot roles, structure templates, feature units, example counts, and source-data fingerprints. Later, a classifier, vector retriever, generator, or real neural model can replace the learner internals in `query_learning.py` and `statement_learning.py` without pushing logic back into `reasoner.py`.
 
@@ -89,6 +90,7 @@ The default implementation is intentionally lightweight and uses only the Python
 - Structural slots: `$item#1`, `$container#1`, `$person#1` encode entity roles and occurrence order.
 - Surface normalization: `normalization.py` unifies particles, synonym actions, container suffixes, question wrappers, and surface variants such as `啥/什么`.
 - Abstract feature matching: compiled Query models use abstract questions and character bigram features to find similar structures; missed inputs use the same similarity path to ask the user for confirmation.
+- Uncertainty policy: `uncertainty.py` owns confidence thresholds so CLI and reasoning layers do not grow scattered decisions.
 - Template instantiation: compiled Statement models extract slots from sentence templates and instantiate `ENTITY + FRAME/ROLE`.
 - State projection: `state_engine.py` turns historical `FRAME` values into current `STATE` values and handles later events overwriting earlier state.
 - Structural inference: `inference.py` produces `RULE` and answers from frame-role matching, state lookup, relation closure, event constraints, and counterfactual replay.
@@ -220,7 +222,15 @@ For daily testing, use:
 make ask TEXT="你擅长什么"
 ```
 
-If the model cannot parse it, it first searches the existing learned model for a similar meaning and asks for confirmation. If you confirm, it saves the original sentence with that structure and recompiles the model; only rejected or unclear cases fall back to manual guidance.
+Runtime behavior follows one confidence policy:
+
+| Confidence | Behavior |
+| --- | --- |
+| `>= 0.90` | Treat the structure as certain enough and answer directly. |
+| `0.50 - 0.90` | Do not guess the answer; ask the user to confirm the inferred meaning first. If confirmed, write the sentence back to JSONL, recompile the model, and retry. |
+| `< 0.50` | Admit that no close learned structure was found and start guided labeling. |
+
+If the model cannot answer directly, it first searches the compiled model artifact for a similar meaning, for example asking whether the sentence means "asking what I can do." Confirmed feedback is saved with that structure and recompiled; only low-confidence or rejected suggestions fall back to manual guidance.
 
 ### Feeding Intent Data
 

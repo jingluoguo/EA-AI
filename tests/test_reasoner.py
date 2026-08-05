@@ -18,6 +18,8 @@ from struct_llm.cognitive.intent_dataset import (
 from struct_llm.cognitive.feedback_learning import (
     LearningPaths,
     accept_query_suggestion,
+    assess_query_uncertainty,
+    confidence_band,
     save_manual_query_feedback,
     save_manual_statement_feedback,
     suggest_query_feedback,
@@ -208,6 +210,27 @@ class ReasonerTest(unittest.TestCase):
         self.assertIsNotNone(suggestion)
         assert suggestion is not None
         self.assertEqual(suggestion.query.linearize(), "QUERY dialog_act(capabilities)")
+
+    def test_query_uncertainty_bands_direct_confirm_and_unknown(self) -> None:
+        parser = LearnedQueryParser.from_model("data/query_model.json")
+
+        direct = parser("你能做什么", ())
+        confirm = suggest_query_feedback("你会做啥", (parser,))
+        unknown = suggest_query_feedback("风雨雷电云山河", (parser,))
+        confirm_assessment = assess_query_uncertainty("你会做啥", (parser,))
+        unknown_assessment = assess_query_uncertainty("风雨雷电云山河", (parser,))
+
+        self.assertIsNotNone(direct)
+        self.assertIsNone(parser("你会做啥", ()))
+        self.assertIsNotNone(confirm)
+        assert confirm is not None
+        self.assertEqual(confidence_band(confirm.score), "confirm")
+        self.assertEqual(confirm.query.linearize(), "QUERY dialog_act(capabilities)")
+        self.assertIsNone(unknown)
+        self.assertEqual(confirm_assessment.band, "confirm")
+        self.assertIsNotNone(confirm_assessment.suggestion)
+        self.assertEqual(unknown_assessment.band, "unknown")
+        self.assertIsNone(unknown_assessment.suggestion)
 
     def test_query_feedback_accepts_suggested_structure_without_cli_coupling(self) -> None:
         base_parser = LearnedQueryParser.from_model("data/query_model.json")
