@@ -1,8 +1,8 @@
 {
   "schema": "struct_llm.query_model.v1",
-  "source_sha256": "beb74ddad7e6ed4ac0b6a840517a2e8f34b08b5ce7737366a53e91dd9e7fd0bb",
-  "example_count": 118,
-  "pattern_count": 112,
+  "source_sha256": "c3519883a351468ff1d963df66eaca8f805f3da0de5f46345282ba1ffe8b0606",
+  "example_count": 121,
+  "pattern_count": 115,
   "patterns": [
     {
       "abstract_question": "<container>在哪里",
@@ -3187,6 +3187,57 @@
       },
       "feature_units": [
         "你好"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你擅长什么",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "capabilities",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "什么",
+        "你擅",
+        "擅长",
+        "长什"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你是什么呀",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "identity",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "么呀",
+        "什么",
+        "你是",
+        "是什"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你是干什么",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "identity",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "什么",
+        "你是",
+        "干什",
+        "是干"
       ],
       "support": 1
     },

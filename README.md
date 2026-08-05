@@ -58,6 +58,46 @@
 
 这个顺序很重要。陈述句按原文顺序处理，后发生的放入、移动、交接、涂色会覆盖同一对象的旧当前状态；历史事件仍保留在 `FRAME` 里，所以“现在在哪里”和“谁曾经把 X 放进 Y”可以同时成立。
 
+### 完整实现流程
+
+项目现在按“训练数据沉淀能力，运行时加载能力产物”的方式工作：
+
+| 阶段 | 做什么 | 用到的方法 / 技术 | 主要代码 / 产物 |
+| --- | --- | --- | --- |
+| 1. 收集样本 | 保存用户输入、失败案例和人工反馈 | JSONL 追加式数据集；训练样本 schema；人工确认反馈 | `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl` |
+| 2. 样本校验 | 确认样本字段完整、结构合法 | 结构化 schema 校验；`dataclass` 样本对象；槽位字段检查 | `query_learning.py`、`statement_learning.py`、`intent_dataset.py` |
+| 3. 编译模型产物 | 把训练样本沉淀成运行时能力文件 | 结构模板聚合；抽象问题模式；字符 bigram 特征；源数据 `sha256` 指纹；原子写入 JSON | `make model`、`struct-compile-query`、`struct-compile-statement`、`data/query_model.json`、`data/statement_model.json` |
+| 4. 运行时加载 | 启动时加载编译后的能力，而不是扫描训练集 | 模型 artifact 加载；能力函数注册；可替换 learner 接口 | `reasoner.default_capabilities()`、`LearnedQueryParser.from_model()`、`LearnedStatementParser.from_model()`、`CognitiveCapabilities` |
+| 5. 文本切分 | 把输入拆成陈述片段和查询候选 | 标点切句；逗号/分号候选拆分；聊天片段保留；尾句保留 | `text_processing.py` |
+| 6. 表层归一化 | 剥离不影响语义的表层差异 | 语气词清理；提问外壳清理；同义动作归一；容器后缀归一；`啥 -> 什么` | `normalization.py` |
+| 7. 陈述理解 | 把陈述句变成实体和历史事件 | 句子模板槽位抽取；实体角色实例化；`FRAME/ROLE` 结构模板实例化 | `statement_learning.py`、`ENTITY`、`FRAME`、`ROLE` |
+| 8. Query 理解 | 把问题变成可计算查询 | 抽象问题匹配；字符 bigram 相似度；角色槽位实例化；复合查询组合 | `query_learning.py`、`QUERY` |
+| 9. 状态投影 | 从历史事件得到当前世界状态 | 事件 schema；状态 projector；状态 reducer；后发生事件覆盖旧状态 | `state_engine.py`、`event_schema.py`、`STATE` |
+| 10. 结构推理 | 根据结构推导规则和答案 | frame 角色匹配；状态查询；关系闭包；事件约束；反事实重放；答案生成器 | `inference.py`、`RULE`、answerer |
+| 11. 自学习反馈 | 未命中时让用户确认相似含义并沉淀 | 低阈值相似结构召回；中文确认式交互；确认后写回 JSONL；重新编译；立即重试 | `feedback_learning.py`、`struct-ask --learn-on-fail`、`suggest_query_feedback()`、`accept_query_suggestion()` |
+| 12. 实验验证 | 验证训练集、模型产物和端到端行为 | 数据集评估；unittest 回归；结构线性化断言；端到端答案断言 | `make check`、`uv run python -m unittest discover -q -b` |
+
+这里的“模型产物”目前不是神经网络权重，而是由训练样本编译出的结构能力文件。它保存抽象后的问题模式、句子模板、槽位角色、结构模板、特征单元、样本数量和数据指纹。后续如果替换成分类器、向量检索、生成模型或真正的神经模型，只需要替换 `query_learning.py`、`statement_learning.py` 里的学习能力实现，不需要把逻辑堆回 `reasoner.py`。
+
+### 用到的技术
+
+当前实现刻意保持轻量，核心路径只依赖 Python 标准库：
+
+- Python `dataclass`：定义 `Entity`、`Frame`、`Role`、`State`、`Query`、`Intention`、训练样本和编译模型结构。
+- JSONL 数据集：用 `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl` 保存可增量追加的训练/反馈样本。
+- 编译 JSON 模型：用 `data/query_model.json`、`data/statement_model.json` 保存从训练集中沉淀出的运行时能力。
+- 结构槽位：用 `$item#1`、`$container#1`、`$person#1` 这类槽位表达实体角色和出现顺序。
+- 表层归一化：在 `normalization.py` 中统一语气词、同义动作、容器后缀、提问外壳和“啥/什么”等表层差异。
+- 抽象特征匹配：Query 编译后使用抽象问题和字符 bigram 特征寻找相似结构；未命中时也用同一套相似度给用户推荐可能含义。
+- 模板实例化：Statement 编译后使用句子模板抽取槽位，再实例化为 `ENTITY + FRAME/ROLE`。
+- 状态投影：`state_engine.py` 把历史 `FRAME` 转成当前 `STATE`，并处理后发生事件覆盖旧状态。
+- 结构推理：`inference.py` 基于 frame 角色匹配、状态查询、关系闭包、事件约束和反事实重放生成 `RULE` 和答案。
+- 能力注册：`CognitiveCapabilities` 把陈述学习、Query 学习、状态投影、状态覆盖、规则推导和答案生成组合为可替换能力。
+- 反馈学习服务：`feedback_learning.py` 封装相似建议、用户确认后的写回和模型重编译；CLI 只负责交互展示。
+- CLI 与 Makefile：`struct-ask`、`struct-compile-*`、`struct-eval-*` 提供命令入口；`make model`、`make check`、`make ask` 是日常使用入口。
+- unittest 回归：`tests/test_reasoner.py` 覆盖数据 loader、反馈写入、模型编译、运行时加载、结构推理和端到端回答。
+- 可选 tiny Transformer：`model.py`、`vocab.py`、`struct-train-tiny` 预留神经模型入口，目前不参与默认结构推理路径。
+
 ### 能力组合
 
 当前认知内核用 `CognitiveCapabilities` 组合学习、状态、推理和答案能力：
@@ -171,6 +211,16 @@ uv run struct-ask \
 make model
 make check
 ```
+
+### 交互式自学习
+
+日常测试直接用：
+
+```bash
+make ask TEXT="你擅长什么"
+```
+
+如果没有命中现有模型，它会先拿现有训练模型找相似含义，例如问你“是不是在问我能做什么”。你确认后，它会把原句按相同结构写入 JSONL，并重新编译模型；只有猜不到或你否认时，才进入手动引导。
 
 ### 喂意图数据
 
@@ -303,7 +353,7 @@ struct-make-dataset = struct_llm.cli:make_dataset
 struct-train-tiny = struct_llm.cli:train_tiny_model
 ```
 
-`Makefile` 是日常入口。`make ask` 会调用 `uv run struct-ask "$(TEXT)"`；`make test` 会调用标准库 unittest。
+`Makefile` 是日常入口。`make ask` 会调用 `uv run struct-ask --learn-on-fail "$(TEXT)"`；`make test` 会调用标准库 unittest。
 
 `structure.py` 定义所有中间结构。优先扩展这里的结构模型，而不是把语义塞进字符串。
 

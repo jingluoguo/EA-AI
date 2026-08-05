@@ -79,6 +79,7 @@ CHAT_EXPRESSION_HINTS = (
 
 def normalize_question(sentence: str) -> str:
     normalized = sentence.strip().replace("？", "").replace("?", "")
+    normalized = normalized.replace("啥", "什么")
     changed = True
     while changed:
         previous = normalized

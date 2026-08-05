@@ -1,13 +1,29 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
+from .errors import ParseError
 from .cognitive.intent_dataset import append_intent_record, build_intent_record
 from .cognitive.intent_learning import InMemoryIntentAnalyzer, evaluate_intent_analyzer, from_jsonl
-from .cognitive.query_learning import LearnedQueryParser, evaluate_query_parser, load_query_jsonl
+from .cognitive.feedback_learning import (
+    LearningPaths,
+    accept_query_suggestion,
+    save_manual_query_feedback,
+    save_manual_statement_feedback,
+    suggest_query_feedback,
+)
+from .cognitive.query_learning import (
+    EntityExample,
+    LearnedQueryParser,
+    evaluate_query_parser,
+    load_query_jsonl,
+)
 from .cognitive.query_learning import compile_query_model_from_jsonl, save_query_model
 from .cognitive.statement_learning import (
+    EntitySlot,
+    FrameTemplate,
     LearnedStatementParser,
     compile_statement_model_from_jsonl,
     evaluate_statement_parser,
@@ -42,21 +58,22 @@ def ask_symbolic() -> None:
     parser.add_argument("--statement-data", help="JSONL file with learned statement examples.")
     parser.add_argument("--statement-model", help="Compiled statement model artifact.")
     parser.add_argument("--statement-min-score", type=float, default=0.58)
+    parser.add_argument("--learn-on-fail", action="store_true", help="Prompt for feedback when structure extraction fails.")
     args = parser.parse_args()
     capabilities = default_capabilities()
-    if args.statement_model:
+    if args.statement_model and Path(args.statement_model).exists():
         capabilities = capabilities.replace_statement_parsers(
             LearnedStatementParser.from_model(Path(args.statement_model), min_score=args.statement_min_score)
         )
-    elif args.statement_data:
+    elif args.statement_data and Path(args.statement_data).exists():
         capabilities = capabilities.replace_statement_parsers(
             LearnedStatementParser.from_jsonl(Path(args.statement_data), min_score=args.statement_min_score)
         )
-    if args.query_model:
+    if args.query_model and Path(args.query_model).exists():
         capabilities = capabilities.replace_query_parsers(
             LearnedQueryParser.from_model(Path(args.query_model), min_score=args.query_min_score)
         )
-    elif args.query_data:
+    elif args.query_data and Path(args.query_data).exists():
         capabilities = capabilities.replace_query_parsers(
             LearnedQueryParser.from_jsonl(Path(args.query_data), min_score=args.query_min_score)
         )
@@ -65,7 +82,7 @@ def ask_symbolic() -> None:
         capabilities = capabilities.with_intent_analyzers(analyzer)
 
     if args.text:
-        print_prediction(args.text, capabilities)
+        print_prediction_with_learning(args.text, capabilities, args)
         return
 
     print("输入一句话，按回车推理；输入 exit 退出。")
@@ -74,7 +91,7 @@ def ask_symbolic() -> None:
         if text.lower() in {"exit", "quit", "q"}:
             break
         if text:
-            print_prediction(text, capabilities)
+            print_prediction_with_learning(text, capabilities, args)
 
 
 def ask_neural() -> None:
@@ -146,7 +163,7 @@ def eval_intent_examples() -> None:
     analyzer = InMemoryIntentAnalyzer.from_jsonl(Path(args.train_data), min_score=args.intent_min_score)
     examples = from_jsonl(Path(args.eval_data or args.train_data))
     result = evaluate_intent_analyzer(analyzer, examples)
-    print(f"intent_examples={result.total} matched={result.matched} accuracy={result.accuracy:.2f}")
+    print(f"意图样本={result.total} 命中={result.matched} 准确率={result.accuracy:.2f}")
 
 
 def eval_query_examples() -> None:
@@ -163,7 +180,7 @@ def eval_query_examples() -> None:
         else LearnedQueryParser.from_examples(examples, min_score=args.query_min_score)
     )
     result = evaluate_query_parser(query_parser, examples)
-    print(f"query_examples={result.total} matched={result.matched} accuracy={result.accuracy:.2f}")
+    print(f"问题样本={result.total} 命中={result.matched} 准确率={result.accuracy:.2f}")
 
 
 def eval_statement_examples() -> None:
@@ -180,7 +197,7 @@ def eval_statement_examples() -> None:
         else LearnedStatementParser.from_examples(examples, min_score=args.statement_min_score)
     )
     result = evaluate_statement_parser(statement_parser, examples)
-    print(f"statement_examples={result.total} matched={result.matched} accuracy={result.accuracy:.2f}")
+    print(f"陈述样本={result.total} 命中={result.matched} 准确率={result.accuracy:.2f}")
 
 
 def compile_query_model() -> None:
@@ -191,9 +208,7 @@ def compile_query_model() -> None:
 
     model = compile_query_model_from_jsonl(Path(args.query_data))
     save_query_model(model, Path(args.output))
-    print(
-        f"compiled_query_model examples={model.example_count} patterns={len(model.patterns)} output={args.output}"
-    )
+    print(f"已生成问题模型：样本={model.example_count} 模式={len(model.patterns)} 输出={args.output}")
 
 
 def compile_statement_model() -> None:
@@ -204,9 +219,7 @@ def compile_statement_model() -> None:
 
     model = compile_statement_model_from_jsonl(Path(args.statement_data))
     save_statement_model(model, Path(args.output))
-    print(
-        f"compiled_statement_model examples={model.example_count} patterns={len(model.patterns)} output={args.output}"
-    )
+    print(f"已生成陈述模型：样本={model.example_count} 模式={len(model.patterns)} 输出={args.output}")
 
 
 def print_prediction(question: str, capabilities=None) -> None:
@@ -217,6 +230,240 @@ def print_prediction(question: str, capabilities=None) -> None:
     print(prediction.structure.linearize())
     print()
     print(prediction.answer)
+
+
+def print_prediction_with_learning(question: str, capabilities, args) -> None:
+    try:
+        print_prediction(question, capabilities)
+    except ParseError:
+        if not getattr(args, "learn_on_fail", False):
+            raise
+        print("这句话我还没有学会。")
+        learned = prompt_learning_feedback(question, args)
+        if not learned:
+            print("已跳过，不写入训练集。")
+            return
+        refreshed = capabilities_after_recompile(args)
+        print("我已经记下并重新整理模型了。现在重试一次：")
+        try:
+            print_prediction(question, refreshed)
+        except ParseError:
+            print("样本已经保存，不过当前还不能完整回答。后续补更多同类样本后会更稳。")
+
+
+def prompt_learning_feedback(text: str, args) -> bool:
+    print("你愿意教我一下吗？我会把它沉淀到训练集里。")
+    if prompt_similar_query_feedback(text, args):
+        return True
+    choice = choose_from_menu(
+        "这句话更像哪一类？",
+        (
+            ("1", "问题或追问", "用户在问一件事，希望我回答。"),
+            ("2", "事实陈述", "用户在告诉我一件事实或事件。"),
+            ("3", "行为意图", "用户在描述某人的目标、想法或动机。"),
+            ("4", "先跳过", "这次不写入训练集。"),
+        ),
+    )
+    if choice == "1":
+        return prompt_query_feedback(text, args)
+    if choice == "2":
+        return prompt_statement_feedback(text, args)
+    if choice == "3":
+        return prompt_intent_feedback(text, args)
+    return False
+
+
+def prompt_similar_query_feedback(text: str, args) -> bool:
+    capabilities = capabilities_after_recompile(args)
+    suggestion = suggest_query_feedback(text, capabilities.query_parsers)
+    if suggestion is None:
+        return False
+    description = describe_query(suggestion.query.target, suggestion.query.intent, suggestion.query.qualifiers)
+    choice = choose_from_menu(
+        f"我猜它的意思是：{description}。对吗？",
+        (
+            ("1", "是这个意思", "把这句话按这个结构沉淀到训练集。"),
+            ("2", "不是", "继续手动教我。"),
+        ),
+    )
+    if choice == "1":
+        result = accept_query_suggestion(suggestion, learning_paths_from_args(args))
+        print(f"已按相似样本学习，匹配置信度约 {suggestion.score:.2f}，问题样本现在有 {result.example_count} 条。")
+        return True
+    return False
+
+
+def prompt_query_feedback(text: str, args) -> bool:
+    question = text
+    kind = choose_from_menu(
+        "它想问什么？",
+        (
+            ("1", "你能做什么", "学习为能力介绍。"),
+            ("2", "你是谁", "学习为身份介绍。"),
+            ("3", "打招呼", "学习为问候。"),
+            ("4", "表示感谢", "学习为感谢。"),
+            ("5", "告别", "学习为告别。"),
+            ("6", "总结一下", "学习为对话摘要。"),
+            ("7", "自定义结构", "手动提供结构类型、目标和限定条件。"),
+        ),
+    )
+    intent, target, entities, qualifiers = query_feedback_values(kind)
+    if kind == "7":
+        raw_entities = input_default("实体列表，留空表示没有", "[]")
+        intent = input_required("结构类型")
+        target = input_required("查询目标")
+        raw_qualifiers = input_default("限定条件，多个用逗号分开", "")
+        entities = tuple(
+            EntityExample(str(item["role"]), str(item["name"])) for item in parse_json_list(raw_entities, "实体列表")
+        )
+        qualifiers = tuple(value.strip() for value in raw_qualifiers.split(",") if value.strip())
+    result = save_manual_query_feedback(
+        question,
+        intent,
+        target,
+        learning_paths_from_args(args),
+        entities=entities,
+        qualifiers=qualifiers,
+    )
+    print(f"已保存问题样本并重新编译，问题样本现在有 {result.example_count} 条。")
+    return True
+
+
+def describe_query(target: str, intent: str, qualifiers: tuple[str, ...]) -> str:
+    if intent == "dialog_act":
+        if target == "capabilities":
+            return "询问我能做什么"
+        if target == "identity":
+            return "询问我是谁"
+        if target == "greeting":
+            return "打招呼"
+        if target == "thanks":
+            return "表示感谢"
+        if target == "farewell":
+            return "告别"
+        if target == "summary":
+            return "让总结一下"
+    if intent == "location":
+        return f"询问{target}在哪里"
+    if intent == "contents":
+        return f"询问{target}里有什么"
+    if qualifiers:
+        return f"{intent}，目标是 {target}，条件是 {'，'.join(qualifiers)}"
+    return f"{intent}，目标是 {target}"
+
+
+def prompt_statement_feedback(text: str, args) -> bool:
+    print("这类样本需要标出“实体槽位”和“事件结构”。")
+    print('例：句子模板可以写成 "$person#1把$item#1放进$container#1"。')
+    sentence = input_default("要学习的原句", text)
+    sentence_template = input_required("句子模板")
+    raw_entities = input_required("实体列表")
+    raw_frames = input_required("事件结构列表")
+    entities = tuple(EntitySlot(str(item["role"]), str(item["name"])) for item in parse_json_list(raw_entities, "实体列表"))
+    frames = tuple(frame_template_from_feedback(item) for item in parse_json_list(raw_frames, "事件结构列表"))
+    result = save_manual_statement_feedback(
+        sentence,
+        sentence_template,
+        learning_paths_from_args(args),
+        entities=entities,
+        frames=frames,
+    )
+    print(f"已保存陈述样本并重新编译，陈述样本现在有 {result.example_count} 条。")
+    return True
+
+
+def prompt_intent_feedback(text: str, args) -> bool:
+    subject = input_required("这是在描述谁的意图")
+    goal = input_required("这个人想达成什么")
+    belief = input_default("这个人当时相信什么", "")
+    strategy = input_default("这个人可能会怎么做", "")
+    intent_data = Path(getattr(args, "intent_data", None) or "data/intent_examples.jsonl")
+    append_intent_record(
+        intent_data,
+        build_intent_record(
+            text,
+            subject,
+            goal,
+            belief=belief,
+            strategy=strategy,
+            source="human_feedback",
+        ),
+    )
+    return True
+
+
+def learning_paths_from_args(args) -> LearningPaths:
+    return LearningPaths(
+        query_data=Path(getattr(args, "query_data", None) or "data/query_examples.jsonl"),
+        query_model=Path(getattr(args, "query_model", None) or "data/query_model.json"),
+        statement_data=Path(getattr(args, "statement_data", None) or "data/statement_examples.jsonl"),
+        statement_model=Path(getattr(args, "statement_model", None) or "data/statement_model.json"),
+    )
+
+
+def frame_template_from_feedback(record: dict) -> FrameTemplate:
+    frame_type = str(record.get("frame_type") or "").strip()
+    roles = record.get("roles")
+    if not frame_type or not isinstance(roles, dict):
+        raise ValueError("事件结构需要包含 frame_type 和 roles。")
+    return FrameTemplate(frame_type, tuple((str(key), str(value)) for key, value in roles.items()))
+
+
+def parse_json_list(raw: str, label: str) -> list[dict]:
+    value = json.loads(raw)
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise ValueError(f"{label}需要是对象列表。")
+    return value
+
+
+def query_feedback_values(kind: str) -> tuple[str, str, tuple[EntityExample, ...], tuple[str, ...]]:
+    if kind == "1":
+        return "dialog_act", "capabilities", (), ()
+    if kind == "2":
+        return "dialog_act", "identity", (), ()
+    if kind == "3":
+        return "dialog_act", "greeting", (), ()
+    if kind == "4":
+        return "dialog_act", "thanks", (), ()
+    if kind == "5":
+        return "dialog_act", "farewell", (), ()
+    if kind == "6":
+        return "dialog_act", "summary", (), ()
+    return "", "", (), ()
+
+
+def choose_from_menu(title: str, options: tuple[tuple[str, str, str], ...]) -> str:
+    print(title)
+    for key, label, description in options:
+        print(f"{key}. {label}：{description}")
+    allowed = {key for key, _, _ in options}
+    while True:
+        choice = input("请选择编号> ").strip()
+        if choice in allowed:
+            return choice
+
+
+def input_default(label: str, default: str) -> str:
+    value = input(f"{label} [{default}]> ").strip()
+    return value or default
+
+
+def input_required(label: str) -> str:
+    while True:
+        value = input(f"{label}> ").strip()
+        if value:
+            return value
+
+
+def capabilities_after_recompile(args):
+    capabilities = default_capabilities()
+    query_model = getattr(args, "query_model", None)
+    statement_model = getattr(args, "statement_model", None)
+    if statement_model and Path(statement_model).exists():
+        capabilities = capabilities.replace_statement_parsers(LearnedStatementParser.from_model(Path(statement_model)))
+    if query_model and Path(query_model).exists():
+        capabilities = capabilities.replace_query_parsers(LearnedQueryParser.from_model(Path(query_model)))
+    return capabilities
 
 
 def print_neural_prediction(output: str) -> None:

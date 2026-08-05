@@ -15,6 +15,13 @@ from struct_llm.cognitive.intent_dataset import (
     intent_record_from_dict,
     load_intent_jsonl,
 )
+from struct_llm.cognitive.feedback_learning import (
+    LearningPaths,
+    accept_query_suggestion,
+    save_manual_query_feedback,
+    save_manual_statement_feedback,
+    suggest_query_feedback,
+)
 from struct_llm.cognitive.intent_learning import InMemoryIntentAnalyzer, evaluate_intent_analyzer
 from struct_llm.cognitive.query_learning import (
     LearnedQueryParser,
@@ -25,9 +32,12 @@ from struct_llm.cognitive.query_learning import (
     save_query_model,
 )
 from struct_llm.cognitive.statement_learning import (
+    EntitySlot,
+    FrameTemplate,
     LearnedStatementParser,
     compile_statement_model_from_jsonl,
     evaluate_statement_parser,
+    linearize_statement_result,
     load_statement_jsonl,
     load_statement_model,
     normalize_statement_text,
@@ -98,6 +108,33 @@ class ReasonerTest(unittest.TestCase):
         self.assertTrue(loaded_model.source_sha256)
         self.assertEqual(result.accuracy, 1.0)
 
+    def test_statement_feedback_appends_and_compiles_into_model(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            data_path = Path(directory) / "statement_examples.jsonl"
+            model_path = Path(directory) / "statement_model.json"
+            result = save_manual_statement_feedback(
+                "小王打开盒子",
+                "$person#1打开$container#1",
+                LearningPaths(statement_data=data_path, statement_model=model_path),
+                entities=(
+                    EntitySlot("person", "$person#1"),
+                    EntitySlot("container", "$container#1"),
+                ),
+                frames=(
+                    FrameTemplate(
+                        "open",
+                        (("actor", "$person#1"), ("theme", "$container#1"), ("result", "打开")),
+                    ),
+                ),
+            )
+            parser = LearnedStatementParser.from_model(model_path)
+            parsed = parser("小王打开盒子")
+
+        self.assertEqual(result.example_count, 1)
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertIn("FRAME open", linearize_statement_result(parsed))
+
     def test_statement_normalization_collapses_container_surface_forms(self) -> None:
         self.assertEqual(
             normalize_statement_text("小王把芯片从托盘里面拿出来"),
@@ -144,6 +181,53 @@ class ReasonerTest(unittest.TestCase):
         self.assertGreater(len(loaded_model.patterns), 0)
         self.assertTrue(loaded_model.source_sha256)
         self.assertEqual(result.accuracy, 1.0)
+
+    def test_query_feedback_appends_and_compiles_into_model(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            data_path = Path(directory) / "query_examples.jsonl"
+            model_path = Path(directory) / "query_model.json"
+            result = save_manual_query_feedback(
+                "你能干嘛",
+                "dialog_act",
+                "capabilities",
+                LearningPaths(query_data=data_path, query_model=model_path),
+            )
+            parser = LearnedQueryParser.from_model(model_path)
+            query = parser("你能干嘛", ())
+
+        self.assertEqual(result.example_count, 1)
+        self.assertIsNotNone(query)
+        assert query is not None
+        self.assertEqual(query.linearize(), "QUERY dialog_act(capabilities)")
+
+    def test_query_feedback_can_suggest_similar_learned_meaning(self) -> None:
+        parser = LearnedQueryParser.from_model("data/query_model.json")
+
+        suggestion = suggest_query_feedback("你擅长啥", (parser,))
+
+        self.assertIsNotNone(suggestion)
+        assert suggestion is not None
+        self.assertEqual(suggestion.query.linearize(), "QUERY dialog_act(capabilities)")
+
+    def test_query_feedback_accepts_suggested_structure_without_cli_coupling(self) -> None:
+        base_parser = LearnedQueryParser.from_model("data/query_model.json")
+        suggestion = suggest_query_feedback("你擅长啥", (base_parser,))
+        self.assertIsNotNone(suggestion)
+        assert suggestion is not None
+        with tempfile.TemporaryDirectory() as directory:
+            data_path = Path(directory) / "query_examples.jsonl"
+            model_path = Path(directory) / "query_model.json"
+            result = accept_query_suggestion(
+                suggestion,
+                LearningPaths(query_data=data_path, query_model=model_path),
+            )
+            parser = LearnedQueryParser.from_model(model_path)
+            query = parser("你擅长啥", ())
+
+        self.assertEqual(result.example_count, 1)
+        self.assertIsNotNone(query)
+        assert query is not None
+        self.assertEqual(query.linearize(), "QUERY dialog_act(capabilities)")
 
     def test_default_module_registry_exposes_outer_system_slots(self) -> None:
         registry = default_module_registry(default_capabilities())

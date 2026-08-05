@@ -7,13 +7,13 @@ demo:
 	uv run struct-demo
 
 ask:
-	uv run struct-ask "$(TEXT)"
+	uv run struct-ask --learn-on-fail "$(TEXT)"
 
 ask-neural:
 	uv run --extra neural struct-ask-neural "$(TEXT)"
 
 chat:
-	uv run struct-ask
+	uv run struct-ask --learn-on-fail
 
 chat-neural:
 	uv run --extra neural struct-ask-neural

@@ -58,6 +58,46 @@ raw text
 
 Order matters. Statements are processed in source order. Later `put_in`, `move`, `give`, and `paint` events overwrite the old current state for the same object. Historical events remain available as `FRAME`, so "where is it now?" and "who previously put X into Y?" can both be answered.
 
+### End-To-End Implementation Flow
+
+The project works as "training data distills capability; runtime loads the compiled capability artifact":
+
+| Stage | Purpose | Method / Technology | Main Code / Artifact |
+| --- | --- | --- | --- |
+| 1. Collect examples | Save user inputs, failures, and human feedback | Append-only JSONL datasets; training schemas; human-confirmed feedback | `data/query_examples.jsonl`, `data/statement_examples.jsonl`, `data/intent_examples.jsonl` |
+| 2. Validate examples | Ensure records are complete and structurally valid | Structured schema validation; `dataclass` sample objects; slot-field checks | `query_learning.py`, `statement_learning.py`, `intent_dataset.py` |
+| 3. Compile model artifacts | Distill training examples into runtime capability files | Structure-template aggregation; abstract question patterns; character bigram features; source-data `sha256`; atomic JSON writes | `make model`, `struct-compile-query`, `struct-compile-statement`, `data/query_model.json`, `data/statement_model.json` |
+| 4. Load at runtime | Load compiled capabilities instead of scanning training data | Model artifact loading; capability-function registration; replaceable learner interfaces | `reasoner.default_capabilities()`, `LearnedQueryParser.from_model()`, `LearnedStatementParser.from_model()`, `CognitiveCapabilities` |
+| 5. Split text | Separate statements from query candidates | Punctuation sentence splitting; comma/semicolon candidate splitting; chat-fragment retention; tail retention | `text_processing.py` |
+| 6. Normalize surface form | Remove wording differences that do not change meaning | Particle cleanup; question-wrapper cleanup; synonym action normalization; container-suffix normalization; `啥 -> 什么` | `normalization.py` |
+| 7. Understand statements | Convert statements into entities and historical events | Sentence-template slot extraction; entity-role instantiation; `FRAME/ROLE` template instantiation | `statement_learning.py`, `ENTITY`, `FRAME`, `ROLE` |
+| 8. Understand Query | Convert questions into computable queries | Abstract question matching; character bigram similarity; role-slot instantiation; compound-query composition | `query_learning.py`, `QUERY` |
+| 9. Project state | Derive current world state from historical events | Event schemas; state projectors; state reducers; later events overwrite earlier state | `state_engine.py`, `event_schema.py`, `STATE` |
+| 10. Reason structurally | Infer rules and answers from structure | Frame-role matching; state lookup; relation closure; event constraints; counterfactual replay; answerers | `inference.py`, `RULE`, answerer |
+| 11. Self-learning feedback | Confirm similar meanings and save missed examples | Low-threshold similar-structure recall; Chinese confirmation prompt; JSONL write-back; recompilation; immediate retry | `feedback_learning.py`, `struct-ask --learn-on-fail`, `suggest_query_feedback()`, `accept_query_suggestion()` |
+| 12. Verify experimentally | Validate datasets, artifacts, and end-to-end behavior | Dataset evaluation; unittest regression; structure linearization assertions; answer assertions | `make check`, `uv run python -m unittest discover -q -b` |
+
+The current "model artifact" is not neural-network weights. It is a structural capability file compiled from training examples. It stores abstract question patterns, sentence templates, slot roles, structure templates, feature units, example counts, and source-data fingerprints. Later, a classifier, vector retriever, generator, or real neural model can replace the learner internals in `query_learning.py` and `statement_learning.py` without pushing logic back into `reasoner.py`.
+
+### Technologies Used
+
+The default implementation is intentionally lightweight and uses only the Python standard library on the main path:
+
+- Python `dataclass`: defines `Entity`, `Frame`, `Role`, `State`, `Query`, `Intention`, training examples, and compiled model structures.
+- JSONL datasets: `data/query_examples.jsonl`, `data/statement_examples.jsonl`, and `data/intent_examples.jsonl` store appendable training and feedback records.
+- Compiled JSON models: `data/query_model.json` and `data/statement_model.json` store runtime capabilities distilled from training examples.
+- Structural slots: `$item#1`, `$container#1`, `$person#1` encode entity roles and occurrence order.
+- Surface normalization: `normalization.py` unifies particles, synonym actions, container suffixes, question wrappers, and surface variants such as `啥/什么`.
+- Abstract feature matching: compiled Query models use abstract questions and character bigram features to find similar structures; missed inputs use the same similarity path to ask the user for confirmation.
+- Template instantiation: compiled Statement models extract slots from sentence templates and instantiate `ENTITY + FRAME/ROLE`.
+- State projection: `state_engine.py` turns historical `FRAME` values into current `STATE` values and handles later events overwriting earlier state.
+- Structural inference: `inference.py` produces `RULE` and answers from frame-role matching, state lookup, relation closure, event constraints, and counterfactual replay.
+- Capability registration: `CognitiveCapabilities` composes statement learning, Query learning, state projection, state reduction, rule inference, and answer generation as replaceable capabilities.
+- Feedback-learning service: `feedback_learning.py` encapsulates similar-meaning suggestions, confirmed write-back, and model recompilation; the CLI only handles interaction.
+- CLI and Makefile: `struct-ask`, `struct-compile-*`, and `struct-eval-*` expose commands; `make model`, `make check`, and `make ask` are daily entry points.
+- unittest regression: `tests/test_reasoner.py` covers loaders, feedback writes, model compilation, runtime loading, structural reasoning, and end-to-end answers.
+- Optional tiny Transformer: `model.py`, `vocab.py`, and `struct-train-tiny` reserve a neural-model path, but it is not part of the default structural reasoning pipeline.
+
 ### Capability Composition
 
 The cognitive kernel composes learned, state, reasoning, and answer capabilities through `CognitiveCapabilities`:
@@ -171,6 +211,16 @@ You can also just run:
 make model
 make check
 ```
+
+### Interactive Self-Learning
+
+For daily testing, use:
+
+```bash
+make ask TEXT="你擅长什么"
+```
+
+If the model cannot parse it, it first searches the existing learned model for a similar meaning and asks for confirmation. If you confirm, it saves the original sentence with that structure and recompiles the model; only rejected or unclear cases fall back to manual guidance.
 
 ### Feeding Intent Data
 
@@ -304,7 +354,7 @@ struct-make-dataset = struct_llm.cli:make_dataset
 struct-train-tiny = struct_llm.cli:train_tiny_model
 ```
 
-`Makefile` is the daily command surface. `make ask` calls `uv run struct-ask "$(TEXT)"`; `make test` runs standard-library unittest.
+`Makefile` is the daily command surface. `make ask` calls `uv run struct-ask --learn-on-fail "$(TEXT)"`; `make test` runs standard-library unittest.
 
 `structure.py` defines all intermediate structures. Prefer extending this structural model instead of encoding semantics in strings.
 

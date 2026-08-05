@@ -277,6 +277,46 @@ def load_statement_jsonl(path: str | Path) -> tuple[StatementTrainingExample, ..
     return tuple(examples)
 
 
+def append_statement_record(path: str | Path, record: dict[str, Any]) -> StatementTrainingExample:
+    example = statement_example_from_dict(record)
+    data_path = Path(path)
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    with data_path.open("a", encoding="utf-8") as file:
+        json.dump(statement_example_to_record(example), file, ensure_ascii=False)
+        file.write("\n")
+    return example
+
+
+def build_statement_record(
+    sentence: str,
+    sentence_template: str,
+    *,
+    entities: tuple[EntitySlot, ...],
+    frames: tuple[FrameTemplate, ...],
+    source: str = "human_feedback",
+    split: str = "train",
+) -> dict[str, Any]:
+    return {
+        "sentence": sentence.strip(),
+        "sentence_template": sentence_template.strip(),
+        "entities": [entity_slot_to_dict(entity) for entity in entities],
+        "frames": [frame_template_to_dict(frame) for frame in frames],
+        "source": source.strip() or "human_feedback",
+        "split": split.strip() or "train",
+    }
+
+
+def statement_example_to_record(example: StatementTrainingExample) -> dict[str, Any]:
+    return {
+        "sentence": example.sentence,
+        "sentence_template": example.sentence_template,
+        "entities": [entity_slot_to_dict(entity) for entity in example.entities],
+        "frames": [frame_template_to_dict(frame) for frame in example.frames],
+        "source": example.source,
+        "split": example.split,
+    }
+
+
 def statement_example_from_dict(record: dict[str, Any], *, line_number: int | None = None) -> StatementTrainingExample:
     prefix = f"Statement example at line {line_number}" if line_number is not None else "Statement example"
     sentence = normalize_statement_text(str(record.get("sentence") or record.get("text") or ""))

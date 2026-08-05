@@ -330,6 +330,25 @@ def query_candidate_is_learned_unit(
     return False
 
 
+def suggest_query_pattern(
+    sentence: str,
+    entities: tuple[Entity, ...],
+    parsers: tuple[QueryParser, ...],
+    min_score: float = 0.12,
+) -> tuple[float, CompiledQueryPattern] | None:
+    abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities))
+    suggestions: list[tuple[float, CompiledQueryPattern]] = []
+    for parser in parsers:
+        patterns = getattr(parser, "patterns", ())
+        for pattern in patterns:
+            score = query_pattern_score(pattern, abstract_sentence)
+            if score >= min_score:
+                suggestions.append((score, pattern))
+    if not suggestions:
+        return None
+    return max(suggestions, key=lambda item: item[0])
+
+
 def evaluate_query_parser(
     parser: LearnedQueryParser,
     examples: tuple[QueryTrainingExample, ...],
@@ -358,6 +377,49 @@ def load_query_jsonl(path: str | Path) -> tuple[QueryTrainingExample, ...]:
                 raise ValueError(f"Invalid query JSONL at line {line_number}: expected object")
             examples.append(query_example_from_dict(raw_record, line_number=line_number))
     return tuple(examples)
+
+
+def append_query_record(path: str | Path, record: dict[str, Any]) -> QueryTrainingExample:
+    example = query_example_from_dict(record)
+    data_path = Path(path)
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    with data_path.open("a", encoding="utf-8") as file:
+        json.dump(query_example_to_record(example), file, ensure_ascii=False)
+        file.write("\n")
+    return example
+
+
+def build_query_record(
+    question: str,
+    intent: str,
+    target: str,
+    *,
+    entities: tuple[EntityExample, ...] = (),
+    qualifiers: tuple[str, ...] = (),
+    source: str = "human_feedback",
+    split: str = "train",
+) -> dict[str, Any]:
+    return {
+        "question": question.strip(),
+        "entities": [entity_example_to_dict(entity) for entity in entities],
+        "query": {
+            "intent": intent.strip(),
+            "target": target.strip(),
+            "qualifiers": [value.strip() for value in qualifiers if value.strip()],
+        },
+        "source": source.strip() or "human_feedback",
+        "split": split.strip() or "train",
+    }
+
+
+def query_example_to_record(example: QueryTrainingExample) -> dict[str, Any]:
+    return {
+        "question": example.question,
+        "entities": [entity_example_to_dict(entity) for entity in example.entities],
+        "query": query_to_dict(example.query),
+        "source": example.source,
+        "split": example.split,
+    }
 
 
 def query_example_from_dict(record: dict[str, Any], *, line_number: int | None = None) -> QueryTrainingExample:
