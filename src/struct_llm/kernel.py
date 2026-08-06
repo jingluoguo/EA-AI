@@ -13,6 +13,7 @@ from .comprehension.structure_helpers import dedupe_entities, with_time
 from .errors import ParseError
 from .motor.dialogue import default_learned_dialog_answerer
 from .neural import NeuralBoundaryModel, configured_neural_boundary_model, with_neural_boundary
+from .memory.long_term import default_memory_states, memory_entities_from_states
 from .perception.lexer import is_query_like_fragment, split_query_candidate, split_sentences
 from .perception.reference import resolve_references
 from .reasoning.pipeline import (
@@ -41,6 +42,7 @@ def default_capabilities(
     *,
     neural_answer_priority: str = "first",
     use_environment: bool = True,
+    use_memory: bool = True,
 ) -> CognitiveCapabilities:
     capabilities = CognitiveCapabilities(
         statement_parsers=(default_learned_statement_parser(),),
@@ -50,6 +52,10 @@ def default_capabilities(
         rule_inferers=DEFAULT_RULE_INFERERS,
         answerers=(*DEFAULT_ANSWERERS, default_learned_dialog_answerer()),
     )
+    if use_memory:
+        memory_states = default_memory_states()
+        if memory_states:
+            capabilities = capabilities.with_memory_states(*memory_states)
     if neural_model is None and use_environment:
         neural_model = configured_neural_boundary_model()
     if neural_model is None:
@@ -62,9 +68,9 @@ def default_capabilities(
 
 
 def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities) -> Structure:
-    entities: list[Entity] = []
+    entities: list[Entity] = list(memory_entities_from_states(capabilities.memory_states))
     frames: list[Frame] = []
-    states: list[State] = []
+    states: list[State] = list(capabilities.memory_states)
     query_candidates: list[str] = []
     next_time = 1
 

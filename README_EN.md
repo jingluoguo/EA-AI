@@ -48,6 +48,7 @@ raw text
   -> comprehension/statement.py: load statement_model.json -> Entity + FRAME/ROLE
   -> world/state.py: FRAME -> current STATE
   -> comprehension/query.py: load query_model.json -> QUERY
+  -> memory/long_term.py: load memory_model.json -> confirmed long-term STATE
   -> intent_analyzers: complete Structure + learned examples -> INTENT
   -> reasoning/pipeline.py facade -> reasoning/core.py: QUERY + FRAME/STATE -> RULE
   -> motor/dialogue.py: supplies learned replies
@@ -62,10 +63,10 @@ The project works as "training data distills capability; runtime loads the compi
 
 | Stage | Purpose | Method / Technology | Main Code / Artifact |
 | --- | --- | --- | --- |
-| 1. Collect examples | Save user inputs, failures, and human feedback | Append-only JSONL datasets; training schemas; human-confirmed feedback | `data/query_examples.jsonl`, `data/statement_examples.jsonl`, `data/intent_examples.jsonl`, `data/dialog_answer_examples.jsonl` |
+| 1. Collect examples | Save user inputs, failures, human feedback, and confirmed memory | Append-only JSONL datasets; training schemas; human-confirmed feedback | `data/query_examples.jsonl`, `data/statement_examples.jsonl`, `data/intent_examples.jsonl`, `data/dialog_answer_examples.jsonl`, `data/memory_direct_examples.jsonl`, `data/memory_chat_examples.jsonl` |
 | 2. Validate examples | Ensure records are complete and structurally valid | Structured schema validation; `dataclass` sample objects; slot-field checks | `comprehension/query.py`, `comprehension/statement.py`, `comprehension/intent_dataset.py` |
-| 3. Compile model artifacts | Distill training examples into runtime capability files | Structure-template aggregation; abstract question patterns; learned reply aggregation; source-data `sha256`; atomic JSON writes | `data/query_model.json`, `data/statement_model.json`, `data/dialog_answer_model.json` |
-| 4. Load at runtime | Load compiled capabilities instead of scanning training data | Model artifact loading; capability-function registration; replaceable learner interfaces | `kernel.default_capabilities()`, `LearnedQueryParser`, `LearnedStatementParser`, `LearnedDialogActAnswerer` |
+| 3. Compile model artifacts | Distill training examples and memory entries into runtime capability files | Structure-template aggregation; abstract question patterns; learned reply aggregation; memory-state merge; source-data `sha256`; atomic JSON writes | `data/query_model.json`, `data/statement_model.json`, `data/dialog_answer_model.json`, `data/memory_model.json` |
+| 4. Load at runtime | Load compiled capabilities and confirmed memory instead of scanning raw files | Model artifact loading; capability-function registration; replaceable learner interfaces; long-term state injection | `kernel.default_capabilities()`, `LearnedQueryParser`, `LearnedStatementParser`, `LearnedDialogActAnswerer`, `memory_states` |
 | 5. Split text | Separate statements from query candidates | Punctuation sentence splitting; comma/semicolon candidate splitting; chat-fragment retention; tail retention | `perception/lexer.py` |
 | 6. Normalize surface form | Remove wording differences that do not change meaning | Particle cleanup; question-wrapper cleanup; synonym action normalization; container-suffix normalization; `啥 -> 什么` | `perception/normalizer.py` |
 | 7. Understand statements | Convert statements into entities and historical events | Sentence-template slot extraction; entity-role instantiation; `FRAME/ROLE` template instantiation | `comprehension/statement.py`, `ENTITY`, `FRAME`, `ROLE` |
@@ -83,8 +84,8 @@ The current "model artifact" is not neural-network weights. It is a structural c
 The default implementation is intentionally lightweight and uses only the Python standard library on the main path:
 
 - Python `dataclass`: defines `Entity`, `Frame`, `Role`, `State`, `Query`, `Intention`, training examples, and compiled model structures.
-- JSONL datasets: `data/query_examples.jsonl`, `data/statement_examples.jsonl`, `data/intent_examples.jsonl`, and `data/dialog_answer_examples.jsonl` store appendable training and feedback records.
-- Compiled JSON models: `data/query_model.json`, `data/statement_model.json`, and `data/dialog_answer_model.json` store runtime capabilities distilled from training examples.
+- JSONL datasets: `data/query_examples.jsonl`, `data/statement_examples.jsonl`, `data/intent_examples.jsonl`, `data/dialog_answer_examples.jsonl`, `data/memory_direct_examples.jsonl`, and `data/memory_chat_examples.jsonl` store appendable training, feedback, and confirmed memory records.
+- Compiled JSON models: `data/query_model.json`, `data/statement_model.json`, `data/dialog_answer_model.json`, and `data/memory_model.json` store runtime capabilities distilled from training examples and memory entries.
 - Structural slots: `$item#1`, `$container#1`, `$person#1` encode entity roles and occurrence order.
 - Surface normalization: `perception/normalizer.py` unifies particles, synonym actions, container suffixes, question wrappers, and surface variants such as `啥/什么`.
 - Abstract feature matching: compiled Query models use abstract questions and character bigram features to find similar structures; missed inputs use the same similarity path to ask the user for confirmation.
@@ -94,7 +95,7 @@ The default implementation is intentionally lightweight and uses only the Python
 - Structural inference: `reasoning/core.py` produces `RULE` and answers from frame-role matching, state lookup, relation closure, event constraints, and counterfactual replay; `reasoning/pipeline.py` is only the stable facade.
 - Capability registration: `CognitiveCapabilities` composes statement learning, Query learning, state projection, state reduction, rule inference, and answer generation as replaceable capabilities.
 - Feedback-learning service: `motor/feedback.py` and `motor/dialogue.py` encapsulate similar-meaning suggestions, new dialog capabilities, trusted answer loading, and model recompilation; the CLI only handles interaction.
-- CLI and Makefile: `struct-ask`, `struct-compile-*`, and `struct-eval-*` expose commands; `make model`, `make check`, and `make ask` are daily entry points.
+- CLI and Makefile: `struct-ask`, `struct-compile-*`, `struct-eval-*`, and `struct-add-memory` expose commands; `make model`, `make check`, `make ask`, and `make remember` are daily entry points.
 - unittest regression: `tests/test_reasoner.py` covers loaders, feedback writes, model compilation, runtime loading, structural reasoning, and end-to-end answers.
 
 ### Capability Composition
@@ -231,6 +232,8 @@ If the model cannot answer directly, it first searches the compiled model artifa
 
 If a queued example later becomes a new dialog capability, migrate it into `data/query_examples.jsonl` as a Query example, then run `make model`. Answers are not generated from runtime interaction. Only trusted answer sources such as `training`, `teacher`, `self_model`, `knowledge`, `curated`, or `human_verified` are compiled into `data/dialog_answer_model.json`. Without a trusted answer, the system says it understands the question but does not yet have a verified reply.
 
+Long-term memory is separate and does not get written automatically. Use `make remember`, `make remember-state`, or an explicit `--remember-chat` flow with confirmation if you want to store something permanently.
+
 ### Feeding Intent Data
 
 Intent analysis should not keep growing by matching more user phrasings. Feed "behavior observation -> mental-state hypothesis" data instead, so the system can learn `Goal + Belief + Strategy`:
@@ -357,9 +360,11 @@ struct-eval-statement = struct_llm.cli:eval_statement_examples
 struct-compile-query = struct_llm.cli:compile_query_model
 struct-compile-statement = struct_llm.cli:compile_statement_model
 struct-compile-dialog-answer = struct_llm.cli:compile_dialog_answer_model
+struct-compile-memory = struct_llm.cli:compile_memory_model
+struct-add-memory = struct_llm.cli:add_memory_entry
 ```
 
-`Makefile` is the daily command surface. `make ask` calls `uv run struct-ask --learn-on-fail "$(TEXT)"`; `make test` runs standard-library unittest.
+`Makefile` is the daily command surface. `make ask` calls `uv run struct-ask --neural-provider "$(NEURAL_PROVIDER)" --learn-on-fail --memory-model data/memory_model.json "$(TEXT)"`; `make chat` opens interactive dialogue; `make remember` and `make remember-state` write long-term memory explicitly; `make test` runs standard-library unittest.
 
 `structure.py` defines all intermediate structures. Prefer extending this structural model instead of encoding semantics in strings.
 
@@ -421,6 +426,7 @@ Most common commands:
 ```bash
 make demo
 make ask
+make remember
 make test
 ```
 
@@ -434,6 +440,27 @@ Start interactive symbolic mode:
 
 ```bash
 make chat
+```
+
+`make chat` does not auto-write long-term memory. It keeps only the current dialogue context for reasoning.
+
+User input analysis goes through the neural boundary first, then feeds the symbolic kernel.
+
+Explicit memory writes:
+
+```bash
+make remember TEXT="I am Xiao Wang"
+make remember-state NAME=name LEFT=我 RIGHT=小王
+```
+
+Long-term knowledge is separate from long-term state memory:
+
+- `data/why_knowledge_seed.jsonl` is the batch import source.
+- `data/memory_knowledge_examples.jsonl` stores verified knowledge examples.
+- `data/memory_knowledge_model.json` stores the compiled knowledge model.
+
+```bash
+make remember-knowledge-file FILE=data/why_knowledge_seed.jsonl
 ```
 
 ## Minimal Task

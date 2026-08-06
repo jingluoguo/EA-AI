@@ -1,2 +1,56 @@
-"""Memory layer: working-memory primitives for cognitive state."""
+"""Memory layer: short-term and long-term memory primitives."""
 
+from .long_term import (
+    CompiledMemoryModel,
+    MemoryEntry,
+    MemoryWriteResult,
+    append_memory_entry,
+    compile_memory_entries,
+    compile_memory_model_from_jsonl,
+    default_memory_states,
+    extract_chat_memory_entries,
+    load_memory_jsonl,
+    load_memory_model,
+    memory_entities_from_states,
+    save_memory_model,
+)
+from .knowledge import (
+    CompiledMemoryKnowledgeModel,
+    KnowledgeWriteResult,
+    LearnedMemoryKnowledgeAnswerer,
+    MemoryKnowledgeEntry,
+    append_memory_knowledge_entry,
+    compile_memory_knowledge_examples,
+    compile_memory_knowledge_model_from_jsonl,
+    default_learned_memory_knowledge_answerer,
+    load_memory_knowledge_jsonl,
+    load_memory_knowledge_model,
+    save_memory_knowledge_feedback,
+    save_memory_knowledge_model,
+)
+
+__all__ = [
+    "CompiledMemoryModel",
+    "CompiledMemoryKnowledgeModel",
+    "MemoryEntry",
+    "MemoryWriteResult",
+    "MemoryKnowledgeEntry",
+    "KnowledgeWriteResult",
+    "append_memory_entry",
+    "append_memory_knowledge_entry",
+    "compile_memory_entries",
+    "compile_memory_knowledge_examples",
+    "compile_memory_knowledge_model_from_jsonl",
+    "compile_memory_model_from_jsonl",
+    "default_memory_states",
+    "default_learned_memory_knowledge_answerer",
+    "extract_chat_memory_entries",
+    "load_memory_jsonl",
+    "load_memory_knowledge_jsonl",
+    "load_memory_knowledge_model",
+    "load_memory_model",
+    "memory_entities_from_states",
+    "save_memory_knowledge_feedback",
+    "save_memory_knowledge_model",
+    "save_memory_model",
+]

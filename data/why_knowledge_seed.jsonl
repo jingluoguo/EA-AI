@@ -1,0 +1,10 @@
+{"question":"为什么天是蓝的？","answer":"因为阳光进入大气后会被空气分子散射，短波长的蓝光更容易散开，所以天空看起来偏蓝。","source":"curated","split":"train"}
+{"question":"太阳为什么会发光？","answer":"太阳内部持续发生核聚变，把质量转成能量，再以光和热的形式释放出来。","source":"curated","split":"train"}
+{"question":"为什么海水是咸的？","answer":"因为河流把岩石中的矿物质带进海洋，长期积累后，海水里就含有很多盐类。","source":"curated","split":"train"}
+{"question":"为什么冬天会下雪？","answer":"冬天空气温度更低，水汽更容易在高空凝结成冰晶，落下来就形成雪。","source":"curated","split":"train"}
+{"question":"为什么铁会生锈？","answer":"铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。","source":"curated","split":"train"}
+{"question":"为什么彩虹有七种颜色？","answer":"阳光穿过雨滴时会发生折射和色散，不同波长的光分开后，就形成了多种颜色。","source":"curated","split":"train"}
+{"question":"月亮为什么会有圆缺变化？","answer":"月亮本身并不变形，是太阳照亮的那一半随着月球绕地球运行而呈现出不同可见面积。","source":"curated","split":"train"}
+{"question":"植物为什么需要阳光？","answer":"植物要用光进行光合作用，把水和二氧化碳转成养分，维持生长。","source":"curated","split":"train"}
+{"question":"为什么人会打哈欠？","answer":"打哈欠和疲劳、缺少刺激、状态切换有关，具体机制还没有完全统一的答案。","source":"curated","split":"train"}
+{"question":"为什么会打雷？","answer":"云层里电荷分离后会放电，空气被瞬间加热膨胀，就形成了雷声。","source":"curated","split":"train"}

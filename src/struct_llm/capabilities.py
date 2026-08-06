@@ -25,6 +25,7 @@ class CognitiveCapabilities:
     rule_inferers: tuple[RuleInferer, ...]
     answerers: tuple[Answerer, ...]
     intent_analyzers: tuple[IntentAnalyzer, ...] = ()
+    memory_states: tuple[State, ...] = ()
 
     def parse_statement(self, sentence: str) -> StatementParseResult | None:
         for parser in self.statement_parsers:
@@ -82,6 +83,7 @@ class CognitiveCapabilities:
             rule_inferers=self.rule_inferers,
             answerers=self.answerers,
             intent_analyzers=self.intent_analyzers,
+            memory_states=self.memory_states,
         )
 
     def with_state_projectors(self, *projectors: StateProjector) -> CognitiveCapabilities:
@@ -93,6 +95,7 @@ class CognitiveCapabilities:
             rule_inferers=self.rule_inferers,
             answerers=self.answerers,
             intent_analyzers=self.intent_analyzers,
+            memory_states=self.memory_states,
         )
 
     def with_state_reducers(self, *reducers: StateReducer) -> CognitiveCapabilities:
@@ -104,6 +107,7 @@ class CognitiveCapabilities:
             rule_inferers=self.rule_inferers,
             answerers=self.answerers,
             intent_analyzers=self.intent_analyzers,
+            memory_states=self.memory_states,
         )
 
     def replace_query_parsers(self, *parsers: QueryParser) -> CognitiveCapabilities:
@@ -115,6 +119,7 @@ class CognitiveCapabilities:
             rule_inferers=self.rule_inferers,
             answerers=self.answerers,
             intent_analyzers=self.intent_analyzers,
+            memory_states=self.memory_states,
         )
 
     def with_rule_inferers(self, *inferers: RuleInferer) -> CognitiveCapabilities:
@@ -126,6 +131,7 @@ class CognitiveCapabilities:
             rule_inferers=(*self.rule_inferers, *inferers),
             answerers=self.answerers,
             intent_analyzers=self.intent_analyzers,
+            memory_states=self.memory_states,
         )
 
     def with_answerers(self, *answerers: Answerer) -> CognitiveCapabilities:
@@ -137,6 +143,7 @@ class CognitiveCapabilities:
             rule_inferers=self.rule_inferers,
             answerers=(*self.answerers, *answerers),
             intent_analyzers=self.intent_analyzers,
+            memory_states=self.memory_states,
         )
 
     def with_intent_analyzers(self, *analyzers: IntentAnalyzer) -> CognitiveCapabilities:
@@ -148,4 +155,17 @@ class CognitiveCapabilities:
             rule_inferers=self.rule_inferers,
             answerers=self.answerers,
             intent_analyzers=(*self.intent_analyzers, *analyzers),
+            memory_states=self.memory_states,
+        )
+
+    def with_memory_states(self, *states: State) -> CognitiveCapabilities:
+        return CognitiveCapabilities(
+            statement_parsers=self.statement_parsers,
+            state_projectors=self.state_projectors,
+            state_reducers=self.state_reducers,
+            query_parsers=self.query_parsers,
+            rule_inferers=self.rule_inferers,
+            answerers=self.answerers,
+            intent_analyzers=self.intent_analyzers,
+            memory_states=(*self.memory_states, *states),
         )

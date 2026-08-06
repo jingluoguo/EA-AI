@@ -28,6 +28,28 @@ from ..comprehension.statement import (
     compile_statement_model_from_jsonl,
     save_statement_model,
 )
+from ..memory.long_term import (
+    MEMORY_CHAT_DATA_PATH,
+    MEMORY_DIRECT_DATA_PATH,
+    MEMORY_MODEL_PATH,
+    MemoryEntry,
+    MemoryWriteResult,
+    append_memory_entry,
+    compile_memory_model_from_jsonl,
+    default_memory_states,
+    extract_chat_memory_entries,
+    save_memory_model,
+)
+from ..memory.knowledge import (
+    MEMORY_KNOWLEDGE_DATA_PATH,
+    MEMORY_KNOWLEDGE_MODEL_PATH,
+    CompiledMemoryKnowledgeModel,
+    KnowledgeWriteResult,
+    MemoryKnowledgeEntry,
+    append_memory_knowledge_entry,
+    compile_memory_knowledge_model_from_jsonl,
+    save_memory_knowledge_model,
+)
 from ..metacognition.confidence import (
     CONFIRM_CONFIDENCE_THRESHOLD,
     DIRECT_CONFIDENCE_THRESHOLD,
@@ -44,6 +66,11 @@ class LearningPaths:
     dialog_answer_data: Path = Path("data/dialog_answer_examples.jsonl")
     dialog_answer_model: Path = Path("data/dialog_answer_model.json")
     unrecognized_data: Path = Path("data/unrecognized_examples.jsonl")
+    memory_direct_data: Path = MEMORY_DIRECT_DATA_PATH
+    memory_chat_data: Path = MEMORY_CHAT_DATA_PATH
+    memory_model: Path = MEMORY_MODEL_PATH
+    memory_knowledge_data: Path = MEMORY_KNOWLEDGE_DATA_PATH
+    memory_knowledge_model: Path = MEMORY_KNOWLEDGE_MODEL_PATH
 
 
 @dataclass(frozen=True)
@@ -72,6 +99,85 @@ class LearningWriteResult:
     model_path: Path | None = None
     example_count: int = 0
     pattern_count: int = 0
+
+
+def save_chat_memory_feedback(
+    text: str,
+    structure,
+    paths: LearningPaths,
+    *,
+    confidence: float = 0.85,
+) -> MemoryWriteResult:
+    entries = extract_chat_memory_entries(text, structure, confidence=confidence)
+    for entry in entries:
+        append_memory_entry(paths.memory_chat_data, entry)
+    model = compile_memory_model_from_jsonl(paths.memory_direct_data, paths.memory_chat_data)
+    save_memory_model(model, paths.memory_model)
+    return MemoryWriteResult(
+        data_path=paths.memory_chat_data,
+        model_path=paths.memory_model,
+        entry_count=len(entries),
+        state_count=len(model.states),
+    )
+
+
+def save_direct_memory_structure_feedback(
+    text: str,
+    structure,
+    paths: LearningPaths,
+    *,
+    confidence: float = 1.0,
+    source: str = "human_feedback",
+) -> MemoryWriteResult:
+    entries = extract_chat_memory_entries(text, structure, confidence=confidence)
+    for entry in entries:
+        append_memory_entry(
+            paths.memory_direct_data,
+            MemoryEntry(
+                state=entry.state,
+                text=text,
+                channel="direct",
+                source=source,
+                confidence=confidence,
+            ),
+        )
+    model = compile_memory_model_from_jsonl(paths.memory_direct_data, paths.memory_chat_data)
+    save_memory_model(model, paths.memory_model)
+    return MemoryWriteResult(
+        data_path=paths.memory_direct_data,
+        model_path=paths.memory_model,
+        entry_count=len(entries),
+        state_count=len(model.states),
+    )
+
+
+def save_direct_memory_feedback(
+    state,
+    paths: LearningPaths,
+    *,
+    text: str = "",
+    source: str = "human_feedback",
+    channel: str = "direct",
+    confidence: float = 1.0,
+) -> MemoryWriteResult:
+    append_memory_entry(
+        paths.memory_direct_data,
+        MemoryEntry(
+            state=state,
+            text=text,
+            channel=channel,
+            source=source,
+            confidence=confidence,
+        ),
+    )
+    model = compile_memory_model_from_jsonl(paths.memory_direct_data, paths.memory_chat_data)
+    save_memory_model(model, paths.memory_model)
+    return MemoryWriteResult(
+        data_path=paths.memory_direct_data,
+        model_path=paths.memory_model,
+        entry_count=1,
+        state_count=len(model.states),
+    )
 
 
 def suggest_query_feedback(
@@ -215,6 +321,33 @@ def save_manual_statement_feedback(
         kind="statement",
         data_path=paths.statement_data,
         model_path=paths.statement_model,
+        example_count=model.example_count,
+        pattern_count=len(model.patterns),
+    )
+
+
+def save_memory_knowledge_feedback(
+    question: str,
+    query: Query,
+    answer: str,
+    paths: LearningPaths,
+    *,
+    source: str = "human_feedback",
+) -> KnowledgeWriteResult:
+    append_memory_knowledge_entry(
+        paths.memory_knowledge_data,
+        MemoryKnowledgeEntry(
+            question=question,
+            query=query,
+            answer=answer,
+            source=source,
+        ),
+    )
+    model = compile_memory_knowledge_model_from_jsonl(paths.memory_knowledge_data)
+    save_memory_knowledge_model(model, paths.memory_knowledge_model)
+    return KnowledgeWriteResult(
+        data_path=paths.memory_knowledge_data,
+        model_path=paths.memory_knowledge_model,
         example_count=model.example_count,
         pattern_count=len(model.patterns),
     )

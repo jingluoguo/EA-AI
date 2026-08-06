@@ -1,8 +1,8 @@
 {
   "schema": "struct_llm.statement_model.v1",
-  "source_sha256": "b5e8b98e175f03e80de4c4a8dd9d9f66b2d159d187190df2fa5bd3314aea1e6a",
-  "example_count": 514,
-  "pattern_count": 269,
+  "source_sha256": "6c1d27dc59e616238e474ebe0d32e03e53f483df2d272f792b77372a9ce999cd",
+  "example_count": 491,
+  "pattern_count": 267,
   "patterns": [
     {
       "sentence_template": "$person#1把$item#1放进$container#1",
@@ -234,32 +234,6 @@
       "support": 11
     },
     {
-      "sentence_template": "$thing#1在$place#1",
-      "entities": [
-        {
-          "role": "thing",
-          "name": "$thing#1"
-        },
-        {
-          "role": "place",
-          "name": "$place#1"
-        }
-      ],
-      "frames": [
-        {
-          "frame_type": "move",
-          "roles": {
-            "goal": "$place#1",
-            "theme": "$thing#1"
-          }
-        }
-      ],
-      "feature_units": [
-        "在"
-      ],
-      "support": 11
-    },
-    {
       "sentence_template": "$person#1从$container#1里取出$item#1",
       "entities": [
         {
@@ -296,32 +270,6 @@
         "从里",
         "取出",
         "里取"
-      ],
-      "support": 10
-    },
-    {
-      "sentence_template": "$person#1喜欢$profile_value#1",
-      "entities": [
-        {
-          "role": "person",
-          "name": "$person#1"
-        },
-        {
-          "role": "profile_value",
-          "name": "$profile_value#1"
-        }
-      ],
-      "frames": [
-        {
-          "frame_type": "profile_like",
-          "roles": {
-            "subject": "$person#1",
-            "value": "$profile_value#1"
-          }
-        }
-      ],
-      "feature_units": [
-        "喜欢"
       ],
       "support": 10
     },
@@ -1163,32 +1111,6 @@
         "个放",
         "把一",
         "放进"
-      ],
-      "support": 3
-    },
-    {
-      "sentence_template": "$person#1讨厌$profile_value#1",
-      "entities": [
-        {
-          "role": "person",
-          "name": "$person#1"
-        },
-        {
-          "role": "profile_value",
-          "name": "$profile_value#1"
-        }
-      ],
-      "frames": [
-        {
-          "frame_type": "profile_dislike",
-          "roles": {
-            "subject": "$person#1",
-            "value": "$profile_value#1"
-          }
-        }
-      ],
-      "feature_units": [
-        "讨厌"
       ],
       "support": 3
     },
@@ -8360,6 +8282,32 @@
         "把它",
         "销毁",
         "，把"
+      ],
+      "support": 1
+    },
+    {
+      "sentence_template": "$thing#1在$place#1",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "goal": "$place#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "feature_units": [
+        "在"
       ],
       "support": 1
     },

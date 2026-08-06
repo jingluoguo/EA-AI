@@ -126,7 +126,7 @@ def train() -> None:
 def build_trained_capabilities() -> CognitiveCapabilities:
     # Start from the structural kernel, then replace the learnable pieces with
     # versions trained directly from the current data files.
-    capabilities = default_capabilities(use_environment=False)
+    capabilities = default_capabilities(use_environment=False, use_memory=False)
     if STATEMENT_DATA_PATH.exists():
         capabilities = capabilities.replace_statement_parsers(
             LearnedStatementParser.from_jsonl(STATEMENT_DATA_PATH)

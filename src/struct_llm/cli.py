@@ -15,6 +15,10 @@ from .motor.feedback import (
     assess_query_uncertainty,
     save_manual_query_feedback,
     save_manual_statement_feedback,
+    save_chat_memory_feedback,
+    save_direct_memory_feedback,
+    save_direct_memory_structure_feedback,
+    save_memory_knowledge_feedback,
     save_unrecognized_feedback,
 )
 from .motor.dialogue import (
@@ -40,6 +44,17 @@ from .comprehension.statement import (
     load_statement_jsonl,
     save_statement_model,
 )
+from .memory.long_term import (
+    extract_chat_memory_entries,
+    load_memory_model,
+)
+from .memory.knowledge import (
+    compile_memory_knowledge_model_from_jsonl,
+    default_learned_memory_knowledge_answerer,
+    load_memory_knowledge_model,
+    save_memory_knowledge_model,
+)
+from .structure import State
 
 
 QUESTIONS = (
@@ -68,6 +83,12 @@ def ask_symbolic() -> None:
     parser.add_argument("--statement-min-score", type=float, default=0.58)
     parser.add_argument("--dialog-answer-data", help="JSONL file with learned dialog answer examples.")
     parser.add_argument("--dialog-answer-model", help="Compiled dialog answer model artifact.")
+    parser.add_argument("--memory-direct-data", help="JSONL file with direct memory entries.")
+    parser.add_argument("--memory-chat-data", help="JSONL file with chat-sedimented memory entries.")
+    parser.add_argument("--memory-model", help="Compiled memory model artifact.")
+    parser.add_argument("--memory-knowledge-data", help="JSONL file with long-term knowledge entries.")
+    parser.add_argument("--memory-knowledge-model", help="Compiled long-term knowledge artifact.")
+    parser.add_argument("--remember-chat", action="store_true", help="Ask before storing stable facts from successful chat turns.")
     parser.add_argument(
         "--neural-provider",
         help="Python factory in module:function form; defaults to EA_AI_NEURAL_PROVIDER.",
@@ -84,6 +105,7 @@ def ask_symbolic() -> None:
     capabilities = default_capabilities(
         neural_answer_priority=args.neural_answer_priority,
         use_environment=False,
+        use_memory=False,
     )
     if args.statement_model and Path(args.statement_model).exists():
         capabilities = capabilities.replace_statement_parsers(
@@ -112,6 +134,8 @@ def ask_symbolic() -> None:
         capabilities = capabilities.with_answerers(
             LearnedDialogActAnswerer.from_jsonl(Path(args.dialog_answer_data))
         )
+    capabilities = apply_memory_args(capabilities, args)
+    capabilities = apply_memory_knowledge_args(capabilities, args)
     capabilities = apply_neural_provider_args(capabilities, args)
 
     if args.text:
@@ -244,6 +268,17 @@ def compile_dialog_answer_model() -> None:
     print(f"已生成回答模型：样本={model.example_count} 模式={len(model.patterns)} 输出={args.output}")
 
 
+def compile_memory_knowledge_model() -> None:
+    parser = argparse.ArgumentParser(description="Compile verified long-term knowledge entries into a runtime artifact.")
+    parser.add_argument("--memory-knowledge-data", default="data/memory_knowledge_examples.jsonl")
+    parser.add_argument("--output", default="data/memory_knowledge_model.json")
+    args = parser.parse_args()
+
+    model = compile_memory_knowledge_model_from_jsonl(Path(args.memory_knowledge_data))
+    save_memory_knowledge_model(model, Path(args.output))
+    print(f"已生成长期知识模型：样本={model.example_count} 模式={len(model.patterns)} 输出={args.output}")
+
+
 def print_prediction(question: str, capabilities=None) -> None:
     prediction = predict(question, capabilities)
     print("=" * 60)
@@ -252,11 +287,13 @@ def print_prediction(question: str, capabilities=None) -> None:
     print(prediction.structure.linearize())
     print()
     print(prediction.answer)
+    return prediction
 
 
 def print_prediction_with_learning(question: str, capabilities, args) -> None:
     try:
-        print_prediction(question, capabilities)
+        prediction = print_prediction(question, capabilities)
+        maybe_save_chat_memory(question, prediction.structure, args)
     except ParseError:
         try:
             structure = parse_text(question, capabilities)
@@ -455,6 +492,15 @@ def learning_paths_from_args(args) -> LearningPaths:
         unrecognized_data=Path(
             getattr(args, "unrecognized_data", None) or "data/unrecognized_examples.jsonl"
         ),
+        memory_direct_data=Path(getattr(args, "memory_direct_data", None) or "data/memory_direct_examples.jsonl"),
+        memory_chat_data=Path(getattr(args, "memory_chat_data", None) or "data/memory_chat_examples.jsonl"),
+        memory_model=Path(getattr(args, "memory_model", None) or "data/memory_model.json"),
+        memory_knowledge_data=Path(
+            getattr(args, "memory_knowledge_data", None) or "data/memory_knowledge_examples.jsonl"
+        ),
+        memory_knowledge_model=Path(
+            getattr(args, "memory_knowledge_model", None) or "data/memory_knowledge_model.json"
+        ),
     )
 
 
@@ -516,6 +562,7 @@ def capabilities_after_recompile(args):
     capabilities = default_capabilities(
         neural_answer_priority=getattr(args, "neural_answer_priority", "first"),
         use_environment=False,
+        use_memory=False,
     )
     query_model = getattr(args, "query_model", None)
     statement_model = getattr(args, "statement_model", None)
@@ -526,6 +573,8 @@ def capabilities_after_recompile(args):
         capabilities = capabilities.replace_query_parsers(LearnedQueryParser.from_model(Path(query_model)))
     if dialog_answer_model and Path(dialog_answer_model).exists():
         capabilities = capabilities.with_answerers(LearnedDialogActAnswerer.from_model(Path(dialog_answer_model)))
+    capabilities = apply_memory_args(capabilities, args)
+    capabilities = apply_memory_knowledge_args(capabilities, args)
     return apply_neural_provider_args(capabilities, args)
 
 
@@ -544,3 +593,180 @@ def apply_neural_provider_args(capabilities, args):
         model,
         answer_priority=getattr(args, "neural_answer_priority", "fallback"),
     )
+
+
+def apply_memory_args(capabilities, args):
+    memory_model = getattr(args, "memory_model", None) or "data/memory_model.json"
+    memory_path = Path(memory_model)
+    if not memory_path.exists():
+        return capabilities
+    return capabilities.with_memory_states(*load_memory_model(memory_path).states)
+
+
+def apply_memory_knowledge_args(capabilities, args):
+    knowledge_model = getattr(args, "memory_knowledge_model", None) or "data/memory_knowledge_model.json"
+    knowledge_path = Path(knowledge_model)
+    if knowledge_path.exists():
+        return capabilities.with_answerers(default_learned_memory_knowledge_answerer(knowledge_path))
+    knowledge_data = getattr(args, "memory_knowledge_data", None)
+    if knowledge_data and Path(knowledge_data).exists():
+        return capabilities.with_answerers(default_learned_memory_knowledge_answerer(Path(knowledge_data)))
+    return capabilities
+
+
+def maybe_save_chat_memory(question: str, structure, args) -> None:
+    if not getattr(args, "remember_chat", False):
+        return
+    entries = extract_chat_memory_entries(question, structure)
+    if not entries:
+        return
+    print("候选记忆：")
+    for index, entry in enumerate(entries, start=1):
+        state = entry.state
+        print(f"{index}. STATE {state.name}({state.left},{state.right})")
+    choice = choose_from_menu(
+        "这些内容要写入长期记忆吗？",
+        (
+            ("1", "写入", "确认这些结构事实可信，保存到长期记忆。"),
+            ("2", "跳过", "只用于当前推理，不写入长期记忆。"),
+        ),
+    )
+    if choice != "1":
+        print("已跳过，不写入长期记忆。")
+        return
+    paths = learning_paths_from_args(args)
+    result = save_chat_memory_feedback(question, structure, paths)
+    if result.entry_count:
+        print(f"已沉淀 {result.entry_count} 条记忆，当前记忆状态 {result.state_count} 条。")
+
+
+def add_memory_entry() -> None:
+    parser = argparse.ArgumentParser(description="Append one memory entry to the long-term memory store.")
+    parser.add_argument("text", nargs="?", help="Plain text to parse into memory states.")
+    parser.add_argument("--state", nargs=3, metavar=("NAME", "LEFT", "RIGHT"), help="Direct state insert.")
+    parser.add_argument("--channel", default="direct", choices=("direct", "chat"))
+    parser.add_argument("--source", default="human_feedback")
+    parser.add_argument("--confidence", type=float, default=1.0)
+    parser.add_argument("--memory-direct-data", default="data/memory_direct_examples.jsonl")
+    parser.add_argument("--memory-chat-data", default="data/memory_chat_examples.jsonl")
+    parser.add_argument("--memory-model", default="data/memory_model.json")
+    parser.add_argument("--statement-model", default="data/statement_model.json")
+    parser.add_argument("--query-model", default="data/query_model.json")
+    parser.add_argument("--neural-provider")
+    args = parser.parse_args()
+
+    paths = learning_paths_from_args(args)
+    if args.state:
+        name, left, right = args.state
+        result = save_direct_memory_feedback(
+            State(name, left, right),
+            paths,
+            text=args.text or "",
+            source=args.source,
+            channel=args.channel,
+            confidence=args.confidence,
+        )
+        print(f"已写入记忆状态，当前记忆状态 {result.state_count} 条。")
+        return
+
+    if not args.text:
+        raise SystemExit("需要提供 TEXT 或 --state。")
+    capabilities = default_capabilities(use_environment=False, use_memory=False)
+    if args.statement_model and Path(args.statement_model).exists():
+        capabilities = capabilities.replace_statement_parsers(LearnedStatementParser.from_model(Path(args.statement_model)))
+    if args.query_model and Path(args.query_model).exists():
+        capabilities = capabilities.replace_query_parsers(LearnedQueryParser.from_model(Path(args.query_model)))
+    capabilities = apply_neural_provider_args(capabilities, args)
+    structure = parse_text(args.text, capabilities)
+    result = save_direct_memory_structure_feedback(args.text, structure, paths, confidence=args.confidence)
+    print(f"已写入记忆样本 {result.entry_count} 条，当前记忆状态 {result.state_count} 条。")
+
+
+def add_memory_knowledge_entry() -> None:
+    parser = argparse.ArgumentParser(description="Append verified long-term knowledge entries.")
+    parser.add_argument("text", nargs="?", help="Question text. Omit it when using --file.")
+    parser.add_argument("--answer", required=False, default="", help="Verified answer for the question.")
+    parser.add_argument("--file", help="JSONL source file with question/text and answer/response fields.")
+    parser.add_argument("--source", default="human_feedback")
+    parser.add_argument("--memory-knowledge-data", default="data/memory_knowledge_examples.jsonl")
+    parser.add_argument("--memory-knowledge-model", default="data/memory_knowledge_model.json")
+    parser.add_argument("--query-model", default="data/query_model.json")
+    parser.add_argument("--statement-model", default="data/statement_model.json")
+    parser.add_argument("--neural-provider")
+    args = parser.parse_args()
+
+    if args.file and args.text:
+        raise SystemExit("TEXT 和 --file 只能选一个。")
+    if not args.file and not args.text:
+        raise SystemExit("需要提供 TEXT 或 --file。")
+    if args.text and not args.answer.strip():
+        raise SystemExit("单条写入需要提供 --answer。")
+    paths = learning_paths_from_args(args)
+    capabilities = default_capabilities(use_environment=False, use_memory=False)
+    if args.statement_model and Path(args.statement_model).exists():
+        capabilities = capabilities.replace_statement_parsers(LearnedStatementParser.from_model(Path(args.statement_model)))
+    if args.query_model and Path(args.query_model).exists():
+        capabilities = capabilities.replace_query_parsers(LearnedQueryParser.from_model(Path(args.query_model)))
+    capabilities = apply_neural_provider_args(capabilities, args)
+    records = (
+        load_memory_knowledge_source_records(Path(args.file), fallback_source=args.source)
+        if args.file
+        else ((args.text, args.answer, args.source),)
+    )
+    written = 0
+    result = None
+    for question, answer, source in records:
+        structure = parse_text(question, capabilities)
+        if structure.query is None:
+            raise SystemExit(f"当前解析结果没有生成可编译的 Query：{question}")
+        result = save_memory_knowledge_feedback(
+            question,
+            structure.query,
+            answer,
+            paths,
+            source=source,
+        )
+        written += 1
+    if result is None:
+        print("没有可写入的长期知识样本。")
+        return
+    print(f"已写入长期知识样本 {written} 条，当前知识样本 {result.example_count} 条，知识模式 {result.pattern_count} 条。")
+
+
+def load_memory_knowledge_source_records(
+    path: Path,
+    *,
+    fallback_source: str,
+) -> tuple[tuple[str, str, str], ...]:
+    records: list[tuple[str, str, str]] = []
+    with path.open("r", encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            if not line.strip():
+                continue
+            try:
+                raw_record = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ValueError(f"Invalid knowledge source JSONL at line {line_number}: {error}") from error
+            if not isinstance(raw_record, dict):
+                raise ValueError(f"Invalid knowledge source JSONL at line {line_number}: expected object")
+            question = str(raw_record.get("question") or raw_record.get("text") or "").strip()
+            answer = str(raw_record.get("answer") or raw_record.get("response") or "").strip()
+            source = str(raw_record.get("source") or fallback_source).strip() or fallback_source
+            if not question or not answer:
+                raise ValueError(f"Knowledge source at line {line_number} requires question/text and answer/response.")
+            records.append((question, answer, source))
+    return tuple(records)
+
+
+def compile_memory_model() -> None:
+    parser = argparse.ArgumentParser(description="Compile memory JSONL entries into a runtime model artifact.")
+    parser.add_argument("--memory-direct-data", default="data/memory_direct_examples.jsonl")
+    parser.add_argument("--memory-chat-data", default="data/memory_chat_examples.jsonl")
+    parser.add_argument("--output", default="data/memory_model.json")
+    args = parser.parse_args()
+
+    from .memory.long_term import compile_memory_model_from_jsonl, save_memory_model
+
+    model = compile_memory_model_from_jsonl(Path(args.memory_direct_data), Path(args.memory_chat_data))
+    save_memory_model(model, Path(args.output))
+    print(f"已生成记忆模型：样本={model.example_count} 状态={len(model.states)} 输出={args.output}")

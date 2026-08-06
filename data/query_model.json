@@ -1,8 +1,8 @@
 {
   "schema": "struct_llm.query_model.v1",
-  "source_sha256": "5f2837af8521f7a2705d25c9ac46e09ee7e93821a88b04d9601ff3fb2da064a5",
-  "example_count": 641,
-  "pattern_count": 593,
+  "source_sha256": "b05038e695d4e9ba4b4c6565b85b6c51c53783090fa7690eed9b91a5c15cad78",
+  "example_count": 630,
+  "pattern_count": 584,
   "patterns": [
     {
       "abstract_question": "<item>在哪里",
@@ -337,58 +337,6 @@
       "query": {
         "intent": "location",
         "target": "$item#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">在",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "哪里",
-        "在哪"
-      ],
-      "support": 2
-    },
-    {
-      "abstract_question": "<item>在哪里",
-      "entities": [
-        {
-          "role": "thing",
-          "name": "故宫"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$thing#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">在",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "哪里",
-        "在哪"
-      ],
-      "support": 2
-    },
-    {
-      "abstract_question": "<item>在哪里",
-      "entities": [
-        {
-          "role": "thing",
-          "name": "金字塔"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$thing#1",
         "qualifiers": [],
         "subqueries": []
       },
@@ -3798,31 +3746,6 @@
       "support": 1
     },
     {
-      "abstract_question": "<item>在哪",
-      "entities": [
-        {
-          "role": "thing",
-          "name": "故宫"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$thing#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">在",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "在哪"
-      ],
-      "support": 1
-    },
-    {
       "abstract_question": "<item>在哪以及<container>里有什么",
       "entities": [
         {
@@ -4077,110 +4000,6 @@
       "query": {
         "intent": "location",
         "target": "$item#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">在",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "哪里",
-        "在哪"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<item>在哪里",
-      "entities": [
-        {
-          "role": "thing",
-          "name": "巨石阵"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$thing#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">在",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "哪里",
-        "在哪"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<item>在哪里",
-      "entities": [
-        {
-          "role": "thing",
-          "name": "泰姬陵"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$thing#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">在",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "哪里",
-        "在哪"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<item>在哪里",
-      "entities": [
-        {
-          "role": "thing",
-          "name": "埃菲尔铁塔"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$thing#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">在",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "哪里",
-        "在哪"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<item>在哪里",
-      "entities": [
-        {
-          "role": "thing",
-          "name": "卢浮宫"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$thing#1",
         "qualifiers": [],
         "subqueries": []
       },
@@ -7448,130 +7267,6 @@
       "support": 1
     },
     {
-      "abstract_question": "<person>喜欢什么",
-      "entities": [
-        {
-          "role": "person",
-          "name": "爱因斯坦"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=likes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">喜",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "什么",
-        "喜欢",
-        "欢什"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<person>喜欢什么",
-      "entities": [
-        {
-          "role": "person",
-          "name": "牛顿"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=likes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">喜",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "什么",
-        "喜欢",
-        "欢什"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<person>喜欢什么",
-      "entities": [
-        {
-          "role": "person",
-          "name": "达芬奇"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=likes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">喜",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "什么",
-        "喜欢",
-        "欢什"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<person>喜欢什么",
-      "entities": [
-        {
-          "role": "person",
-          "name": "李白"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=likes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">喜",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "什么",
-        "喜欢",
-        "欢什"
-      ],
-      "support": 1
-    },
-    {
       "abstract_question": "<person>在哪还有<item>是什么颜色",
       "entities": [
         {
@@ -10044,38 +9739,6 @@
       "support": 1
     },
     {
-      "abstract_question": "<person>有什么爱好",
-      "entities": [
-        {
-          "role": "person",
-          "name": "爱因斯坦"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=likes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">有",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "么爱",
-        "什么",
-        "有什",
-        "爱好"
-      ],
-      "support": 1
-    },
-    {
       "abstract_question": "<person>猜测<item>的位置",
       "entities": [
         {
@@ -10176,39 +9839,6 @@
         "在<",
         "测<",
         "猜测"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<person>的爱好是什么",
-      "entities": [
-        {
-          "role": "person",
-          "name": "牛顿"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=likes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">的",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "什么",
-        "好是",
-        "是什",
-        "爱好",
-        "的爱"
       ],
       "support": 1
     },
@@ -10853,130 +10483,6 @@
         "片在",
         "芯片",
         "认为"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<person>讨厌什么",
-      "entities": [
-        {
-          "role": "person",
-          "name": "特斯拉"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=dislikes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">讨",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "什么",
-        "厌什",
-        "讨厌"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<person>讨厌什么",
-      "entities": [
-        {
-          "role": "person",
-          "name": "牛顿"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=dislikes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">讨",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "什么",
-        "厌什",
-        "讨厌"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<person>讨厌什么",
-      "entities": [
-        {
-          "role": "person",
-          "name": "爱因斯坦"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=dislikes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">讨",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "什么",
-        "厌什",
-        "讨厌"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<person>讨厌什么",
-      "entities": [
-        {
-          "role": "person",
-          "name": "李白"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$person#1",
-        "qualifiers": [
-          "attribute=dislikes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">讨",
-        "er",
-        "n>",
-        "on",
-        "pe",
-        "rs",
-        "so",
-        "什么",
-        "厌什",
-        "讨厌"
       ],
       "support": 1
     },
@@ -13549,6 +13055,144 @@
         "给了",
         "被交",
         "说<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "彩虹有七种颜色"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$topic#1",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "冬天会下雪"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$topic#1",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "铁会生锈"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$topic#1",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么天是蓝",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "天是蓝的"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$topic#1",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "为什",
+        "么天",
+        "什么",
+        "天是",
+        "是蓝"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么海水是咸",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "海水是咸的"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$topic#1",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "为什",
+        "么海",
+        "什么",
+        "是咸",
+        "水是",
+        "海水"
       ],
       "support": 1
     },
@@ -17983,6 +17627,33 @@
       "support": 1
     },
     {
+      "abstract_question": "太阳为什么会发光",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "太阳会发光"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$topic#1",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "为什",
+        "么会",
+        "什么",
+        "会发",
+        "发光",
+        "太阳",
+        "阳为"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "头一个把<item>从<container>取出的是谁",
       "entities": [
         {
@@ -21010,6 +20681,35 @@
       "support": 1
     },
     {
+      "abstract_question": "月亮为什么有圆缺变化",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "月亮有圆缺变化"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$topic#1",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "为什",
+        "么有",
+        "亮为",
+        "什么",
+        "变化",
+        "圆缺",
+        "月亮",
+        "有圆",
+        "缺变"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "有情绪么你",
       "entities": [],
       "query": {
@@ -21023,6 +20723,34 @@
         "情绪",
         "有情",
         "绪么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "植物为什么需要阳光",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "植物需要阳光"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$topic#1",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "为什",
+        "么需",
+        "什么",
+        "植物",
+        "物为",
+        "要阳",
+        "阳光",
+        "需要"
       ],
       "support": 1
     },

@@ -165,6 +165,7 @@ def with_neural_boundary(
         rule_inferers=capabilities.rule_inferers,
         answerers=answerers,
         intent_analyzers=intent_analyzers,
+        memory_states=capabilities.memory_states,
     )
 
 

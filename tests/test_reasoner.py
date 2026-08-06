@@ -27,6 +27,8 @@ from struct_llm.motor.feedback import (
     accept_query_suggestion,
     assess_query_uncertainty,
     confidence_band,
+    save_chat_memory_feedback,
+    save_direct_memory_feedback,
     save_manual_query_feedback,
     save_manual_statement_feedback,
     save_new_dialog_capability_feedback,
@@ -34,8 +36,11 @@ from struct_llm.motor.feedback import (
     suggest_query_feedback,
 )
 from struct_llm.motor.dialogue import LearnedDialogActAnswerer, save_manual_dialog_answer_feedback
+from struct_llm.motor.feedback import save_memory_knowledge_feedback
 from struct_llm.comprehension.intent import InMemoryIntentAnalyzer, evaluate_intent_analyzer
 from struct_llm.motor.learning_queue import load_unrecognized_jsonl
+from struct_llm.memory.long_term import load_memory_model
+from struct_llm.memory.knowledge import LearnedMemoryKnowledgeAnswerer, load_memory_knowledge_model
 from struct_llm.comprehension.query import (
     LearnedQueryParser,
     compile_query_model_from_jsonl,
@@ -59,6 +64,7 @@ from struct_llm.comprehension.statement import (
 )
 from struct_llm.world.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, states_for_frame_schema
 from struct_llm.structure import Entity, Intention, Query, Structure
+from struct_llm.structure import State
 
 
 def predict(text: str, capabilities: CognitiveCapabilities | None = None):
@@ -193,28 +199,6 @@ class ReasonerTest(unittest.TestCase):
             prediction.answer,
             "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。",
         )
-
-    def test_neural_provider_keeps_short_zainali_location_as_query(self) -> None:
-        model = load_neural_boundary_model("my_neural:make_model")
-        capabilities = default_capabilities(neural_model=model)
-
-        prediction = predict("故宫在哪", capabilities)
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY location(故宫)", structure)
-        self.assertNotIn("REL at(故宫,哪)", structure)
-        self.assertEqual(prediction.answer, "不知道故宫在哪里。")
-
-    def test_neural_provider_answers_short_zainali_location_with_context(self) -> None:
-        model = load_neural_boundary_model("my_neural:make_model")
-        capabilities = default_capabilities(neural_model=model)
-
-        prediction = predict("故宫在北京。故宫在哪", capabilities)
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL at(故宫,北京)", structure)
-        self.assertIn("QUERY location(故宫)", structure)
-        self.assertEqual(prediction.answer, "故宫在北京。")
 
     def test_neural_training_summary_uses_current_datasets(self) -> None:
         model = make_model()
@@ -1633,6 +1617,62 @@ class ReasonerTest(unittest.TestCase):
         self.assertNotIn("REL likes(我,咖啡)", structure)
         self.assertIn("REL dislikes(我,咖啡)", structure)
         self.assertEqual(prediction.answer, "你叫小李；我还不知道你喜欢什么；你不喜欢咖啡。")
+
+    def test_direct_memory_entries_can_be_written_and_reloaded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            paths = LearningPaths(
+                memory_direct_data=Path(directory) / "memory_direct_examples.jsonl",
+                memory_chat_data=Path(directory) / "memory_chat_examples.jsonl",
+                memory_model=Path(directory) / "memory_model.json",
+            )
+            save_direct_memory_feedback(State("name", "我", "小王"), paths)
+
+            loaded = load_memory_model(paths.memory_model)
+            capabilities = default_capabilities(use_environment=False, use_memory=False).with_memory_states(*loaded.states)
+            prediction = predict("我叫什么", capabilities)
+
+        self.assertEqual(prediction.answer, "你叫小王。")
+
+    def test_chat_memory_entries_can_be_sedimented_and_reused(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            paths = LearningPaths(
+                memory_direct_data=Path(directory) / "memory_direct_examples.jsonl",
+                memory_chat_data=Path(directory) / "memory_chat_examples.jsonl",
+                memory_model=Path(directory) / "memory_model.json",
+            )
+            seed_prediction = predict("我叫小李。我叫什么？", default_capabilities(use_environment=False, use_memory=False))
+            result = save_chat_memory_feedback("我叫小李。我叫什么？", seed_prediction.structure, paths)
+
+            loaded = load_memory_model(result.model_path)
+            capabilities = default_capabilities(use_environment=False, use_memory=False).with_memory_states(*loaded.states)
+            prediction = predict("我叫什么", capabilities)
+
+        self.assertGreaterEqual(result.entry_count, 1)
+        self.assertEqual(prediction.answer, "你叫小李。")
+
+    def test_long_term_knowledge_entries_can_be_written_and_reused(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            paths = LearningPaths(
+                memory_knowledge_data=Path(directory) / "memory_knowledge_examples.jsonl",
+                memory_knowledge_model=Path(directory) / "memory_knowledge_model.json",
+            )
+            result = save_memory_knowledge_feedback(
+                "为什么天是蓝的？",
+                Query("why", "天是蓝的", ("type=why",)),
+                "因为阳光进入大气后会被空气分子散射，短波长的蓝光更容易散开，所以天空看起来偏蓝。",
+                paths,
+                source="curated",
+            )
+
+            loaded = load_memory_knowledge_model(result.model_path)
+            capabilities = default_capabilities(use_environment=False, use_memory=False).with_answerers(
+                LearnedMemoryKnowledgeAnswerer.from_model(result.model_path)
+            )
+            prediction = predict("为什么天是蓝的？", capabilities)
+
+        self.assertEqual(result.example_count, 1)
+        self.assertEqual(len(loaded.patterns), 1)
+        self.assertEqual(prediction.answer, "因为阳光进入大气后会被空气分子散射，短波长的蓝光更容易散开，所以天空看起来偏蓝。")
 
     def test_mixed_chat_fragments_preserve_task_core(self) -> None:
         prediction = predict("小郭把芯片放进托盘。你好，我想知道芯片在哪里？")

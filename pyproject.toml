@@ -19,6 +19,10 @@ struct-eval-statement = "struct_llm.cli:eval_statement_examples"
 struct-compile-query = "struct_llm.cli:compile_query_model"
 struct-compile-statement = "struct_llm.cli:compile_statement_model"
 struct-compile-dialog-answer = "struct_llm.cli:compile_dialog_answer_model"
+struct-compile-memory = "struct_llm.cli:compile_memory_model"
+struct-compile-memory-knowledge = "struct_llm.cli:compile_memory_knowledge_model"
+struct-add-memory = "struct_llm.cli:add_memory_entry"
+struct-add-knowledge = "struct_llm.cli:add_memory_knowledge_entry"
 struct-train-neural = "my_neural:train"
 
 [build-system]
