@@ -7,20 +7,11 @@ authors = [
     { name = "guoshijun", email = "guoshijun@regen-bio.com" }
 ]
 requires-python = ">=3.9"
-dependencies = [
-    "numpy>=2.0.2",
-]
-
-[project.optional-dependencies]
-neural = [
-    "torch>=2.2",
-]
 
 [project.scripts]
 ea-ai = "ea_ai:main"
 struct-demo = "struct_llm.cli:run_symbolic_demo"
 struct-ask = "struct_llm.cli:ask_symbolic"
-struct-ask-neural = "struct_llm.cli:ask_neural"
 struct-add-intent-example = "struct_llm.cli:add_intent_example"
 struct-eval-intent = "struct_llm.cli:eval_intent_examples"
 struct-eval-query = "struct_llm.cli:eval_query_examples"
@@ -28,8 +19,6 @@ struct-eval-statement = "struct_llm.cli:eval_statement_examples"
 struct-compile-query = "struct_llm.cli:compile_query_model"
 struct-compile-statement = "struct_llm.cli:compile_statement_model"
 struct-compile-dialog-answer = "struct_llm.cli:compile_dialog_answer_model"
-struct-make-dataset = "struct_llm.cli:make_dataset"
-struct-train-tiny = "struct_llm.cli:train_tiny_model"
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]

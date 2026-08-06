@@ -6,16 +6,16 @@ import unittest
 from pathlib import Path
 
 from struct_llm.errors import ParseError
-from struct_llm.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, states_for_frame_schema
-from struct_llm.cognitive import CognitiveCapabilities
-from struct_llm.cognitive.structure_helpers import frame_from_roles, with_time
-from struct_llm.cognitive.intent_dataset import (
+from struct_llm.capabilities import CognitiveCapabilities
+from struct_llm.comprehension.structure_helpers import frame_from_roles, with_time
+from struct_llm.comprehension.intent_dataset import (
     append_intent_record,
     build_intent_record,
     intent_record_from_dict,
     load_intent_jsonl,
 )
-from struct_llm.cognitive.feedback_learning import (
+from struct_llm.kernel import default_capabilities, parse_text, predict as _predict
+from struct_llm.motor.feedback import (
     LearningPaths,
     accept_query_suggestion,
     assess_query_uncertainty,
@@ -26,10 +26,10 @@ from struct_llm.cognitive.feedback_learning import (
     save_unrecognized_feedback,
     suggest_query_feedback,
 )
-from struct_llm.cognitive.dialog_answer_learning import LearnedDialogActAnswerer, save_manual_dialog_answer_feedback
-from struct_llm.cognitive.intent_learning import InMemoryIntentAnalyzer, evaluate_intent_analyzer
-from struct_llm.cognitive.learning_queue import load_unrecognized_jsonl
-from struct_llm.cognitive.query_learning import (
+from struct_llm.motor.dialogue import LearnedDialogActAnswerer, save_manual_dialog_answer_feedback
+from struct_llm.comprehension.intent import InMemoryIntentAnalyzer, evaluate_intent_analyzer
+from struct_llm.motor.learning_queue import load_unrecognized_jsonl
+from struct_llm.comprehension.query import (
     LearnedQueryParser,
     compile_query_model_from_jsonl,
     evaluate_query_parser,
@@ -37,7 +37,7 @@ from struct_llm.cognitive.query_learning import (
     load_query_model,
     save_query_model,
 )
-from struct_llm.cognitive.statement_learning import (
+from struct_llm.comprehension.statement import (
     EntitySlot,
     FrameTemplate,
     LearnedStatementParser,
@@ -50,9 +50,7 @@ from struct_llm.cognitive.statement_learning import (
     save_statement_model,
     statement_example_from_dict,
 )
-from struct_llm.modules import ModuleContext, default_module_registry
-from struct_llm.modules.cognitive import CognitiveKernelModule
-from struct_llm.reasoner import default_capabilities, parse_text, predict as _predict
+from struct_llm.world.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, states_for_frame_schema
 from struct_llm.structure import Entity, Intention, Query, Structure
 
 
@@ -331,44 +329,6 @@ class ReasonerTest(unittest.TestCase):
         self.assertEqual(records[0].confidence, 0.18)
         self.assertEqual(records[0].status, "pending")
         self.assertEqual(records[0].reason, "low_confidence")
-
-    def test_default_module_registry_exposes_outer_system_slots(self) -> None:
-        registry = default_module_registry(default_capabilities())
-
-        self.assertEqual(
-            registry.module_names(),
-            (
-                "alignment",
-                "memory",
-                "knowledge",
-                "cognitive_kernel",
-                "generation",
-                "planning",
-                "embodiment",
-                "emotion",
-                "self_model",
-                "learning",
-            ),
-        )
-
-    def test_noop_outer_modules_preserve_cognitive_kernel_result(self) -> None:
-        text = "研究员把芯片放进托盘。托盘被带到实验室。芯片在哪里？"
-        capabilities = default_capabilities()
-
-        parsed = parse_text(text, capabilities)
-        direct = CognitiveKernelModule(capabilities).run(ModuleContext(text=text))
-        modular = default_module_registry(capabilities).run(ModuleContext(text=text))
-
-        self.assertEqual(modular.notes, ())
-        direct_structure = direct.context.structure
-        modular_structure = modular.context.structure
-        self.assertIsNotNone(direct_structure)
-        self.assertIsNotNone(modular_structure)
-        assert direct_structure is not None
-        assert modular_structure is not None
-        self.assertEqual(parsed.linearize(), direct_structure.linearize())
-        self.assertEqual(direct_structure.linearize(), modular_structure.linearize())
-        self.assertEqual(direct.context.answer, modular.context.answer)
 
     def test_event_schema_projects_registered_state_effects(self) -> None:
         examples = (

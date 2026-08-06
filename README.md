@@ -6,10 +6,7 @@
 
 > 模型能否从句子里抽取实体、关系、事件和规则，再基于这些结构推理出答案？
 
-第一版包含两个层次：
-
-- `symbolic`：标准库即可运行的显式结构推理 baseline。
-- `neural`：预留 PyTorch tiny Transformer 训练入口，用来学习生成结构 token 和答案 token。
+当前主路径是标准库即可运行的显式结构推理 baseline。
 
 ## 设计思想
 
@@ -46,14 +43,15 @@
 
 ```text
 原始文本
-  -> text_processing.split_sentences
-  -> normalization 表层剥离和槽位归一
-  -> statement_learning 加载 statement_model.json，实例化 Entity + FRAME/ROLE
-  -> state_engine FRAME 投影为当前 STATE
-  -> query_learning 加载 query_model.json，把查询候选抽象为 QUERY
+  -> perception/lexer.py 切句和查询候选保留
+  -> perception/normalizer.py 表层剥离和槽位归一
+  -> comprehension/statement.py 加载 statement_model.json，实例化 Entity + FRAME/ROLE
+  -> world/state.py FRAME 投影为当前 STATE
+  -> comprehension/query.py 加载 query_model.json，把查询候选抽象为 QUERY
   -> intent_analyzers 从完整结构和训练样本推断 INTENT
-  -> inference 根据 QUERY + FRAME/STATE 推导 RULE；dialog_answer_learning 补充已学习的回答能力
-  -> reasoner 编排并返回 Prediction
+  -> reasoning/pipeline.py 门面转发到 reasoning/core.py 根据 QUERY + FRAME/STATE 推导 RULE
+  -> motor/dialogue.py 补充已学习的回答能力
+  -> kernel.py 编排并返回 Prediction
 ```
 
 这个顺序很重要。陈述句按原文顺序处理，后发生的放入、移动、交接、涂色会覆盖同一对象的旧当前状态；历史事件仍保留在 `FRAME` 里，所以“现在在哪里”和“谁曾经把 X 放进 Y”可以同时成立。
@@ -65,20 +63,20 @@
 | 阶段 | 做什么 | 用到的方法 / 技术 | 主要代码 / 产物 |
 | --- | --- | --- | --- |
 | 1. 收集样本 | 保存用户输入、失败案例和人工反馈 | JSONL 追加式数据集；训练样本 schema；人工确认反馈 | `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl`、`data/dialog_answer_examples.jsonl` |
-| 2. 样本校验 | 确认样本字段完整、结构合法 | 结构化 schema 校验；`dataclass` 样本对象；槽位字段检查 | `query_learning.py`、`statement_learning.py`、`intent_dataset.py` |
+| 2. 样本校验 | 确认样本字段完整、结构合法 | 结构化 schema 校验；`dataclass` 样本对象；槽位字段检查 | `comprehension/query.py`、`comprehension/statement.py`、`comprehension/intent_dataset.py` |
 | 3. 编译模型产物 | 把训练样本沉淀成运行时能力文件 | 结构模板聚合；抽象问题模式；回答结构聚合；源数据 `sha256` 指纹；原子写入 JSON | `data/query_model.json`、`data/statement_model.json`、`data/dialog_answer_model.json` |
-| 4. 运行时加载 | 启动时加载编译后的能力，而不是扫描训练集 | 模型 artifact 加载；能力函数注册；可替换 learner 接口 | `reasoner.default_capabilities()`、`LearnedQueryParser`、`LearnedStatementParser`、`LearnedDialogActAnswerer` |
-| 5. 文本切分 | 把输入拆成陈述片段和查询候选 | 标点切句；逗号/分号候选拆分；聊天片段保留；尾句保留 | `text_processing.py` |
-| 6. 表层归一化 | 剥离不影响语义的表层差异 | 语气词清理；提问外壳清理；同义动作归一；容器后缀归一；`啥 -> 什么` | `normalization.py` |
-| 7. 陈述理解 | 把陈述句变成实体和历史事件 | 句子模板槽位抽取；实体角色实例化；`FRAME/ROLE` 结构模板实例化 | `statement_learning.py`、`ENTITY`、`FRAME`、`ROLE` |
-| 8. Query 理解 | 把问题变成可计算查询 | 抽象问题匹配；字符 bigram 相似度；角色槽位实例化；复合查询组合 | `query_learning.py`、`QUERY` |
-| 9. 状态投影 | 从历史事件得到当前世界状态 | 事件 schema；状态 projector；状态 reducer；后发生事件覆盖旧状态 | `state_engine.py`、`event_schema.py`、`STATE` |
-| 10. 结构推理 | 根据结构推导规则和答案 | frame 角色匹配；状态查询；关系闭包；事件约束；反事实重放；答案生成器 | `inference.py`、`RULE`、answerer |
-| 11. 不确定性决策 | 按置信度决定回答、确认或学习 | 置信度分段；`>=0.90` 直接回答；`0.50-0.90` 询问确认；`<0.50` 引导学习 | `uncertainty.py`、`feedback_learning.py` |
-| 12. 自学习反馈 | 未命中时确认相似含义或记录待整理样本 | 中置信相似结构召回；低置信写入待整理队列；回答只加载可信来源；重新编译；立即重试 | `feedback_learning.py`、`learning_queue.py`、`dialog_answer_learning.py`、`struct-ask --learn-on-fail` |
+| 4. 运行时加载 | 启动时加载编译后的能力，而不是扫描训练集 | 模型 artifact 加载；能力函数注册；可替换 learner 接口 | `kernel.default_capabilities()`、`LearnedQueryParser`、`LearnedStatementParser`、`LearnedDialogActAnswerer` |
+| 5. 文本切分 | 把输入拆成陈述片段和查询候选 | 标点切句；逗号/分号候选拆分；聊天片段保留；尾句保留 | `perception/lexer.py` |
+| 6. 表层归一化 | 剥离不影响语义的表层差异 | 语气词清理；提问外壳清理；同义动作归一；容器后缀归一；`啥 -> 什么` | `perception/normalizer.py` |
+| 7. 陈述理解 | 把陈述句变成实体和历史事件 | 句子模板槽位抽取；实体角色实例化；`FRAME/ROLE` 结构模板实例化 | `comprehension/statement.py`、`ENTITY`、`FRAME`、`ROLE` |
+| 8. Query 理解 | 把问题变成可计算查询 | 抽象问题匹配；字符 bigram 相似度；角色槽位实例化；复合查询组合 | `comprehension/query.py`、`QUERY` |
+| 9. 状态投影 | 从历史事件得到当前世界状态 | 事件 schema；状态 projector；状态 reducer；后发生事件覆盖旧状态 | `world/state.py`、`world/event_schema.py`、`STATE` |
+| 10. 结构推理 | 根据结构推导规则和答案 | frame 角色匹配；状态查询；关系闭包；事件约束；反事实重放；答案生成器 | `reasoning/core.py`、`reasoning/pipeline.py`、`reasoning/rules/`、`reasoning/answers/`、`RULE`、answerer |
+| 11. 不确定性决策 | 按置信度决定回答、确认或学习 | 置信度分段；`>=0.90` 直接回答；`0.50-0.90` 询问确认；`<0.50` 引导学习 | `metacognition/confidence.py`、`motor/feedback.py` |
+| 12. 自学习反馈 | 未命中时确认相似含义或记录待整理样本 | 中置信相似结构召回；低置信写入待整理队列；回答只加载可信来源；重新编译；立即重试 | `motor/feedback.py`、`motor/learning_queue.py`、`motor/dialogue.py`、`struct-ask --learn-on-fail` |
 | 13. 实验验证 | 验证训练集、模型产物和端到端行为 | 数据集评估；unittest 回归；结构线性化断言；端到端答案断言 | `make check`、`uv run python -m unittest discover -q -b` |
 
-这里的“模型产物”目前不是神经网络权重，而是由训练样本编译出的结构能力文件。它保存抽象后的问题模式、句子模板、槽位角色、结构模板、特征单元、样本数量和数据指纹。后续如果替换成分类器、向量检索、生成模型或真正的神经模型，只需要替换 `query_learning.py`、`statement_learning.py` 里的学习能力实现，不需要把逻辑堆回 `reasoner.py`。
+这里的“模型产物”目前不是神经网络权重，而是由训练样本编译出的结构能力文件。它保存抽象后的问题模式、句子模板、槽位角色、结构模板、特征单元、样本数量和数据指纹。后续如果替换成分类器、向量检索、生成模型或真正的神经模型，只需要替换 `comprehension/query.py`、`comprehension/statement.py` 里的学习能力实现，不需要把逻辑堆回 `kernel.py`。
 
 ### 用到的技术
 
@@ -88,17 +86,16 @@
 - JSONL 数据集：用 `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl`、`data/dialog_answer_examples.jsonl` 保存可增量追加的训练/反馈样本。
 - 编译 JSON 模型：用 `data/query_model.json`、`data/statement_model.json`、`data/dialog_answer_model.json` 保存从训练集中沉淀出的运行时能力。
 - 结构槽位：用 `$item#1`、`$container#1`、`$person#1` 这类槽位表达实体角色和出现顺序。
-- 表层归一化：在 `normalization.py` 中统一语气词、同义动作、容器后缀、提问外壳和“啥/什么”等表层差异。
+- 表层归一化：在 `perception/normalizer.py` 中统一语气词、同义动作、容器后缀、提问外壳和“啥/什么”等表层差异。
 - 抽象特征匹配：Query 编译后使用抽象问题和字符 bigram 特征寻找相似结构；未命中时也用同一套相似度给用户推荐可能含义。
-- 不确定性策略：`uncertainty.py` 统一管理置信度阈值，避免在 CLI 或推理层写散落判断。
+- 不确定性策略：`metacognition/confidence.py` 统一管理置信度阈值，避免在 CLI 或推理层写散落判断。
 - 模板实例化：Statement 编译后使用句子模板抽取槽位，再实例化为 `ENTITY + FRAME/ROLE`。
-- 状态投影：`state_engine.py` 把历史 `FRAME` 转成当前 `STATE`，并处理后发生事件覆盖旧状态。
-- 结构推理：`inference.py` 基于 frame 角色匹配、状态查询、关系闭包、事件约束和反事实重放生成 `RULE` 和答案。
+- 状态投影：`world/state.py` 把历史 `FRAME` 转成当前 `STATE`，并处理后发生事件覆盖旧状态。
+- 结构推理：`reasoning/core.py` 基于 frame 角色匹配、状态查询、关系闭包、事件约束和反事实重放生成 `RULE` 和答案，`reasoning/pipeline.py` 只保留稳定入口。
 - 能力注册：`CognitiveCapabilities` 把陈述学习、Query 学习、状态投影、状态覆盖、规则推导和答案生成组合为可替换能力。
-- 反馈学习服务：`feedback_learning.py` 和 `dialog_answer_learning.py` 封装相似建议、新聊天能力、可信回答样本加载和模型重编译；CLI 只负责交互展示。
+- 反馈学习服务：`motor/feedback.py` 和 `motor/dialogue.py` 封装相似建议、新聊天能力、可信回答样本加载和模型重编译；CLI 只负责交互展示。
 - CLI 与 Makefile：`struct-ask`、`struct-compile-*`、`struct-eval-*` 提供命令入口；`make model`、`make check`、`make ask` 是日常使用入口。
 - unittest 回归：`tests/test_reasoner.py` 覆盖数据 loader、反馈写入、模型编译、运行时加载、结构推理和端到端回答。
-- 可选 tiny Transformer：`model.py`、`vocab.py`、`struct-train-tiny` 预留神经模型入口，目前不参与默认结构推理路径。
 
 ### 能力组合
 
@@ -270,8 +267,8 @@ uv run struct-eval-intent --train-data data/intent_examples.jsonl
 保存为 JSONL 后，可以在代码里注入：
 
 ```python
-from struct_llm.cognitive.intent_learning import InMemoryIntentAnalyzer
-from struct_llm.reasoner import default_capabilities, predict
+from struct_llm.comprehension.intent import InMemoryIntentAnalyzer
+from struct_llm.kernel import default_capabilities, predict
 
 analyzer = InMemoryIntentAnalyzer.from_jsonl("data/intent_examples.jsonl")
 capabilities = default_capabilities().with_intent_analyzers(analyzer)
@@ -287,10 +284,6 @@ uv run struct-ask --intent-data data/intent_examples.jsonl "妈妈在找眼镜�
 
 当前 `InMemoryIntentAnalyzer` 是冷启动原型：默认没有样本就不会猜意图；有样本时会输出 `INTENT` 中间结构。后续可以把这个插槽替换成检索、训练好的分类/生成模型、在线反馈写回或多智能体强化学习模块，而不需要扩展文案匹配。
 
-### 模块化扩展原则
-
-模块先有边界，再有能力；先能插拔，再谈增强。`CognitiveCapabilities` 承担内部结构推理内核；外层系统模块（规划、具身、情感、自我认知、持续学习）先以空实现注册，后续再逐步增强，但不能把逻辑直接堆进 `reasoner.py`。
-
 ## 项目结构与文件配置
 
 ```text
@@ -302,39 +295,44 @@ uv run struct-ask --intent-data data/intent_examples.jsonl "妈妈在找眼镜�
   uv.toml              # uv 配置
   uv.lock              # uv 锁文件
   data/
-    train.jsonl        # symbolic/neural 训练数据
-    test.jsonl         # 测试数据
     query_examples.jsonl  # Query 解析训练样本
     query_model.json      # Query 编译模型，默认运行时加载
     statement_examples.jsonl  # 陈述解析训练样本
     statement_model.json      # 陈述编译模型，默认运行时加载
     intent_examples.jsonl # 可选：意图分析训练/反馈样本
-    tiny_model.pt      # tiny Transformer 训练产物，如果已训练
 src/struct_llm/
-  world.py              # 微型世界：人物、物品、容器、地点、任务模板
+  capabilities.py       # 认知内核可插拔能力接口和组合方式
+  kernel.py             # 认知循环编排：感知 -> 理解 -> 世界状态 -> 推理 -> 输出
   structure.py          # 结构表示：实体、关系、事件、规则、线性化格式
-  event_schema.py       # 事件 schema：角色别名、状态效果、事件查询匹配
-  dataset.py            # 数据生成：训练/测试组合泛化切分
-  cognitive/
-    capabilities.py     # 认知内核可插拔能力注册：陈述、状态、查询、规则、答案
-    kernel.py           # 认知内核唯一流水线，串起现有解析、状态、查询和推理模块
-    text_processing.py  # 切句和查询候选保留
-    normalization.py    # 语气词、外层话术、槽位边界归一化
-    state_engine.py     # FRAME -> 当前 STATE
-    statement_learning.py # 编译陈述样本并加载 statement_model.json
-    query_learning.py   # 编译 Query 样本并加载 query_model.json
-    structure_helpers.py # 纯结构构造和实体去重工具
+  perception/
+    lexer.py            # 切句和查询候选保留
+    normalizer.py       # 语气词、外层话术、槽位边界归一化
+    reference.py        # 指代和指示词消解
+  comprehension/
+    statement.py        # 编译陈述样本并加载 statement_model.json
+    query.py            # 编译 Query 样本并加载 query_model.json
     intent_dataset.py   # 意图训练/反馈 JSONL schema、校验、追加写入
-    intent_learning.py  # 观察样本 -> INTENT，可替换为训练模型
-    inference.py        # QUERY + FRAME/STATE -> 规则和答案
-  reasoner.py           # 轻量编排层
-  modules/              # 外层可插拔模块；cognitive 模块挂载认知内核
-  vocab.py              # 神经模型用的字符级词表
-  model.py              # PyTorch tiny Transformer，可选依赖
+    intent.py           # 观察样本 -> INTENT，可替换为训练模型
+    structure_helpers.py # 纯结构构造和实体去重工具
+  world/
+    event_schema.py     # 事件 schema：角色别名、状态效果、事件查询匹配
+    causal.py           # 条件规则展开和因果状态投影
+    state.py            # FRAME -> 当前 STATE
+  reasoning/
+    core.py             # QUERY + FRAME/STATE -> 规则和答案
+    pipeline.py         # 稳定门面：转发 core / rules / answers
+    rules/              # 规则推导注册出口
+    answers/            # 答案生成注册出口
+  metacognition/
+    confidence.py       # 置信度和不确定性策略
+  memory/
+    working.py          # 最小工作记忆：焦点实体、近期事件、当前状态
+  motor/
+    dialogue.py         # 已验证对话回答能力
+    feedback.py         # 反馈学习服务
+    learning_queue.py   # 待整理低置信样本队列
 scripts/
-  make_dataset.py       # 生成 JSONL 数据
   run_symbolic_demo.py  # 运行结构推理 demo
-  train_tiny_model.py   # 训练 tiny Transformer，需要安装 torch
 tests/
   test_reasoner.py      # 标准库测试
 ```
@@ -343,12 +341,11 @@ tests/
 
 `AGENTS.md` 是项目约束文件。它规定新增能力必须走“观察现象 -> 剥离次要因素 -> 构建理想模型 -> 数学表达 -> 实验验证”，并明确每种能力应该放在哪个模块。
 
-`pyproject.toml` 定义包名、依赖、可选神经网络依赖和 CLI 命令。当前命令入口包括：
+`pyproject.toml` 定义包名、依赖和 CLI 命令。当前命令入口包括：
 
 ```text
 struct-demo = struct_llm.cli:run_symbolic_demo
 struct-ask = struct_llm.cli:ask_symbolic
-struct-ask-neural = struct_llm.cli:ask_neural
 struct-add-intent-example = struct_llm.cli:add_intent_example
 struct-eval-intent = struct_llm.cli:eval_intent_examples
 struct-eval-query = struct_llm.cli:eval_query_examples
@@ -356,43 +353,41 @@ struct-eval-statement = struct_llm.cli:eval_statement_examples
 struct-compile-query = struct_llm.cli:compile_query_model
 struct-compile-statement = struct_llm.cli:compile_statement_model
 struct-compile-dialog-answer = struct_llm.cli:compile_dialog_answer_model
-struct-make-dataset = struct_llm.cli:make_dataset
-struct-train-tiny = struct_llm.cli:train_tiny_model
 ```
 
 `Makefile` 是日常入口。`make ask` 会调用 `uv run struct-ask --learn-on-fail "$(TEXT)"`；`make test` 会调用标准库 unittest。
 
 `structure.py` 定义所有中间结构。优先扩展这里的结构模型，而不是把语义塞进字符串。
 
-`cognitive/intent_dataset.py` 负责意图训练/反馈样本的 JSONL schema、校验和追加写入。
+`comprehension/intent_dataset.py` 负责意图训练/反馈样本的 JSONL schema、校验和追加写入。
 
-`cognitive/intent_learning.py` 负责可学习意图分析。它把行为观察映射到 `Intention(subject, goal, belief, strategy, evidence, confidence)`；默认实现只消费训练/反馈样本，不内置文案规则。
+`comprehension/intent.py` 负责可学习意图分析。它把行为观察映射到 `Intention(subject, goal, belief, strategy, evidence, confidence)`；默认实现只消费训练/反馈样本，不内置文案规则。
 
-`event_schema.py` 定义事件的角色别名和状态效果。例如 `put_in` 投影为 `in(theme, goal)`，`move` 投影为 `at(theme, goal)`，`open/close` 投影为 `access(theme, result)`，`create/destroy` 投影为 `exists(theme, result)`。事件查询匹配和反事实事件排除也复用这里的角色别名。
+`world/event_schema.py` 定义事件的角色别名和状态效果。例如 `put_in` 投影为 `in(theme, goal)`，`move` 投影为 `at(theme, goal)`，`open/close` 投影为 `access(theme, result)`，`create/destroy` 投影为 `exists(theme, result)`。事件查询匹配和反事实事件排除也复用这里的角色别名。
 
-`cognitive/normalization.py` 负责剥离表层因素。例如当前会把 `放到/放入/放进` 归一为同一类容器放入动作，并把 `盒子里面/盒子里` 归一为 `盒子`。
+`perception/normalizer.py` 负责剥离表层因素。例如当前会把 `放到/放入/放进` 归一为同一类容器放入动作，并把 `盒子里面/盒子里` 归一为 `盒子`。
 
-`cognitive/statement_learning.py` 负责默认陈述学习路径。它把 `data/statement_examples.jsonl` 编译为 `data/statement_model.json`，运行时从模型产物加载结构模板并通过实体槽位实例化 `FRAME/ROLE`；后续可以替换为分类器、生成模型或在线学习模型。
+`comprehension/statement.py` 负责默认陈述学习路径。它把 `data/statement_examples.jsonl` 编译为 `data/statement_model.json`，运行时从模型产物加载结构模板并通过实体槽位实例化 `FRAME/ROLE`；后续可以替换为分类器、生成模型或在线学习模型。
 
-`cognitive/state_engine.py` 负责把历史事件投影成当前世界状态。新增事件如果会改变世界状态，应在这里新增 state projector 或 state reducer。
+`world/state.py` 负责把历史事件投影成当前世界状态。新增事件如果会改变世界状态，应在这里新增 state projector 或 state reducer。
 
-`cognitive/query_learning.py` 负责默认 Query 学习路径。它把 `data/query_examples.jsonl` 编译为 `data/query_model.json`，运行时从模型产物加载抽象问题模式和 `QUERY` 结构模板。后续可以替换为分类器、生成模型或在线学习模型。
+`comprehension/query.py` 负责默认 Query 学习路径。它把 `data/query_examples.jsonl` 编译为 `data/query_model.json`，运行时从模型产物加载抽象问题模式和 `QUERY` 结构模板。后续可以替换为分类器、生成模型或在线学习模型。
 
-`cognitive/inference.py` 负责规则推导和答案生成。新增规则时，通常要成对新增 `rule_inferer` 和 `answerer`。
+`reasoning/core.py` 负责规则推导和答案生成。`reasoning/pipeline.py` 现在只是稳定门面，`reasoning/rules/` 和 `reasoning/answers/` 暂时承接默认注册出口。
 
-`reasoner.py` 只做编排：切句、调用能力、组装结构、返回答案。业务规则不应该写回这个文件。
+`kernel.py` 只做认知循环编排：切句、调用能力、组装结构、返回答案。业务规则不应该写回这个文件。
 
 ### 新增能力落点
 
 遇到新失败样例时，先判断它属于哪个层级：
 
-- 标点、尾句、寒暄问题没有被保留：改 `cognitive/text_processing.py`。
-- 语气词、同义动作、槽位边界污染：改 `cognitive/normalization.py`。
+- 标点、尾句、寒暄问题没有被保留：改 `perception/lexer.py`。
+- 语气词、同义动作、槽位边界污染：改 `perception/normalizer.py`。
 - 陈述表达没有映射到已有 `FRAME/ROLE`：先追加 `data/statement_examples.jsonl`，再跑 `struct-compile-statement` 和 `struct-eval-statement --statement-model data/statement_model.json`。
-- 新事件会改变当前世界，例如取出后不再在容器里：改 `cognitive/state_engine.py`。
+- 新事件会改变当前世界，例如取出后不再在容器里：改 `world/state.py`。
 - 用户换了问法但语义相同：先追加 `data/query_examples.jsonl`，再跑 `struct-compile-query` 和 `struct-eval-query --query-model data/query_model.json`。
-- 已经有 `QUERY` 和 `FRAME/STATE`，但没有命中规则：改 `cognitive/inference.py` 的 rule inferer。
-- 已经命中规则，但答案表达不对：改 `cognitive/inference.py` 的 answerer。
+- 已经有 `QUERY` 和 `FRAME/STATE`，但没有命中规则：改 `reasoning/core.py` 的 rule inferer。
+- 已经命中规则，但答案表达不对：改 `reasoning/core.py` 的 answerer。
 
 每次修改都要在 `tests/test_reasoner.py` 加端到端测试。对于表层差异，测试重点不是“某句能答”，而是多个不同表述能落到同一个 `FRAME/ROLE/STATE/QUERY`。
 
@@ -437,12 +432,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 ```
 
-如果后面要训练 tiny Transformer，同步神经网络依赖：
-
-```bash
-uv sync --extra neural
-```
-
 ## 常用命令
 
 最便捷方式：
@@ -450,7 +439,6 @@ uv sync --extra neural
 ```bash
 make demo
 make ask
-make data
 make test
 ```
 
@@ -464,14 +452,6 @@ make ask TEXT="研究员把芯片放进托盘。托盘被带到实验室。芯�
 
 ```bash
 make chat
-```
-
-训练 tiny Transformer：
-
-```bash
-make train
-make ask-neural TEXT="研究员把芯片放进托盘。托盘被带到实验室。芯片在哪里？"
-make chat-neural
 ```
 
 ## 当前最小任务

@@ -1,4 +1,4 @@
-.PHONY: sync demo ask ask-neural chat chat-neural data compile model check intent-example intent-eval query-eval statement-eval test train
+.PHONY: sync demo ask chat compile model check intent-example intent-eval query-eval statement-eval test
 
 sync:
 	uv sync
@@ -9,17 +9,8 @@ demo:
 ask:
 	uv run struct-ask --learn-on-fail "$(TEXT)"
 
-ask-neural:
-	uv run --extra neural struct-ask-neural "$(TEXT)"
-
 chat:
 	uv run struct-ask --learn-on-fail
-
-chat-neural:
-	uv run --extra neural struct-ask-neural
-
-data:
-	uv run struct-make-dataset
 
 compile: model
 
@@ -46,6 +37,3 @@ statement-eval:
 
 test:
 	uv run python -m unittest discover -q
-
-train:
-	uv run --extra neural struct-train-tiny

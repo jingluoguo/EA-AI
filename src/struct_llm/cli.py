@@ -5,9 +5,10 @@ import json
 from pathlib import Path
 
 from .errors import ParseError
-from .cognitive.intent_dataset import append_intent_record, build_intent_record
-from .cognitive.intent_learning import InMemoryIntentAnalyzer, evaluate_intent_analyzer, from_jsonl
-from .cognitive.feedback_learning import (
+from .comprehension.intent_dataset import append_intent_record, build_intent_record
+from .comprehension.intent import InMemoryIntentAnalyzer, evaluate_intent_analyzer, from_jsonl
+from .kernel import default_capabilities, parse_text, predict
+from .motor.feedback import (
     LearningPaths,
     accept_query_suggestion,
     assess_query_uncertainty,
@@ -15,20 +16,21 @@ from .cognitive.feedback_learning import (
     save_manual_statement_feedback,
     save_unrecognized_feedback,
 )
-from .cognitive.dialog_answer_learning import (
+from .motor.dialogue import (
     LearnedDialogActAnswerer,
     compile_dialog_answer_model_from_jsonl,
     save_dialog_answer_model,
 )
-from .cognitive.query_learning import (
+from .comprehension.query import (
     EntityExample,
     LearnedQueryParser,
     QUERY_DIRECT_CONFIDENCE,
+    compile_query_model_from_jsonl,
     evaluate_query_parser,
     load_query_jsonl,
+    save_query_model,
 )
-from .cognitive.query_learning import compile_query_model_from_jsonl, save_query_model
-from .cognitive.statement_learning import (
+from .comprehension.statement import (
     EntitySlot,
     FrameTemplate,
     LearnedStatementParser,
@@ -37,8 +39,6 @@ from .cognitive.statement_learning import (
     load_statement_jsonl,
     save_statement_model,
 )
-from .dataset import generate_examples, write_jsonl
-from .reasoner import default_capabilities, parse_text, predict
 
 
 QUESTIONS = (
@@ -110,28 +110,6 @@ def ask_symbolic() -> None:
             break
         if text:
             print_prediction_with_learning(text, capabilities, args)
-
-
-def ask_neural() -> None:
-    parser = argparse.ArgumentParser(description="Ask the trained tiny Transformer.")
-    parser.add_argument("text", nargs="?", help="Question text. Omit it to enter interactive mode.")
-    parser.add_argument("--checkpoint", default="data/tiny_model.pt")
-    parser.add_argument("--max-new-tokens", type=int, default=256)
-    args = parser.parse_args()
-
-    predictor = load_neural_predictor(Path(args.checkpoint), args.max_new_tokens)
-
-    if args.text:
-        print_neural_prediction(predictor(args.text))
-        return
-
-    print("输入一句话，按回车让 tiny 模型生成；输入 exit 退出。")
-    while True:
-        text = input("> ").strip()
-        if text.lower() in {"exit", "quit", "q"}:
-            break
-        if text:
-            print_neural_prediction(predictor(text))
 
 
 def add_intent_example() -> None:
@@ -531,102 +509,3 @@ def capabilities_after_recompile(args):
     if dialog_answer_model and Path(dialog_answer_model).exists():
         capabilities = capabilities.with_answerers(LearnedDialogActAnswerer.from_model(Path(dialog_answer_model)))
     return capabilities
-
-
-def print_neural_prediction(output: str) -> None:
-    answer = extract_answer(output)
-    if answer:
-        print(answer)
-        print()
-        print("[raw]")
-    print(output)
-
-
-def extract_answer(output: str) -> str:
-    if "<ANSWER>" not in output:
-        return ""
-    answer = output.rsplit("<ANSWER>", 1)[-1].strip()
-    return answer.splitlines()[0].strip() if answer else ""
-
-
-def make_dataset() -> None:
-    examples = generate_examples()
-    write_jsonl((example for example in examples if example.split == "train"), Path("data/train.jsonl"))
-    write_jsonl((example for example in examples if example.split == "test"), Path("data/test.jsonl"))
-
-    train_count = sum(1 for example in examples if example.split == "train")
-    test_count = sum(1 for example in examples if example.split == "test")
-    print(f"Wrote {train_count} train examples and {test_count} test examples.")
-
-
-def train_tiny_model() -> None:
-    from .model import build_tiny_transformer, require_torch
-    from .structure import linearize_target
-    from .vocab import CharVocab
-
-    torch, nn = require_torch()
-
-    examples = [example for example in generate_examples() if example.split == "train"]
-    sources = [example.text for example in examples]
-    targets = [linearize_target(example.structure, example.answer) for example in examples]
-    vocab = CharVocab.build(sources + targets)
-    model = build_tiny_transformer(len(vocab.token_to_id))
-    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
-    loss_fn = nn.CrossEntropyLoss(ignore_index=vocab.pad_id)
-
-    encoded_sources = [torch.tensor(vocab.encode(text), dtype=torch.long) for text in sources]
-    encoded_targets = [torch.tensor(vocab.encode(text), dtype=torch.long) for text in targets]
-
-    for epoch in range(10):
-        total_loss = 0.0
-        for source, target in zip(encoded_sources, encoded_targets):
-            source = source.unsqueeze(0)
-            decoder_input = target[:-1].unsqueeze(0)
-            expected = target[1:].unsqueeze(0)
-
-            logits = model(source, decoder_input)
-            loss = loss_fn(logits.reshape(-1, logits.size(-1)), expected.reshape(-1))
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            total_loss += float(loss.item())
-
-        print(f"epoch={epoch + 1} loss={total_loss / len(examples):.4f}")
-
-    Path("data").mkdir(exist_ok=True)
-    torch.save(
-        {
-            "config": {"d_model": 128},
-            "model": model.state_dict(),
-            "vocab": vocab.token_to_id,
-        },
-        "data/tiny_model.pt",
-    )
-    print("Saved data/tiny_model.pt")
-
-
-def load_neural_predictor(checkpoint_path: Path, max_new_tokens: int):
-    from .model import build_tiny_transformer, generate_text, require_torch
-    from .vocab import CharVocab
-
-    torch, _ = require_torch()
-
-    if not checkpoint_path.exists():
-        raise FileNotFoundError(
-            f"Cannot find {checkpoint_path}. Run `make train` first to create the tiny model."
-        )
-
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
-    vocab = CharVocab(checkpoint["vocab"])
-    config = checkpoint.get("config", {})
-    model = build_tiny_transformer(
-        vocab_size=len(vocab.token_to_id),
-        d_model=int(config.get("d_model", 128)),
-    )
-    model.load_state_dict(checkpoint["model"])
-
-    def _predict(text: str) -> str:
-        return generate_text(model, vocab, text, max_new_tokens=max_new_tokens)
-
-    return _predict
