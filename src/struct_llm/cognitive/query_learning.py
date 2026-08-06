@@ -657,6 +657,8 @@ def infer_entities_from_abstract_pattern(
 
 def extract_role_token_slots(template: str, sentence: str) -> tuple[tuple[str, str], ...] | None:
     parts = split_role_token_template(template)
+    if not template_has_literal_anchor(parts):
+        return extract_unanchored_role_token_slots(parts, sentence)
     slots: list[tuple[str, str]] = []
     position = 0
     for index, part in enumerate(parts):
@@ -691,6 +693,22 @@ def extract_role_token_slots(template: str, sentence: str) -> tuple[tuple[str, s
     if position > len(sentence):
         return None
     return tuple(slots)
+
+
+def template_has_literal_anchor(parts: tuple[str, ...]) -> bool:
+    return any(role_from_token(part) is None and part.strip() for part in parts)
+
+
+def extract_unanchored_role_token_slots(parts: tuple[str, ...], sentence: str) -> tuple[tuple[str, str], ...] | None:
+    if len(parts) != 1:
+        return None
+    role = role_from_token(parts[0])
+    if role is None:
+        return None
+    sentence_role = role_from_token(sentence)
+    if sentence_role is None or not roles_compatible(role, sentence_role):
+        return None
+    return ((role, sentence),)
 
 
 def split_role_token_template(template: str) -> tuple[str, ...]:

@@ -13,7 +13,7 @@ from .cognitive.feedback_learning import (
     assess_query_uncertainty,
     save_manual_query_feedback,
     save_manual_statement_feedback,
-    save_new_dialog_capability_feedback,
+    save_unrecognized_feedback,
 )
 from .cognitive.dialog_answer_learning import (
     LearnedDialogActAnswerer,
@@ -67,6 +67,7 @@ def ask_symbolic() -> None:
     parser.add_argument("--statement-min-score", type=float, default=0.58)
     parser.add_argument("--dialog-answer-data", help="JSONL file with learned dialog answer examples.")
     parser.add_argument("--dialog-answer-model", help="Compiled dialog answer model artifact.")
+    parser.add_argument("--unrecognized-data", help="JSONL file for low-confidence inputs awaiting offline labeling.")
     parser.add_argument("--learn-on-fail", action="store_true", help="Prompt for feedback when structure extraction fails.")
     args = parser.parse_args()
     capabilities = default_capabilities()
@@ -274,6 +275,8 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
         if not getattr(args, "learn_on_fail", False):
             raise
         learned = prompt_learning_feedback(question, args)
+        if learned == "queued":
+            return
         if not learned:
             print("已跳过，不写入训练集。")
             return
@@ -292,40 +295,34 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
                 print("样本已经保存，不过当前还不能完整理解。后续补充训练样本后再试。")
 
 
-def prompt_learning_feedback(text: str, args) -> bool:
-    similar_result = prompt_similar_query_feedback(text, args)
-    if similar_result is True:
-        return True
-    if similar_result is None:
-        print("我确实还没懂这句话。")
-        print("没有找到足够相近的已学结构，我们一步步来。")
-        if prompt_new_dialog_capability_feedback(text, args):
-            return True
-    else:
-        print("好，那我不按刚才的猜测处理。")
-    if similar_result is not None:
-        print("我们也可以继续做更细的结构标注。")
-    choice = choose_from_menu(
-        "这句话更像哪一类？",
-        (
-            ("1", "问题或追问", "用户在问一件事，希望我回答。"),
-            ("2", "事实陈述", "用户在告诉我一件事实或事件。"),
-            ("3", "行为意图", "用户在描述某人的目标、想法或动机。"),
-            ("4", "先跳过", "这次不写入训练集。"),
-        ),
-    )
-    if choice == "1":
-        return prompt_query_feedback(text, args)
-    if choice == "2":
-        return prompt_statement_feedback(text, args)
-    if choice == "3":
-        return prompt_intent_feedback(text, args)
-    return False
-
-
-def prompt_similar_query_feedback(text: str, args) -> bool | None:
+def prompt_learning_feedback(text: str, args) -> str | bool:
     capabilities = capabilities_after_recompile(args)
     assessment = assess_query_uncertainty(text, capabilities.query_parsers)
+    if assessment.band == "unknown":
+        save_unrecognized_feedback(
+            text,
+            learning_paths_from_args(args),
+            confidence=assessment.score,
+        )
+        print("暂时无法识别。")
+        return "queued"
+    similar_result = prompt_similar_query_feedback(text, args, assessment)
+    if similar_result is True:
+        return "updated"
+    save_unrecognized_feedback(
+        text,
+        learning_paths_from_args(args),
+        confidence=assessment.score,
+        reason="user_rejected_suggestion",
+    )
+    print("暂时无法识别。")
+    return "queued"
+
+
+def prompt_similar_query_feedback(text: str, args, assessment=None) -> bool | None:
+    if assessment is None:
+        capabilities = capabilities_after_recompile(args)
+        assessment = assess_query_uncertainty(text, capabilities.query_parsers)
     suggestion = assessment.suggestion
     if suggestion is None:
         return None
@@ -334,7 +331,7 @@ def prompt_similar_query_feedback(text: str, args) -> bool | None:
         f"我有点把握，但还不想直接答。它是不是在{description}？",
         (
             ("1", "是这个意思", "把这句话按这个结构沉淀到训练集。"),
-            ("2", "不是", "继续手动教我。"),
+            ("2", "不是这个意思", "先记录下来，稍后整理。"),
         ),
     )
     if choice == "1":
@@ -377,24 +374,6 @@ def prompt_query_feedback(text: str, args) -> bool:
         qualifiers=qualifiers,
     )
     print(f"已保存问题样本并重新编译，问题样本现在有 {result.example_count} 条。")
-    return True
-
-
-def prompt_new_dialog_capability_feedback(text: str, args) -> bool:
-    print("如果这是一个新的聊天能力，不用填写实体和事件。")
-    capability_name = input("它想问什么能力（例如：情绪状态，留空进入其他学习方式）> ").strip()
-    if not capability_name:
-        return False
-    result = save_new_dialog_capability_feedback(
-        text,
-        capability_name,
-        learning_paths_from_args(args),
-    )
-    print(
-        f"新聊天能力“{capability_name}”已经写入训练集，"
-        f"问题样本现在有 {result.example_count} 条。"
-    )
-    print("这里只学习问题结构，不会把临时输入直接当成答案。")
     return True
 
 
@@ -480,6 +459,9 @@ def learning_paths_from_args(args) -> LearningPaths:
         statement_model=Path(getattr(args, "statement_model", None) or "data/statement_model.json"),
         dialog_answer_data=Path(getattr(args, "dialog_answer_data", None) or "data/dialog_answer_examples.jsonl"),
         dialog_answer_model=Path(getattr(args, "dialog_answer_model", None) or "data/dialog_answer_model.json"),
+        unrecognized_data=Path(
+            getattr(args, "unrecognized_data", None) or "data/unrecognized_examples.jsonl"
+        ),
     )
 
 

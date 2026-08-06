@@ -75,7 +75,7 @@ The project works as "training data distills capability; runtime loads the compi
 | 9. Project state | Derive current world state from historical events | Event schemas; state projectors; state reducers; later events overwrite earlier state | `state_engine.py`, `event_schema.py`, `STATE` |
 | 10. Reason structurally | Infer rules and answers from structure | Frame-role matching; state lookup; relation closure; event constraints; counterfactual replay; answerers | `inference.py`, `RULE`, answerer |
 | 11. Uncertainty decision | Choose direct answer, confirmation, or learning by confidence | Confidence bands; `>=0.90` answers directly; `0.50-0.90` asks for confirmation; `<0.50` starts guided learning | `uncertainty.py`, `feedback_learning.py` |
-| 12. Self-learning feedback | Confirm similar meanings or create a new dialog capability | Mid-confidence recall; capability names write Query only; answers load from trusted sources; recompilation; immediate retry | `feedback_learning.py`, `dialog_answer_learning.py`, `struct-ask --learn-on-fail` |
+| 12. Self-learning feedback | Confirm similar meanings or record examples for later labeling | Mid-confidence recall; low-confidence queueing; answers load from trusted sources; recompilation; immediate retry | `feedback_learning.py`, `learning_queue.py`, `dialog_answer_learning.py`, `struct-ask --learn-on-fail` |
 | 13. Verify experimentally | Validate datasets, artifacts, and end-to-end behavior | Dataset evaluation; unittest regression; structure linearization assertions; answer assertions | `make check`, `uv run python -m unittest discover -q -b` |
 
 The current "model artifact" is not neural-network weights. It is a structural capability file compiled from training examples. It stores abstract question patterns, sentence templates, slot roles, structure templates, feature units, example counts, and source-data fingerprints. Later, a classifier, vector retriever, generator, or real neural model can replace the learner internals in `query_learning.py` and `statement_learning.py` without pushing logic back into `reasoner.py`.
@@ -228,11 +228,11 @@ Runtime behavior follows one confidence policy:
 | --- | --- |
 | `>= 0.90` | Treat the structure as certain enough and answer directly. |
 | `0.50 - 0.90` | Do not guess the answer; ask the user to confirm the inferred meaning first. If confirmed, write the sentence back to JSONL, recompile the model, and retry. |
-| `< 0.50` | Admit that no close learned structure was found and start guided labeling. |
+| `< 0.50` | Do not ask follow-up questions; write the input to `data/unrecognized_examples.jsonl` and tell the user it cannot be recognized yet. |
 
-If the model cannot answer directly, it first searches the compiled model artifact for a similar meaning, for example asking whether the sentence means "asking what I can do." Confirmed feedback is saved with that structure and recompiled; only low-confidence or rejected suggestions fall back to manual guidance.
+If the model cannot answer directly, it first searches the compiled model artifact for a similar meaning, for example asking whether the sentence means "asking what I can do." Confirmed feedback is saved with that structure and recompiled. Low-confidence inputs, or rejected suggestions, are saved to `data/unrecognized_examples.jsonl` for later offline labeling.
 
-If the input is not an existing structure but a new dialog capability, the terminal can first fill the understanding gap: provide only the capability name, and the system will write a Query example and recompile. Answers are not generated from that interaction. Only trusted answer sources such as `training`, `teacher`, `self_model`, `knowledge`, `curated`, or `human_verified` are compiled into `data/dialog_answer_model.json`. Without a trusted answer, the system says it understands the question but does not yet have a verified reply.
+If a queued example later becomes a new dialog capability, migrate it into `data/query_examples.jsonl` as a Query example, then run `make model`. Answers are not generated from runtime interaction. Only trusted answer sources such as `training`, `teacher`, `self_model`, `knowledge`, `curated`, or `human_verified` are compiled into `data/dialog_answer_model.json`. Without a trusted answer, the system says it understands the question but does not yet have a verified reply.
 
 ### Feeding Intent Data
 
@@ -289,11 +289,7 @@ uv run struct-ask --intent-data data/intent_examples.jsonl "妈妈在找眼镜�
 
 ### Modular Extension Principle
 
-Modules should have boundaries before they have power; they should be pluggable before they become stronger.
-
-In this project, `CognitiveCapabilities` is the inner structural-reasoning kernel. Planning, embodiment, emotion, self-modeling, and continual learning should first exist as empty but swappable slots, then grow concrete implementations without pushing that logic into `reasoner.py`.
-
-See [docs/modular_architecture.md](docs/modular_architecture.md) for the rollout plan.
+Modules should have boundaries before they have power; they should be pluggable before they become stronger. `CognitiveCapabilities` is the inner structural-reasoning kernel; outer system modules (planning, embodiment, emotion, self-model, continual learning) first register as empty swappable slots and grow later, but their logic must not be pushed back into `reasoner.py`.
 
 ## Project Structure And Configuration
 
@@ -306,8 +302,6 @@ See [docs/modular_architecture.md](docs/modular_architecture.md) for the rollout
   pyproject.toml       # Python package metadata, dependencies, and CLI entry points
   uv.toml              # uv configuration
   uv.lock              # uv lockfile
-  docs/
-    modular_architecture.md  # Pluggable module architecture and rollout plan
   data/
     train.jsonl        # symbolic/neural training data
     test.jsonl         # test data

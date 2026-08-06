@@ -1,0 +1,2 @@
+{"schema": "struct_llm.unrecognized_example.v1", "text": "你会做梦吗", "confidence": 0.4, "reason": "low_confidence", "status": "pending", "source": "runtime"}
+{"schema": "struct_llm.unrecognized_example.v1", "text": "你会梦到电子羊吗", "confidence": 0.25, "reason": "low_confidence", "status": "pending", "source": "runtime"}

@@ -75,7 +75,7 @@
 | 9. 状态投影 | 从历史事件得到当前世界状态 | 事件 schema；状态 projector；状态 reducer；后发生事件覆盖旧状态 | `state_engine.py`、`event_schema.py`、`STATE` |
 | 10. 结构推理 | 根据结构推导规则和答案 | frame 角色匹配；状态查询；关系闭包；事件约束；反事实重放；答案生成器 | `inference.py`、`RULE`、answerer |
 | 11. 不确定性决策 | 按置信度决定回答、确认或学习 | 置信度分段；`>=0.90` 直接回答；`0.50-0.90` 询问确认；`<0.50` 引导学习 | `uncertainty.py`、`feedback_learning.py` |
-| 12. 自学习反馈 | 未命中时确认相似含义或创建新聊天能力 | 中置信相似结构召回；新能力名只写入 Query；回答只加载可信来源；重新编译；立即重试 | `feedback_learning.py`、`dialog_answer_learning.py`、`struct-ask --learn-on-fail` |
+| 12. 自学习反馈 | 未命中时确认相似含义或记录待整理样本 | 中置信相似结构召回；低置信写入待整理队列；回答只加载可信来源；重新编译；立即重试 | `feedback_learning.py`、`learning_queue.py`、`dialog_answer_learning.py`、`struct-ask --learn-on-fail` |
 | 13. 实验验证 | 验证训练集、模型产物和端到端行为 | 数据集评估；unittest 回归；结构线性化断言；端到端答案断言 | `make check`、`uv run python -m unittest discover -q -b` |
 
 这里的“模型产物”目前不是神经网络权重，而是由训练样本编译出的结构能力文件。它保存抽象后的问题模式、句子模板、槽位角色、结构模板、特征单元、样本数量和数据指纹。后续如果替换成分类器、向量检索、生成模型或真正的神经模型，只需要替换 `query_learning.py`、`statement_learning.py` 里的学习能力实现，不需要把逻辑堆回 `reasoner.py`。
@@ -228,11 +228,11 @@ make ask TEXT="你擅长什么"
 | --- | --- |
 | `>= 0.90` | 认为结构足够确定，直接回答。 |
 | `0.50 - 0.90` | 不直接猜答案，先问用户“是不是这个意思”。确认后写回 JSONL、重新编译模型，再重试回答。 |
-| `< 0.50` | 承认没有找到足够相近的已学结构，进入引导式标注。 |
+| `< 0.50` | 不再追问用户，写入 `data/unrecognized_examples.jsonl`，对用户只说“暂时无法识别。” |
 
-所以如果一句话没有直接命中现有模型，它会先拿模型产物找相似含义，例如问你“它是不是在询问我能做什么”。你确认后，它会把原句按相同结构写入 JSONL，并重新编译模型；只有低置信或你否认时，才进入手动引导。
+所以如果一句话没有直接命中现有模型，它会先拿模型产物找相似含义，例如问你“它是不是在询问我能做什么”。你确认后，它会把原句按相同结构写入 JSONL，并重新编译模型；如果置信度低，或你否认了这个相似含义，系统只把原句记录到 `data/unrecognized_examples.jsonl`，留给后续离线整理。
 
-如果这不是已有结构，而是一个新的聊天能力，终端可以先补“理解能力”：你只需要给出能力名，系统会写入 Query 样本并重新编译。回答不会从这次交互里直接生成；只有 `training`、`teacher`、`self_model`、`knowledge`、`curated`、`human_verified` 这些可信来源的回答样本会编译进 `data/dialog_answer_model.json`。没有可信回答时，系统会承认“已经理解问题，但还没有经过验证的相关回答”。
+如果待整理样本后来被你补成新的聊天能力，需要先把它迁移成 `data/query_examples.jsonl` 里的 Query 样本，再运行 `make model`。回答不会从运行时交互里直接生成；只有 `training`、`teacher`、`self_model`、`knowledge`、`curated`、`human_verified` 这些可信来源的回答样本会编译进 `data/dialog_answer_model.json`。没有可信回答时，系统会承认“已经理解问题，但还没有经过验证的相关回答”。
 
 ### 喂意图数据
 
@@ -289,11 +289,7 @@ uv run struct-ask --intent-data data/intent_examples.jsonl "妈妈在找眼镜�
 
 ### 模块化扩展原则
 
-模块先有边界，再有能力；先能插拔，再谈增强。
-
-在这个项目里，`CognitiveCapabilities` 承担内部结构推理内核。规划、具身、情感、自我认知、持续学习先都可以是空实现的可替换槽位，后续再逐步长出具体算法，而不要把这些逻辑直接堆进 `reasoner.py`。
-
-更完整的代码路线图见 [docs/modular_architecture.md](docs/modular_architecture.md)。
+模块先有边界，再有能力；先能插拔，再谈增强。`CognitiveCapabilities` 承担内部结构推理内核；外层系统模块（规划、具身、情感、自我认知、持续学习）先以空实现注册，后续再逐步增强，但不能把逻辑直接堆进 `reasoner.py`。
 
 ## 项目结构与文件配置
 
@@ -305,8 +301,6 @@ uv run struct-ask --intent-data data/intent_examples.jsonl "妈妈在找眼镜�
   pyproject.toml       # Python 包元数据、依赖、CLI entry points
   uv.toml              # uv 配置
   uv.lock              # uv 锁文件
-  docs/
-    modular_architecture.md  # 可插拔模块架构和落代码路线图
   data/
     train.jsonl        # symbolic/neural 训练数据
     test.jsonl         # 测试数据

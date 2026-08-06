@@ -5,6 +5,10 @@ from pathlib import Path
 
 from ..structure import Query
 from .capabilities import QueryParser
+from .learning_queue import (
+    UnrecognizedExample,
+    append_unrecognized_example,
+)
 from .query_learning import (
     CompiledQueryPattern,
     EntityExample,
@@ -39,6 +43,7 @@ class LearningPaths:
     statement_model: Path = Path("data/statement_model.json")
     dialog_answer_data: Path = Path("data/dialog_answer_examples.jsonl")
     dialog_answer_model: Path = Path("data/dialog_answer_model.json")
+    unrecognized_data: Path = Path("data/unrecognized_examples.jsonl")
 
 
 @dataclass(frozen=True)
@@ -165,6 +170,23 @@ def save_new_dialog_capability_feedback(
         capability_name,
         paths,
         source=source,
+    )
+
+
+def save_unrecognized_feedback(
+    text: str,
+    paths: LearningPaths,
+    *,
+    confidence: float = 0.0,
+    reason: str = "low_confidence",
+) -> UnrecognizedExample:
+    return append_unrecognized_example(
+        paths.unrecognized_data,
+        UnrecognizedExample(
+            text=text,
+            confidence=confidence,
+            reason=reason,
+        ),
     )
 
 
