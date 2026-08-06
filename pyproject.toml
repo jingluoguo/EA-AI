@@ -19,6 +19,7 @@ struct-eval-statement = "struct_llm.cli:eval_statement_examples"
 struct-compile-query = "struct_llm.cli:compile_query_model"
 struct-compile-statement = "struct_llm.cli:compile_statement_model"
 struct-compile-dialog-answer = "struct_llm.cli:compile_dialog_answer_model"
+struct-train-neural = "my_neural:train"
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]

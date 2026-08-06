@@ -1,34 +1,9 @@
 {
   "schema": "struct_llm.query_model.v1",
-  "source_sha256": "6abc2b152927797d8bde616b8ec63951580b8ea4fab914f1b680f2e9d42ada62",
-  "example_count": 523,
-  "pattern_count": 496,
+  "source_sha256": "5f2837af8521f7a2705d25c9ac46e09ee7e93821a88b04d9601ff3fb2da064a5",
+  "example_count": 641,
+  "pattern_count": 593,
   "patterns": [
-    {
-      "abstract_question": "<item>在哪",
-      "entities": [
-        {
-          "role": "item",
-          "name": "芯片"
-        }
-      ],
-      "query": {
-        "intent": "location",
-        "target": "$item#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">在",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "在哪"
-      ],
-      "support": 5
-    },
     {
       "abstract_question": "<item>在哪里",
       "entities": [
@@ -53,122 +28,32 @@
         "哪里",
         "在哪"
       ],
-      "support": 5
+      "support": 6
     },
     {
-      "abstract_question": "<container>在哪里",
+      "abstract_question": "<item>在哪",
       "entities": [
         {
-          "role": "container",
-          "name": "托盘"
+          "role": "item",
+          "name": "芯片"
         }
       ],
       "query": {
         "intent": "location",
-        "target": "$container#1",
+        "target": "$item#1",
         "qualifiers": [],
         "subqueries": []
       },
       "feature_units": [
-        "<c",
+        "<i",
         ">在",
-        "ai",
-        "co",
-        "er",
-        "in",
-        "ne",
-        "nt",
-        "on",
-        "r>",
-        "ta",
-        "哪里",
+        "em",
+        "it",
+        "m>",
+        "te",
         "在哪"
       ],
-      "support": 3
-    },
-    {
-      "abstract_question": "<self>喜欢什么",
-      "entities": [
-        {
-          "role": "self",
-          "name": "我"
-        }
-      ],
-      "query": {
-        "intent": "profile",
-        "target": "$self#1",
-        "qualifiers": [
-          "attribute=likes"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<s",
-        ">喜",
-        "el",
-        "f>",
-        "lf",
-        "se",
-        "什么",
-        "喜欢",
-        "欢什"
-      ],
-      "support": 3
-    },
-    {
-      "abstract_question": "<item>一开始在哪里",
-      "entities": [
-        {
-          "role": "item",
-          "name": "芯片"
-        }
-      ],
-      "query": {
-        "intent": "initial_location",
-        "target": "$item#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">一",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "一开",
-        "哪里",
-        "在哪",
-        "始在",
-        "开始"
-      ],
-      "support": 2
-    },
-    {
-      "abstract_question": "<item>是谁拿",
-      "entities": [
-        {
-          "role": "item",
-          "name": "芯片"
-        }
-      ],
-      "query": {
-        "intent": "actor_for_item",
-        "target": "$item#1",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        ">是",
-        "em",
-        "it",
-        "m>",
-        "te",
-        "是谁",
-        "谁拿"
-      ],
-      "support": 2
+      "support": 5
     },
     {
       "abstract_question": "<item>被谁放进<container>",
@@ -213,6 +98,467 @@
         "谁放",
         "进<"
       ],
+      "support": 5
+    },
+    {
+      "abstract_question": "<container>在哪里",
+      "entities": [
+        {
+          "role": "container",
+          "name": "托盘"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">在",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "哪里",
+        "在哪"
+      ],
+      "support": 4
+    },
+    {
+      "abstract_question": "<item>一开始在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        }
+      ],
+      "query": {
+        "intent": "initial_location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">一",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "一开",
+        "哪里",
+        "在哪",
+        "始在",
+        "开始"
+      ],
+      "support": 3
+    },
+    {
+      "abstract_question": "<self>喜欢什么",
+      "entities": [
+        {
+          "role": "self",
+          "name": "我"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$self#1",
+        "qualifiers": [
+          "attribute=likes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<s",
+        ">喜",
+        "el",
+        "f>",
+        "lf",
+        "se",
+        "什么",
+        "喜欢",
+        "欢什"
+      ],
+      "support": 3
+    },
+    {
+      "abstract_question": "谁把<item>从<container>里取出",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        },
+        {
+          "role": "container",
+          "name": "托盘"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_event",
+        "target": "take_out",
+        "qualifiers": [
+          "item=$item#1",
+          "source=$container#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">从",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "从<",
+        "取出",
+        "把<",
+        "谁把",
+        "里取"
+      ],
+      "support": 3
+    },
+    {
+      "abstract_question": "<container>里有什么",
+      "entities": [
+        {
+          "role": "container",
+          "name": "托盘"
+        }
+      ],
+      "query": {
+        "intent": "contents",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "什么",
+        "有什",
+        "里有"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<container>里有什么",
+      "entities": [
+        {
+          "role": "container",
+          "name": "书包"
+        }
+      ],
+      "query": {
+        "intent": "contents",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "什么",
+        "有什",
+        "里有"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "药瓶"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "菜"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "故宫"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$thing#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "金字塔"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$thing#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<item>是什么颜色",
+      "entities": [
+        {
+          "role": "item",
+          "name": "笔记本"
+        }
+      ],
+      "query": {
+        "intent": "color",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">是",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "么颜",
+        "什么",
+        "是什",
+        "颜色"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<item>是否存在",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "芯片"
+        }
+      ],
+      "query": {
+        "intent": "existence",
+        "target": "$thing#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">是",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "否存",
+        "存在",
+        "是否"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<item>是谁拿",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_item",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">是",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "是谁",
+        "谁拿"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<item>最开始在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        }
+      ],
+      "query": {
+        "intent": "initial_location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">最",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪",
+        "始在",
+        "开始",
+        "最开"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<item>被谁从<container>里取出",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        },
+        {
+          "role": "container",
+          "name": "托盘"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_event",
+        "target": "take_out",
+        "qualifiers": [
+          "item=$item#1",
+          "source=$container#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">被",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "从<",
+        "取出",
+        "被谁",
+        "谁从",
+        "里取"
+      ],
       "support": 2
     },
     {
@@ -256,6 +602,34 @@
         "在什",
         "地方",
         "相信"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "<place>里有什么",
+      "entities": [
+        {
+          "role": "place",
+          "name": "实验室"
+        }
+      ],
+      "query": {
+        "intent": "contents",
+        "target": "$place#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">里",
+        "ac",
+        "ce",
+        "e>",
+        "la",
+        "pl",
+        "什么",
+        "有什",
+        "里有"
       ],
       "support": 2
     },
@@ -483,6 +857,23 @@
       "support": 2
     },
     {
+      "abstract_question": "你擅长什么",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "capabilities",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "什么",
+        "你擅",
+        "擅长",
+        "长什"
+      ],
+      "support": 2
+    },
+    {
       "abstract_question": "如果<person>没有把<container>带到<place>，<item>会在哪里",
       "entities": [
         {
@@ -558,49 +949,19 @@
       "support": 2
     },
     {
-      "abstract_question": "谁把<item>从<container>里取出",
-      "entities": [
-        {
-          "role": "item",
-          "name": "芯片"
-        },
-        {
-          "role": "container",
-          "name": "托盘"
-        }
-      ],
+      "abstract_question": "有没有矛盾",
+      "entities": [],
       "query": {
-        "intent": "actor_for_event",
-        "target": "take_out",
-        "qualifiers": [
-          "item=$item#1",
-          "source=$container#1"
-        ],
+        "intent": "contradictions",
+        "target": "world",
+        "qualifiers": [],
         "subqueries": []
       },
       "feature_units": [
-        "<c",
-        "<i",
-        ">从",
-        ">里",
-        "ai",
-        "co",
-        "em",
-        "er",
-        "in",
-        "it",
-        "m>",
-        "ne",
-        "nt",
-        "on",
-        "r>",
-        "ta",
-        "te",
-        "从<",
-        "取出",
-        "把<",
-        "谁把",
-        "里取"
+        "有没",
+        "有矛",
+        "没有",
+        "矛盾"
       ],
       "support": 2
     },
@@ -650,6 +1011,32 @@
       "support": 2
     },
     {
+      "abstract_question": "谁拥有<item>",
+      "entities": [
+        {
+          "role": "item",
+          "name": "药瓶"
+        }
+      ],
+      "query": {
+        "intent": "owner",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "拥有",
+        "有<",
+        "谁拥"
+      ],
+      "support": 2
+    },
+    {
       "abstract_question": "<container>去过哪些地方",
       "entities": [
         {
@@ -680,6 +1067,92 @@
         "哪些",
         "地方",
         "过哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>和<container>哪个东西更多",
+      "entities": [
+        {
+          "role": "container",
+          "name": "冰箱"
+        },
+        {
+          "role": "container",
+          "name": "橱柜"
+        }
+      ],
+      "query": {
+        "intent": "compare_count",
+        "target": "$container#1和$container#2",
+        "qualifiers": [
+          "left=$container#1",
+          "right=$container#2"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">和",
+        ">哪",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "东西",
+        "个东",
+        "和<",
+        "哪个",
+        "更多",
+        "西更"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>和<container>哪个东西更多",
+      "entities": [
+        {
+          "role": "container",
+          "name": "抽屉"
+        },
+        {
+          "role": "container",
+          "name": "柜子"
+        }
+      ],
+      "query": {
+        "intent": "compare_count",
+        "target": "$container#1和$container#2",
+        "qualifiers": [
+          "left=$container#1",
+          "right=$container#2"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">和",
+        ">哪",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "东西",
+        "个东",
+        "和<",
+        "哪个",
+        "更多",
+        "西更"
       ],
       "support": 1
     },
@@ -776,6 +1249,68 @@
         {
           "role": "container",
           "name": "盒子"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">在",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>在哪里",
+      "entities": [
+        {
+          "role": "container",
+          "name": "锅"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">在",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>在哪里",
+      "entities": [
+        {
+          "role": "container",
+          "name": "背包"
         }
       ],
       "query": {
@@ -969,6 +1504,40 @@
       "support": 1
     },
     {
+      "abstract_question": "<container>是谁打开",
+      "entities": [
+        {
+          "role": "container",
+          "name": "盒子"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_event",
+        "target": "open",
+        "qualifiers": [
+          "container=$container#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">是",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "打开",
+        "是谁",
+        "谁打"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "<container>最开始的 position 是哪",
       "entities": [
         {
@@ -1077,6 +1646,52 @@
         "成了",
         "涂成",
         "被涂"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>被谁带到<place>",
+      "entities": [
+        {
+          "role": "container",
+          "name": "锅"
+        },
+        {
+          "role": "place",
+          "name": "厨房"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_event",
+        "target": "move",
+        "qualifiers": [
+          "item=$container#1",
+          "goal=$place#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<p",
+        ">被",
+        "ac",
+        "ai",
+        "ce",
+        "co",
+        "e>",
+        "er",
+        "in",
+        "la",
+        "ne",
+        "nt",
+        "on",
+        "pl",
+        "r>",
+        "ta",
+        "到<",
+        "带到",
+        "被谁",
+        "谁带"
       ],
       "support": 1
     },
@@ -1324,11 +1939,265 @@
       "support": 1
     },
     {
+      "abstract_question": "<container>里有<item>",
+      "entities": [
+        {
+          "role": "container",
+          "name": "锅"
+        },
+        {
+          "role": "item",
+          "name": "菜"
+        }
+      ],
+      "query": {
+        "intent": "polar_contents",
+        "target": "$container#1",
+        "qualifiers": [
+          "item=$item#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "有<",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>里有<item>",
+      "entities": [
+        {
+          "role": "container",
+          "name": "冰箱"
+        },
+        {
+          "role": "item",
+          "name": "牛奶"
+        }
+      ],
+      "query": {
+        "intent": "polar_contents",
+        "target": "$container#1",
+        "qualifiers": [
+          "item=$item#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "有<",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>里有<item>",
+      "entities": [
+        {
+          "role": "container",
+          "name": "书包"
+        },
+        {
+          "role": "item",
+          "name": "书"
+        }
+      ],
+      "query": {
+        "intent": "polar_contents",
+        "target": "$container#1",
+        "qualifiers": [
+          "item=$item#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "有<",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "<container>里有什么",
       "entities": [
         {
           "role": "container",
-          "name": "托盘"
+          "name": "锅"
+        }
+      ],
+      "query": {
+        "intent": "contents",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "什么",
+        "有什",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>里有什么",
+      "entities": [
+        {
+          "role": "container",
+          "name": "冰箱"
+        }
+      ],
+      "query": {
+        "intent": "contents",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "什么",
+        "有什",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>里有什么",
+      "entities": [
+        {
+          "role": "container",
+          "name": "抽屉"
+        }
+      ],
+      "query": {
+        "intent": "contents",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "什么",
+        "有什",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>里有什么",
+      "entities": [
+        {
+          "role": "container",
+          "name": "衣柜"
+        }
+      ],
+      "query": {
+        "intent": "contents",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "什么",
+        "有什",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>里有什么",
+      "entities": [
+        {
+          "role": "container",
+          "name": "背包"
         }
       ],
       "query": {
@@ -1361,6 +2230,108 @@
         {
           "role": "container",
           "name": "盒子"
+        }
+      ],
+      "query": {
+        "intent": "count",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "东西",
+        "个东",
+        "几个",
+        "有几",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>里有几个东西",
+      "entities": [
+        {
+          "role": "container",
+          "name": "冰箱"
+        }
+      ],
+      "query": {
+        "intent": "count",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "东西",
+        "个东",
+        "几个",
+        "有几",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>里有几个东西",
+      "entities": [
+        {
+          "role": "container",
+          "name": "书包"
+        }
+      ],
+      "query": {
+        "intent": "count",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "东西",
+        "个东",
+        "几个",
+        "有几",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<container>里有几个东西",
+      "entities": [
+        {
+          "role": "container",
+          "name": "衣柜"
         }
       ],
       "query": {
@@ -2290,6 +3261,82 @@
       "support": 1
     },
     {
+      "abstract_question": "<item>和<item>在同一个地方",
+      "entities": [
+        {
+          "role": "item",
+          "name": "菜"
+        },
+        {
+          "role": "item",
+          "name": "牛奶"
+        }
+      ],
+      "query": {
+        "intent": "same_location",
+        "target": "$item#1和$item#2",
+        "qualifiers": [
+          "left=$item#1",
+          "right=$item#2"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">和",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "一个",
+        "个地",
+        "同一",
+        "和<",
+        "在同",
+        "地方"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>和<item>在同一个地方",
+      "entities": [
+        {
+          "role": "item",
+          "name": "文件"
+        },
+        {
+          "role": "item",
+          "name": "合同"
+        }
+      ],
+      "query": {
+        "intent": "same_location",
+        "target": "$item#1和$item#2",
+        "qualifiers": [
+          "left=$item#1",
+          "right=$item#2"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">和",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "一个",
+        "个地",
+        "同一",
+        "和<",
+        "在同",
+        "地方"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "<item>和<item>是不是在同一个位置",
       "entities": [
         {
@@ -2417,6 +3464,264 @@
       "support": 1
     },
     {
+      "abstract_question": "<item>在<container>里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "菜"
+        },
+        {
+          "role": "container",
+          "name": "锅"
+        }
+      ],
+      "query": {
+        "intent": "polar_location",
+        "target": "$item#1",
+        "qualifiers": [
+          "expected=$container#1",
+          "kind=in"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">在",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "在<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在<container>里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "牛奶"
+        },
+        {
+          "role": "container",
+          "name": "冰箱"
+        }
+      ],
+      "query": {
+        "intent": "polar_location",
+        "target": "$item#1",
+        "qualifiers": [
+          "expected=$container#1",
+          "kind=in"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">在",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "在<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在<container>里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "文件"
+        },
+        {
+          "role": "container",
+          "name": "抽屉"
+        }
+      ],
+      "query": {
+        "intent": "polar_location",
+        "target": "$item#1",
+        "qualifiers": [
+          "expected=$container#1",
+          "kind=in"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">在",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "在<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在<container>里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "书"
+        },
+        {
+          "role": "container",
+          "name": "书包"
+        }
+      ],
+      "query": {
+        "intent": "polar_location",
+        "target": "$item#1",
+        "qualifiers": [
+          "expected=$container#1",
+          "kind=in"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">在",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "在<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在<container>里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "衣服"
+        },
+        {
+          "role": "container",
+          "name": "衣柜"
+        }
+      ],
+      "query": {
+        "intent": "polar_location",
+        "target": "$item#1",
+        "qualifiers": [
+          "expected=$container#1",
+          "kind=in"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">在",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "在<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在<container>里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "水壶"
+        },
+        {
+          "role": "container",
+          "name": "背包"
+        }
+      ],
+      "query": {
+        "intent": "polar_location",
+        "target": "$item#1",
+        "qualifiers": [
+          "expected=$container#1",
+          "kind=in"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">在",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "在<"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "<item>在<place>",
       "entities": [
         {
@@ -2489,6 +3794,31 @@
         "pl",
         "te",
         "在<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在哪",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "故宫"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$thing#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "在哪"
       ],
       "support": 1
     },
@@ -2637,12 +3967,220 @@
       "entities": [
         {
           "role": "item",
-          "name": "药瓶"
+          "name": "牛奶"
         }
       ],
       "query": {
         "intent": "location",
         "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "文件"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "书"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "衣服"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "水壶"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "巨石阵"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$thing#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "泰姬陵"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$thing#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "埃菲尔铁塔"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$thing#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "哪里",
+        "在哪"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>在哪里",
+      "entities": [
+        {
+          "role": "thing",
+          "name": "卢浮宫"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$thing#1",
         "qualifiers": [],
         "subqueries": []
       },
@@ -3344,7 +4882,7 @@
       "entities": [
         {
           "role": "item",
-          "name": "笔记本"
+          "name": "药瓶"
         }
       ],
       "query": {
@@ -3372,7 +4910,7 @@
       "entities": [
         {
           "role": "item",
-          "name": "药瓶"
+          "name": "蛋糕"
         }
       ],
       "query": {
@@ -3396,16 +4934,16 @@
       "support": 1
     },
     {
-      "abstract_question": "<item>是否存在",
+      "abstract_question": "<item>是什么颜色",
       "entities": [
         {
-          "role": "thing",
-          "name": "芯片"
+          "role": "item",
+          "name": "粉笔"
         }
       ],
       "query": {
-        "intent": "existence",
-        "target": "$thing#1",
+        "intent": "color",
+        "target": "$item#1",
         "qualifiers": [],
         "subqueries": []
       },
@@ -3416,9 +4954,38 @@
         "it",
         "m>",
         "te",
-        "否存",
-        "存在",
-        "是否"
+        "么颜",
+        "什么",
+        "是什",
+        "颜色"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>是什么颜色",
+      "entities": [
+        {
+          "role": "item",
+          "name": "墙壁"
+        }
+      ],
+      "query": {
+        "intent": "color",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">是",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "么颜",
+        "什么",
+        "是什",
+        "颜色"
       ],
       "support": 1
     },
@@ -3885,6 +5452,102 @@
       "support": 1
     },
     {
+      "abstract_question": "<item>最先被谁从<container>里取出",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        },
+        {
+          "role": "container",
+          "name": "托盘"
+        }
+      ],
+      "query": {
+        "intent": "earliest_actor_for_event",
+        "target": "take_out",
+        "qualifiers": [
+          "item=$item#1",
+          "source=$container#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">最",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "从<",
+        "先被",
+        "取出",
+        "最先",
+        "被谁",
+        "谁从",
+        "里取"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>最先被谁放进<container>",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        },
+        {
+          "role": "container",
+          "name": "托盘"
+        }
+      ],
+      "query": {
+        "intent": "earliest_actor_for_event",
+        "target": "put_in",
+        "qualifiers": [
+          "item=$item#1",
+          "holder=$container#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">最",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "先被",
+        "放进",
+        "最先",
+        "被谁",
+        "谁放",
+        "进<"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "<item>最后是被谁碰",
       "entities": [
         {
@@ -3963,31 +5626,98 @@
       "support": 1
     },
     {
-      "abstract_question": "<item>最开始在哪里",
+      "abstract_question": "<item>最后被谁从<container>里取出",
       "entities": [
         {
           "role": "item",
           "name": "芯片"
+        },
+        {
+          "role": "container",
+          "name": "托盘"
         }
       ],
       "query": {
-        "intent": "initial_location",
-        "target": "$item#1",
-        "qualifiers": [],
+        "intent": "latest_actor_for_event",
+        "target": "take_out",
+        "qualifiers": [
+          "item=$item#1",
+          "source=$container#1"
+        ],
         "subqueries": []
       },
       "feature_units": [
+        "<c",
         "<i",
         ">最",
+        ">里",
+        "ai",
+        "co",
         "em",
+        "er",
+        "in",
         "it",
         "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
         "te",
-        "哪里",
-        "在哪",
-        "始在",
-        "开始",
-        "最开"
+        "从<",
+        "取出",
+        "后被",
+        "最后",
+        "被谁",
+        "谁从",
+        "里取"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>最后被谁放进<container>",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        },
+        {
+          "role": "container",
+          "name": "托盘"
+        }
+      ],
+      "query": {
+        "intent": "latest_actor_for_event",
+        "target": "put_in",
+        "qualifiers": [
+          "item=$item#1",
+          "holder=$container#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">最",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "后被",
+        "放进",
+        "最后",
+        "被谁",
+        "谁放",
+        "进<"
       ],
       "support": 1
     },
@@ -4698,15 +6428,46 @@
       "support": 1
     },
     {
+      "abstract_question": "<item>被谁交给爸爸",
+      "entities": [
+        {
+          "role": "item",
+          "name": "碗"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_event",
+        "target": "give",
+        "qualifiers": [
+          "item=$item#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">被",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "交给",
+        "爸爸",
+        "给爸",
+        "被谁",
+        "谁交"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "<item>被谁从<container>里取出",
       "entities": [
         {
           "role": "item",
-          "name": "芯片"
+          "name": "牛奶"
         },
         {
           "role": "container",
-          "name": "托盘"
+          "name": "冰箱"
         }
       ],
       "query": {
@@ -4741,6 +6502,97 @@
         "被谁",
         "谁从",
         "里取"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>被谁放进<container>",
+      "entities": [
+        {
+          "role": "item",
+          "name": "药瓶"
+        },
+        {
+          "role": "container",
+          "name": "抽屉"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_event",
+        "target": "put_in",
+        "qualifiers": [
+          "item=$item#1",
+          "holder=$container#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">被",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "放进",
+        "被谁",
+        "谁放",
+        "进<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<item>被谁放进<container>里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "菜"
+        },
+        {
+          "role": "container",
+          "name": "锅"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_event",
+        "target": "put_in",
+        "qualifiers": [
+          "item=$item#1",
+          "holder=$container#1"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">被",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "放进",
+        "被谁",
+        "谁放",
+        "进<"
       ],
       "support": 1
     },
@@ -5592,6 +7444,130 @@
         "待在",
         "是不",
         "是待"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<person>喜欢什么",
+      "entities": [
+        {
+          "role": "person",
+          "name": "爱因斯坦"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=likes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">喜",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "什么",
+        "喜欢",
+        "欢什"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<person>喜欢什么",
+      "entities": [
+        {
+          "role": "person",
+          "name": "牛顿"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=likes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">喜",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "什么",
+        "喜欢",
+        "欢什"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<person>喜欢什么",
+      "entities": [
+        {
+          "role": "person",
+          "name": "达芬奇"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=likes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">喜",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "什么",
+        "喜欢",
+        "欢什"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<person>喜欢什么",
+      "entities": [
+        {
+          "role": "person",
+          "name": "李白"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=likes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">喜",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "什么",
+        "喜欢",
+        "欢什"
       ],
       "support": 1
     },
@@ -8068,6 +10044,38 @@
       "support": 1
     },
     {
+      "abstract_question": "<person>有什么爱好",
+      "entities": [
+        {
+          "role": "person",
+          "name": "爱因斯坦"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=likes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">有",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "么爱",
+        "什么",
+        "有什",
+        "爱好"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "<person>猜测<item>的位置",
       "entities": [
         {
@@ -8168,6 +10176,39 @@
         "在<",
         "测<",
         "猜测"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<person>的爱好是什么",
+      "entities": [
+        {
+          "role": "person",
+          "name": "牛顿"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=likes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">的",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "什么",
+        "好是",
+        "是什",
+        "爱好",
+        "的爱"
       ],
       "support": 1
     },
@@ -8816,6 +10857,130 @@
       "support": 1
     },
     {
+      "abstract_question": "<person>讨厌什么",
+      "entities": [
+        {
+          "role": "person",
+          "name": "特斯拉"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=dislikes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">讨",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "什么",
+        "厌什",
+        "讨厌"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<person>讨厌什么",
+      "entities": [
+        {
+          "role": "person",
+          "name": "牛顿"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=dislikes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">讨",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "什么",
+        "厌什",
+        "讨厌"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<person>讨厌什么",
+      "entities": [
+        {
+          "role": "person",
+          "name": "爱因斯坦"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=dislikes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">讨",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "什么",
+        "厌什",
+        "讨厌"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<person>讨厌什么",
+      "entities": [
+        {
+          "role": "person",
+          "name": "李白"
+        }
+      ],
+      "query": {
+        "intent": "profile",
+        "target": "$person#1",
+        "qualifiers": [
+          "attribute=dislikes"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">讨",
+        "er",
+        "n>",
+        "on",
+        "pe",
+        "rs",
+        "so",
+        "什么",
+        "厌什",
+        "讨厌"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "<person>说的话有矛盾",
       "entities": [
         {
@@ -9251,7 +11416,7 @@
       "entities": [
         {
           "role": "place",
-          "name": "实验室"
+          "name": "仓库"
         }
       ],
       "query": {
@@ -9279,7 +11444,35 @@
       "entities": [
         {
           "role": "place",
-          "name": "仓库"
+          "name": "厨房"
+        }
+      ],
+      "query": {
+        "intent": "contents",
+        "target": "$place#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">里",
+        "ac",
+        "ce",
+        "e>",
+        "la",
+        "pl",
+        "什么",
+        "有什",
+        "里有"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<place>里有什么",
+      "entities": [
+        {
+          "role": "place",
+          "name": "教室"
         }
       ],
       "query": {
@@ -10438,6 +12631,49 @@
       "support": 1
     },
     {
+      "abstract_question": "为什么<item>在<container>里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "菜"
+        },
+        {
+          "role": "container",
+          "name": "锅"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$item#1在$container#1里",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        "<i",
+        ">在",
+        ">里",
+        "ai",
+        "co",
+        "em",
+        "er",
+        "in",
+        "it",
+        "m>",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "te",
+        "为什",
+        "么<",
+        "什么",
+        "在<"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "为什么<item>在<place>的<container>里",
       "entities": [
         {
@@ -10489,6 +12725,37 @@
         "什么",
         "在<",
         "的<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<item>是爸爸拥有",
+      "entities": [
+        {
+          "role": "item",
+          "name": "碗"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "$item#1拥有",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">是",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "为什",
+        "么<",
+        "什么",
+        "拥有",
+        "是爸",
+        "爸拥",
+        "爸爸"
       ],
       "support": 1
     },
@@ -11304,6 +13571,24 @@
       "support": 1
     },
     {
+      "abstract_question": "你不能做什么",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "limitations",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "不能",
+        "什么",
+        "你不",
+        "做什",
+        "能做"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "你会做梦",
       "entities": [],
       "query": {
@@ -11422,6 +13707,23 @@
       "support": 1
     },
     {
+      "abstract_question": "你喜欢什么",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "preferences",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "什么",
+        "你喜",
+        "喜欢",
+        "欢什"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "你喜欢做什么",
       "entities": [],
       "query": {
@@ -11454,19 +13756,17 @@
       "support": 1
     },
     {
-      "abstract_question": "你擅长什么",
+      "abstract_question": "你好啊",
       "entities": [],
       "query": {
         "intent": "dialog_act",
-        "target": "capabilities",
+        "target": "greeting",
         "qualifiers": [],
         "subqueries": []
       },
       "feature_units": [
-        "什么",
-        "你擅",
-        "擅长",
-        "长什"
+        "你好",
+        "好啊"
       ],
       "support": 1
     },
@@ -11817,6 +14117,42 @@
       "support": 1
     },
     {
+      "abstract_question": "你有什么不足",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "limitations",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "不足",
+        "么不",
+        "什么",
+        "你有",
+        "有什"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你有什么功能",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "capabilities",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "么功",
+        "什么",
+        "你有",
+        "功能",
+        "有什"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "你有情绪",
       "entities": [],
       "query": {
@@ -11829,6 +14165,51 @@
         "你有",
         "情绪",
         "有情"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你清楚吗清楚的话，麻烦告诉我<container>里有什么",
+      "entities": [
+        {
+          "role": "container",
+          "name": "托盘"
+        }
+      ],
+      "query": {
+        "intent": "contents",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">里",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "什么",
+        "你清",
+        "吗清",
+        "告诉",
+        "我<",
+        "有什",
+        "楚吗",
+        "楚的",
+        "清楚",
+        "烦告",
+        "的话",
+        "诉我",
+        "话，",
+        "里有",
+        "麻烦",
+        "，麻"
       ],
       "support": 1
     },
@@ -11994,6 +14375,45 @@
       "support": 1
     },
     {
+      "abstract_question": "你知道吗你知道的话，可以告诉我<item>在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "以告",
+        "你知",
+        "可以",
+        "吗你",
+        "告诉",
+        "哪里",
+        "在哪",
+        "我<",
+        "的话",
+        "知道",
+        "诉我",
+        "话，",
+        "道吗",
+        "道的",
+        "，可"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "你能做什么",
       "entities": [],
       "query": {
@@ -12007,6 +14427,55 @@
         "你能",
         "做什",
         "能做"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你能再说一遍",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "clarification",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "一遍",
+        "你能",
+        "再说",
+        "能再",
+        "说一"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你能告诉我谁拥有<item>",
+      "entities": [
+        {
+          "role": "item",
+          "name": "钥匙"
+        }
+      ],
+      "query": {
+        "intent": "owner",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "你能",
+        "告诉",
+        "我谁",
+        "拥有",
+        "有<",
+        "能告",
+        "诉我",
+        "谁拥"
       ],
       "support": 1
     },
@@ -14295,6 +16764,35 @@
       "support": 1
     },
     {
+      "abstract_question": "嗨",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "greeting",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "嗨"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "回头见",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "farewell",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "回头",
+        "头见"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "在<person>将<container>带到<place>之前，<container>里有哪些东西",
       "entities": [
         {
@@ -15452,6 +17950,35 @@
         "考虑",
         "虑<",
         "，<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "多谢",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "thanks",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "多谢"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "太感谢",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "thanks",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "太感",
+        "感谢"
       ],
       "support": 1
     },
@@ -16799,6 +19326,21 @@
       "support": 1
     },
     {
+      "abstract_question": "对不起",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "apology",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "不起",
+        "对不"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "小王把<item>从<container>里取出之后，<item>在哪里",
       "entities": [
         {
@@ -16926,6 +19468,87 @@
       "feature_units": [
         "总结",
         "结一"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "我不开心",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "emotion",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "不开",
+        "开心",
+        "我不"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "我很难过",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "emotion",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "很难",
+        "我很",
+        "难过"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "我有个问题，<item>是谁拥有",
+      "entities": [
+        {
+          "role": "item",
+          "name": "药瓶"
+        }
+      ],
+      "query": {
+        "intent": "owner",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">是",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "个问",
+        "我有",
+        "拥有",
+        "是谁",
+        "有个",
+        "谁拥",
+        "问题",
+        "题，",
+        "，<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "我没听懂",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "clarification",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "听懂",
+        "我没",
+        "没听"
       ],
       "support": 1
     },
@@ -17168,6 +19791,34 @@
       "support": 1
     },
     {
+      "abstract_question": "抱歉",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "apology",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "抱歉"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "拜拜",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "farewell",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "拜拜"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "按<person>的想法<item>在哪",
       "entities": [
         {
@@ -17406,6 +20057,50 @@
         "谁干",
         "进<",
         "里的"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "早上好",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "greeting",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "上好",
+        "早上"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "晚上好",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "greeting",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "上好",
+        "晚上"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "晚安",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "farewell",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "晚安"
       ],
       "support": 1
     },
@@ -18332,23 +21027,6 @@
       "support": 1
     },
     {
-      "abstract_question": "有没有矛盾",
-      "entities": [],
-      "query": {
-        "intent": "contradictions",
-        "target": "world",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "feature_units": [
-        "有没",
-        "有矛",
-        "没有",
-        "矛盾"
-      ],
-      "support": 1
-    },
-    {
       "abstract_question": "每个人手里有什么",
       "entities": [],
       "query": {
@@ -18468,6 +21146,38 @@
         "的人",
         "第一",
         "进<"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "能不能告诉我<item>在哪里",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        ">在",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "不能",
+        "告诉",
+        "哪里",
+        "在哪",
+        "我<",
+        "能不",
+        "能告",
+        "诉我"
       ],
       "support": 1
     },
@@ -19704,6 +22414,20 @@
       "support": 1
     },
     {
+      "abstract_question": "见",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "farewell",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "见"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "设想<person>没把<container>带到<place>，<item>会落在哪",
       "entities": [
         {
@@ -20780,7 +23504,85 @@
       "entities": [
         {
           "role": "item",
-          "name": "药瓶"
+          "name": "碗"
+        }
+      ],
+      "query": {
+        "intent": "owner",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "拥有",
+        "有<",
+        "谁拥"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "谁拥有<item>",
+      "entities": [
+        {
+          "role": "item",
+          "name": "合同"
+        }
+      ],
+      "query": {
+        "intent": "owner",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "拥有",
+        "有<",
+        "谁拥"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "谁拥有<item>",
+      "entities": [
+        {
+          "role": "item",
+          "name": "钥匙"
+        }
+      ],
+      "query": {
+        "intent": "owner",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "拥有",
+        "有<",
+        "谁拥"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "谁拥有<item>",
+      "entities": [
+        {
+          "role": "item",
+          "name": "伞"
         }
       ],
       "query": {
@@ -21460,6 +24262,20 @@
       "support": 1
     },
     {
+      "abstract_question": "辛苦",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "thanks",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "辛苦"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "近期是谁把<item>从<container>里取出",
       "entities": [
         {
@@ -21583,6 +24399,113 @@
         "我<",
         "烦告",
         "诉我",
+        "麻烦"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "麻烦问一下<container>在哪里",
+      "entities": [
+        {
+          "role": "container",
+          "name": "盒子"
+        }
+      ],
+      "query": {
+        "intent": "location",
+        "target": "$container#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">在",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "一下",
+        "下<",
+        "哪里",
+        "在哪",
+        "烦问",
+        "问一",
+        "麻烦"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "麻烦问一下<container>是什么状态",
+      "entities": [
+        {
+          "role": "container",
+          "name": "盒子"
+        }
+      ],
+      "query": {
+        "intent": "object_state",
+        "target": "$container#1",
+        "qualifiers": [
+          "state=access"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<c",
+        ">是",
+        "ai",
+        "co",
+        "er",
+        "in",
+        "ne",
+        "nt",
+        "on",
+        "r>",
+        "ta",
+        "一下",
+        "下<",
+        "么状",
+        "什么",
+        "是什",
+        "烦问",
+        "状态",
+        "问一",
+        "麻烦"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "麻烦问一下谁拿的<item>",
+      "entities": [
+        {
+          "role": "item",
+          "name": "芯片"
+        }
+      ],
+      "query": {
+        "intent": "actor_for_item",
+        "target": "$item#1",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<i",
+        "em",
+        "it",
+        "m>",
+        "te",
+        "一下",
+        "下谁",
+        "拿的",
+        "烦问",
+        "的<",
+        "谁拿",
+        "问一",
         "麻烦"
       ],
       "support": 1

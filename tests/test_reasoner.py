@@ -15,6 +15,13 @@ from struct_llm.comprehension.intent_dataset import (
     load_intent_jsonl,
 )
 from struct_llm.kernel import default_capabilities, parse_text, predict as _predict
+from struct_llm.neural import (
+    InMemoryNeuralBoundaryModel,
+    NeuralQueryParser,
+    NeuralStatementParser,
+    load_neural_boundary_model,
+)
+from my_neural import make_model, train_summary
 from struct_llm.motor.feedback import (
     LearningPaths,
     accept_query_suggestion,
@@ -89,6 +96,137 @@ class ReasonerTest(unittest.TestCase):
         assert isinstance(parser, LearnedStatementParser)
         self.assertGreater(len(parser.patterns), 0)
         self.assertEqual(parser.examples, ())
+
+    def test_neural_query_parser_can_replace_input_boundary_without_kernel_branch(self) -> None:
+        model = InMemoryNeuralBoundaryModel(
+            {
+                "parse_query": lambda payload: {
+                    "confidence": 0.96,
+                    "query": {"intent": "dialog_act", "target": "identity", "qualifiers": []},
+                },
+            }
+        )
+        capabilities = default_capabilities(neural_model=model)
+
+        prediction = predict("你是哪位？", capabilities)
+
+        self.assertIsInstance(capabilities.query_parsers[0], NeuralQueryParser)
+        self.assertIn("QUERY dialog_act(identity)", prediction.structure.linearize())
+        self.assertEqual(
+            prediction.answer,
+            "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。",
+        )
+
+    def test_neural_statement_parser_projects_into_existing_state_reasoning(self) -> None:
+        model = InMemoryNeuralBoundaryModel(
+            {
+                "parse_statement": lambda payload: {
+                    "confidence": 0.95,
+                    "entities": [
+                        {"role": "person", "name": "阿明"},
+                        {"role": "item", "name": "芯片"},
+                        {"role": "place", "name": "库房"},
+                    ],
+                    "frames": [
+                        {
+                            "frame_type": "move",
+                            "roles": {"actor": "阿明", "theme": "芯片", "goal": "库房"},
+                        }
+                    ],
+                }
+            }
+        )
+        capabilities = default_capabilities(neural_model=model)
+
+        prediction = predict("阿明递送芯片到库房。芯片在哪里？", capabilities)
+
+        structure = prediction.structure.linearize()
+        self.assertIsInstance(capabilities.statement_parsers[0], NeuralStatementParser)
+        self.assertIn("FRAME f1 type=move time=1", structure)
+        self.assertIn("ROLE f1 actor=阿明", structure)
+        self.assertIn("REL at(芯片,库房)", structure)
+        self.assertEqual(prediction.answer, "芯片在库房。")
+
+    def test_neural_answerer_handles_unverified_dialog_output_as_fallback(self) -> None:
+        def parse_query(payload):
+            return {
+                "confidence": 0.97,
+                "query": {"intent": "dialog_act", "target": "poem_translation", "qualifiers": []},
+            }
+
+        def answer(payload):
+            structure = payload["structure"]
+            if structure["query"]["target"] != "poem_translation":
+                return None
+            return {"confidence": 0.91, "answer": "可以，我会先保留意思，再把语气整理得更有诗意。"}
+
+        model = InMemoryNeuralBoundaryModel({"parse_query": parse_query, "answer": answer})
+        capabilities = default_capabilities(neural_model=model)
+
+        prediction = predict("你能帮我把这句话改得像诗吗？", capabilities)
+
+        self.assertIn("QUERY dialog_act(poem_translation)", prediction.structure.linearize())
+        self.assertEqual(prediction.answer, "可以，我会先保留意思，再把语气整理得更有诗意。")
+
+    def test_neural_boundary_rejects_low_confidence_structures(self) -> None:
+        model = InMemoryNeuralBoundaryModel(
+            {
+                "parse_query": lambda payload: {
+                    "confidence": 0.2,
+                    "query": {"intent": "dialog_act", "target": "identity", "qualifiers": []},
+                },
+            }
+        )
+        capabilities = default_capabilities(neural_model=model)
+
+        with self.assertRaises(ParseError):
+            predict("星图回声？", capabilities)
+
+    def test_project_root_neural_provider_can_be_loaded_from_cli_spec(self) -> None:
+        model = load_neural_boundary_model("my_neural:make_model")
+        capabilities = default_capabilities(neural_model=model)
+
+        prediction = predict("你是谁？", capabilities)
+
+        self.assertIn("QUERY dialog_act(identity)", prediction.structure.linearize())
+        self.assertEqual(
+            prediction.answer,
+            "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。",
+        )
+
+    def test_neural_provider_keeps_short_zainali_location_as_query(self) -> None:
+        model = load_neural_boundary_model("my_neural:make_model")
+        capabilities = default_capabilities(neural_model=model)
+
+        prediction = predict("故宫在哪", capabilities)
+
+        structure = prediction.structure.linearize()
+        self.assertIn("QUERY location(故宫)", structure)
+        self.assertNotIn("REL at(故宫,哪)", structure)
+        self.assertEqual(prediction.answer, "不知道故宫在哪里。")
+
+    def test_neural_provider_answers_short_zainali_location_with_context(self) -> None:
+        model = load_neural_boundary_model("my_neural:make_model")
+        capabilities = default_capabilities(neural_model=model)
+
+        prediction = predict("故宫在北京。故宫在哪", capabilities)
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL at(故宫,北京)", structure)
+        self.assertIn("QUERY location(故宫)", structure)
+        self.assertEqual(prediction.answer, "故宫在北京。")
+
+    def test_neural_training_summary_uses_current_datasets(self) -> None:
+        model = make_model()
+        summary = train_summary(model)
+
+        self.assertIn("query", summary)
+        self.assertIn("statement", summary)
+        self.assertIn("intent", summary)
+        self.assertIn("dialog_answer", summary)
+        self.assertGreater(summary["query"]["examples"], 0)
+        self.assertGreater(summary["statement"]["examples"], 0)
+        self.assertGreater(summary["intent"]["examples"], 0)
 
     def test_statement_examples_can_evaluate_learned_parser(self) -> None:
         examples = load_statement_jsonl("data/statement_examples.jsonl")

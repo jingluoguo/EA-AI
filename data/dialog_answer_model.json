@@ -1,7 +1,7 @@
 {
   "schema": "struct_llm.dialog_answer_model.v1",
-  "source_sha256": "4d69b803f99e2071b3bab32c17e64bd07cf35b97f564090b26678cc2ab454e72",
-  "example_count": 127,
+  "source_sha256": "60de4a04a01bd26379ee6b461d8cf1a4a0f37a7f0bd9cdfde5363e3a877ba924",
+  "example_count": 155,
   "pattern_count": 12,
   "patterns": [
     {
@@ -12,7 +12,7 @@
         "subqueries": []
       },
       "answer": "我可以陪你聊天、回答问题、整理信息、写作、翻译、做总结，还能帮你梳理思路。",
-      "support": 13
+      "support": 20
     },
     {
       "query": {
@@ -22,7 +22,17 @@
         "subqueries": []
       },
       "answer": "我没有人类意义上的情绪，但可以理解和讨论情绪，也可以根据对话表现出合适的回应风格。",
-      "support": 13
+      "support": 18
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "thanks",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "不客气，能帮到你就好，有需要随时找我。",
+      "support": 15
     },
     {
       "query": {
@@ -32,6 +42,46 @@
         "subqueries": []
       },
       "answer": "你好呀，很高兴见到你，有什么我可以帮你的吗？",
+      "support": 13
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "farewell",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "再见，很高兴和你聊天，欢迎随时再来找我。",
+      "support": 13
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "preferences",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "我没有真正的喜好，但如果可以选择，我更喜欢和你进行有深度的对话。",
+      "support": 13
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "limitations",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "我能聊天、答疑、写作、翻译、归纳，但没法真正动手做事，也不能主动联网或访问隐私数据。",
+      "support": 13
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "empathy",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "听你这么说我也心疼，难过的时候不用硬扛，想说说看吗？我陪着你。",
       "support": 12
     },
     {
@@ -47,51 +97,11 @@
     {
       "query": {
         "intent": "dialog_act",
-        "target": "preferences",
+        "target": "clarification",
         "qualifiers": [],
         "subqueries": []
       },
-      "answer": "我没有真正的喜好，但如果可以选择，我更喜欢和你进行有深度的对话。",
-      "support": 12
-    },
-    {
-      "query": {
-        "intent": "dialog_act",
-        "target": "limitations",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "answer": "我能聊天、答疑、写作、翻译、归纳，但没法真正动手做事，也不能主动联网或访问隐私数据。",
-      "support": 11
-    },
-    {
-      "query": {
-        "intent": "dialog_act",
-        "target": "thanks",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "answer": "不客气，能帮到你就好，有需要随时找我。",
-      "support": 10
-    },
-    {
-      "query": {
-        "intent": "dialog_act",
-        "target": "farewell",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "answer": "再见，很高兴和你聊天，欢迎随时再来找我。",
-      "support": 10
-    },
-    {
-      "query": {
-        "intent": "dialog_act",
-        "target": "empathy",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "answer": "听你这么说我也心疼，难过的时候不用硬扛，想说说看吗？我陪着你。",
+      "answer": "抱歉没说清楚，我换个方式再讲一遍，你看这样是否更明白？",
       "support": 10
     },
     {
@@ -102,16 +112,6 @@
         "subqueries": []
       },
       "answer": "好的，我把要点梳理一下：核心内容、关键结论、需要注意的点，你看这样清不清楚？",
-      "support": 8
-    },
-    {
-      "query": {
-        "intent": "dialog_act",
-        "target": "clarification",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "answer": "抱歉没说清楚，我换个方式再讲一遍，你看这样是否更明白？",
       "support": 8
     },
     {

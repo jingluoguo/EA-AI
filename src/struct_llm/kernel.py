@@ -12,6 +12,7 @@ from .comprehension.statement import default_learned_statement_parser
 from .comprehension.structure_helpers import dedupe_entities, with_time
 from .errors import ParseError
 from .motor.dialogue import default_learned_dialog_answerer
+from .neural import NeuralBoundaryModel, configured_neural_boundary_model, with_neural_boundary
 from .perception.lexer import is_query_like_fragment, split_query_candidate, split_sentences
 from .perception.reference import resolve_references
 from .reasoning.pipeline import (
@@ -35,14 +36,28 @@ class Prediction:
     answer: str
 
 
-def default_capabilities() -> CognitiveCapabilities:
-    return CognitiveCapabilities(
+def default_capabilities(
+    neural_model: NeuralBoundaryModel | None = None,
+    *,
+    neural_answer_priority: str = "first",
+    use_environment: bool = True,
+) -> CognitiveCapabilities:
+    capabilities = CognitiveCapabilities(
         statement_parsers=(default_learned_statement_parser(),),
         state_projectors=DEFAULT_STATE_PROJECTORS,
         state_reducers=DEFAULT_STATE_REDUCERS,
         query_parsers=(default_learned_query_parser(),),
         rule_inferers=DEFAULT_RULE_INFERERS,
         answerers=(*DEFAULT_ANSWERERS, default_learned_dialog_answerer()),
+    )
+    if neural_model is None and use_environment:
+        neural_model = configured_neural_boundary_model()
+    if neural_model is None:
+        return capabilities
+    return with_neural_boundary(
+        capabilities,
+        neural_model,
+        answer_priority=neural_answer_priority,
     )
 
 

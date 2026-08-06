@@ -456,20 +456,22 @@ def answer_profile_lookup(structure: Structure) -> str | None:
         return None
     attribute = query_qualifier(query, "attribute")
     values = profile_values(structure, query.target, attribute)
+    # 对话场景 target="我" 用"你"称呼;百科人物场景用人物名
+    subject = "你" if query.target == "我" else query.target
     if not values:
         if attribute == "name":
-            return "我还不知道你叫什么。"
+            return f"我还不知道{subject}叫什么。"
         if attribute == "likes":
-            return "我还不知道你喜欢什么。"
+            return f"我还不知道{subject}喜欢什么。"
         if attribute == "dislikes":
-            return "我还不知道你不喜欢什么。"
+            return f"我还不知道{subject}不喜欢什么。"
         return "我还不知道这项信息。"
     if attribute == "name":
-        return f"你叫{values[-1]}。"
+        return f"{subject}叫{values[-1]}。"
     if attribute == "likes":
-        return f"你喜欢{join_names(values)}。"
+        return f"{subject}喜欢{join_names(values)}。"
     if attribute == "dislikes":
-        return f"你不喜欢{join_names(values)}。"
+        return f"{subject}不喜欢{join_names(values)}。"
     return None
 
 

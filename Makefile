@@ -1,4 +1,6 @@
-.PHONY: sync demo ask chat compile model check intent-example intent-eval query-eval statement-eval test
+.PHONY: sync demo ask chat train-neural compile model check intent-example intent-eval query-eval statement-eval test
+
+NEURAL_PROVIDER ?= my_neural:make_model
 
 sync:
 	uv sync
@@ -7,10 +9,13 @@ demo:
 	uv run struct-demo
 
 ask:
-	uv run struct-ask --learn-on-fail "$(TEXT)"
+	uv run struct-ask --neural-provider "$(NEURAL_PROVIDER)" --learn-on-fail "$(TEXT)"
 
 chat:
-	uv run struct-ask --learn-on-fail
+	uv run struct-ask --neural-provider "$(NEURAL_PROVIDER)" --learn-on-fail
+
+train-neural:
+	uv run struct-train-neural
 
 compile: model
 

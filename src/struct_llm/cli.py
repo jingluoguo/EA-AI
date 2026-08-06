@@ -8,6 +8,7 @@ from .errors import ParseError
 from .comprehension.intent_dataset import append_intent_record, build_intent_record
 from .comprehension.intent import InMemoryIntentAnalyzer, evaluate_intent_analyzer, from_jsonl
 from .kernel import default_capabilities, parse_text, predict
+from .neural import load_neural_boundary_model, with_neural_boundary
 from .motor.feedback import (
     LearningPaths,
     accept_query_suggestion,
@@ -67,10 +68,23 @@ def ask_symbolic() -> None:
     parser.add_argument("--statement-min-score", type=float, default=0.58)
     parser.add_argument("--dialog-answer-data", help="JSONL file with learned dialog answer examples.")
     parser.add_argument("--dialog-answer-model", help="Compiled dialog answer model artifact.")
+    parser.add_argument(
+        "--neural-provider",
+        help="Python factory in module:function form; defaults to EA_AI_NEURAL_PROVIDER.",
+    )
+    parser.add_argument(
+        "--neural-answer-priority",
+        choices=("fallback", "first"),
+        default="fallback",
+        help="Use neural answers only after verified answerers, or before them.",
+    )
     parser.add_argument("--unrecognized-data", help="JSONL file for low-confidence inputs awaiting offline labeling.")
     parser.add_argument("--learn-on-fail", action="store_true", help="Prompt for feedback when structure extraction fails.")
     args = parser.parse_args()
-    capabilities = default_capabilities()
+    capabilities = default_capabilities(
+        neural_answer_priority=args.neural_answer_priority,
+        use_environment=False,
+    )
     if args.statement_model and Path(args.statement_model).exists():
         capabilities = capabilities.replace_statement_parsers(
             LearnedStatementParser.from_model(Path(args.statement_model), min_score=args.statement_min_score)
@@ -98,6 +112,7 @@ def ask_symbolic() -> None:
         capabilities = capabilities.with_answerers(
             LearnedDialogActAnswerer.from_jsonl(Path(args.dialog_answer_data))
         )
+    capabilities = apply_neural_provider_args(capabilities, args)
 
     if args.text:
         print_prediction_with_learning(args.text, capabilities, args)
@@ -498,7 +513,10 @@ def input_required(label: str) -> str:
 
 
 def capabilities_after_recompile(args):
-    capabilities = default_capabilities()
+    capabilities = default_capabilities(
+        neural_answer_priority=getattr(args, "neural_answer_priority", "first"),
+        use_environment=False,
+    )
     query_model = getattr(args, "query_model", None)
     statement_model = getattr(args, "statement_model", None)
     dialog_answer_model = getattr(args, "dialog_answer_model", None)
@@ -508,4 +526,21 @@ def capabilities_after_recompile(args):
         capabilities = capabilities.replace_query_parsers(LearnedQueryParser.from_model(Path(query_model)))
     if dialog_answer_model and Path(dialog_answer_model).exists():
         capabilities = capabilities.with_answerers(LearnedDialogActAnswerer.from_model(Path(dialog_answer_model)))
-    return capabilities
+    return apply_neural_provider_args(capabilities, args)
+
+
+def apply_neural_provider_args(capabilities, args):
+    provider = getattr(args, "neural_provider", None)
+    if provider:
+        model = load_neural_boundary_model(provider)
+    else:
+        from .neural import configured_neural_boundary_model
+
+        model = configured_neural_boundary_model()
+    if model is None:
+        return capabilities
+    return with_neural_boundary(
+        capabilities,
+        model,
+        answer_priority=getattr(args, "neural_answer_priority", "fallback"),
+    )
