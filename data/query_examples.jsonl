@@ -119,8 +119,8 @@
 {"question": "你擅长啥", "entities": [], "query": {"intent": "dialog_act", "target": "capabilities", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
 {"question": "你是啥呀", "entities": [], "query": {"intent": "dialog_act", "target": "identity", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
 {"question": "你是干啥的", "entities": [], "query": {"intent": "dialog_act", "target": "identity", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
-{"question": "你有情绪吗", "entities": [], "query": {"intent": "dialog_act", "target": "情绪状态", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
-{"question": "有情绪么你", "entities": [], "query": {"intent": "dialog_act", "target": "情绪状态", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "你有情绪吗", "entities": [], "query": {"intent": "dialog_act", "target": "emotion", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "有情绪么你", "entities": [], "query": {"intent": "dialog_act", "target": "emotion", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
 {"entities": [{"name": "芯片", "role": "item"}], "query": {"intent": "location", "qualifiers": [], "target": "$item#1"}, "question": "芯片现在在哪儿", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "芯片", "role": "item"}], "query": {"intent": "location", "qualifiers": [], "target": "$item#1"}, "question": "芯片在哪呢", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "芯片", "role": "item"}], "query": {"intent": "location", "qualifiers": [], "target": "$item#1"}, "question": "芯片具体在什么位置", "source": "migrated_training", "split": "train"}
@@ -514,3 +514,10 @@
 {"question": "你是 AI 机器人吗", "entities": [], "query": {"intent": "dialog_act", "target": "identity", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
 {"question": "你是虚拟助手吗", "entities": [], "query": {"intent": "dialog_act", "target": "identity", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
 {"question": "你是AI吗", "entities": [], "query": {"intent": "dialog_act", "target": "identity", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "你会做梦吗", "entities": [], "query": {"intent": "dialog_act", "target": "emotion", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "你会梦到电子羊吗", "entities": [], "query": {"intent": "dialog_act", "target": "emotion", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "你会打游戏吗", "entities": [], "query": {"intent": "dialog_act", "target": "capabilities", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "你会运动吗", "entities": [], "query": {"intent": "dialog_act", "target": "limitations", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "你爱好是什么", "entities": [], "query": {"intent": "dialog_act", "target": "preferences", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "你喜欢做什么", "entities": [], "query": {"intent": "dialog_act", "target": "preferences", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "你可以运动吗", "entities": [], "query": {"intent": "dialog_act", "target": "limitations", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}

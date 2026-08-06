@@ -1,13 +1,33 @@
 {
   "schema": "struct_llm.dialog_answer_model.v1",
-  "source_sha256": "18e3e597f34458a55f2145038fb9bc2b0bbdcbb7155d1cb7521214a8f103f3c3",
-  "example_count": 121,
+  "source_sha256": "4d69b803f99e2071b3bab32c17e64bd07cf35b97f564090b26678cc2ab454e72",
+  "example_count": 127,
   "pattern_count": 12,
   "patterns": [
     {
       "query": {
         "intent": "dialog_act",
-        "target": "问候",
+        "target": "capabilities",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "我可以陪你聊天、回答问题、整理信息、写作、翻译、做总结，还能帮你梳理思路。",
+      "support": 13
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "emotion",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "我没有人类意义上的情绪，但可以理解和讨论情绪，也可以根据对话表现出合适的回应风格。",
+      "support": 13
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "greeting",
         "qualifiers": [],
         "subqueries": []
       },
@@ -17,17 +37,7 @@
     {
       "query": {
         "intent": "dialog_act",
-        "target": "能力",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "answer": "我可以陪你聊天、回答问题、整理信息、写作、翻译、做总结，还能帮你梳理思路。",
-      "support": 12
-    },
-    {
-      "query": {
-        "intent": "dialog_act",
-        "target": "身份",
+        "target": "identity",
         "qualifiers": [],
         "subqueries": []
       },
@@ -37,17 +47,27 @@
     {
       "query": {
         "intent": "dialog_act",
-        "target": "情绪状态",
+        "target": "preferences",
         "qualifiers": [],
         "subqueries": []
       },
-      "answer": "我没有人类意义上的情绪，但可以理解和讨论情绪，也可以根据对话表现出合适的回应风格。",
+      "answer": "我没有真正的喜好，但如果可以选择，我更喜欢和你进行有深度的对话。",
+      "support": 12
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "limitations",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "我能聊天、答疑、写作、翻译、归纳，但没法真正动手做事，也不能主动联网或访问隐私数据。",
       "support": 11
     },
     {
       "query": {
         "intent": "dialog_act",
-        "target": "感谢",
+        "target": "thanks",
         "qualifiers": [],
         "subqueries": []
       },
@@ -57,7 +77,7 @@
     {
       "query": {
         "intent": "dialog_act",
-        "target": "告别",
+        "target": "farewell",
         "qualifiers": [],
         "subqueries": []
       },
@@ -67,7 +87,7 @@
     {
       "query": {
         "intent": "dialog_act",
-        "target": "共情",
+        "target": "empathy",
         "qualifiers": [],
         "subqueries": []
       },
@@ -77,27 +97,7 @@
     {
       "query": {
         "intent": "dialog_act",
-        "target": "自我偏好",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "answer": "我没有真正的喜好，但如果可以选择，我更喜欢和你进行有深度的对话。",
-      "support": 10
-    },
-    {
-      "query": {
-        "intent": "dialog_act",
-        "target": "能力边界",
-        "qualifiers": [],
-        "subqueries": []
-      },
-      "answer": "我能聊天、答疑、写作、翻译、归纳，但没法真正动手做事，也不能主动联网或访问隐私数据。",
-      "support": 10
-    },
-    {
-      "query": {
-        "intent": "dialog_act",
-        "target": "总结",
+        "target": "summary",
         "qualifiers": [],
         "subqueries": []
       },
@@ -107,7 +107,7 @@
     {
       "query": {
         "intent": "dialog_act",
-        "target": "澄清",
+        "target": "clarification",
         "qualifiers": [],
         "subqueries": []
       },
@@ -117,7 +117,7 @@
     {
       "query": {
         "intent": "dialog_act",
-        "target": "道歉",
+        "target": "apology",
         "qualifiers": [],
         "subqueries": []
       },

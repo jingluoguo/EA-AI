@@ -1,8 +1,8 @@
 {
   "schema": "struct_llm.query_model.v1",
-  "source_sha256": "d7f99b798d20967f27b32fdbf1a229d5abe2ab2e4192425489c41ce955ed09fc",
-  "example_count": 516,
-  "pattern_count": 489,
+  "source_sha256": "6abc2b152927797d8bde616b8ec63951580b8ea4fab914f1b680f2e9d42ada62",
+  "example_count": 523,
+  "pattern_count": 496,
   "patterns": [
     {
       "abstract_question": "<item>在哪",
@@ -11304,6 +11304,22 @@
       "support": 1
     },
     {
+      "abstract_question": "你会做梦",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "emotion",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "会做",
+        "你会",
+        "做梦"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "你会干",
       "entities": [],
       "query": {
@@ -11315,6 +11331,58 @@
       "feature_units": [
         "会干",
         "你会"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你会打游戏",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "capabilities",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "会打",
+        "你会",
+        "打游",
+        "游戏"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你会梦到电子羊",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "emotion",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "会梦",
+        "你会",
+        "到电",
+        "子羊",
+        "梦到",
+        "电子"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你会运动",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "limitations",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "会运",
+        "你会",
+        "运动"
       ],
       "support": 1
     },
@@ -11333,6 +11401,41 @@
         "你叫",
         "叫什",
         "名字"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你可以运动",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "limitations",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "以运",
+        "你可",
+        "可以",
+        "运动"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你喜欢做什么",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "preferences",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "什么",
+        "你喜",
+        "做什",
+        "喜欢",
+        "欢做"
       ],
       "support": 1
     },
@@ -11718,7 +11821,7 @@
       "entities": [],
       "query": {
         "intent": "dialog_act",
-        "target": "情绪状态",
+        "target": "emotion",
         "qualifiers": [],
         "subqueries": []
       },
@@ -11726,6 +11829,24 @@
         "你有",
         "情绪",
         "有情"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "你爱好是什么",
+      "entities": [],
+      "query": {
+        "intent": "dialog_act",
+        "target": "preferences",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "feature_units": [
+        "什么",
+        "你爱",
+        "好是",
+        "是什",
+        "爱好"
       ],
       "support": 1
     },
@@ -18198,7 +18319,7 @@
       "entities": [],
       "query": {
         "intent": "dialog_act",
-        "target": "情绪状态",
+        "target": "emotion",
         "qualifiers": [],
         "subqueries": []
       },
