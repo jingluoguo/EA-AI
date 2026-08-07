@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..dataset_io import append_jsonl_object, file_sha256, load_jsonl_objects
 from ..comprehension.query import query_from_dict, query_signature, query_to_dict
 from ..structure import Query, Structure
 
@@ -156,28 +157,15 @@ def load_memory_knowledge_jsonl(path: str | Path) -> tuple[MemoryKnowledgeEntry,
     data_path = Path(path)
     if not data_path.exists():
         return ()
-    entries: list[MemoryKnowledgeEntry] = []
-    with data_path.open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                raw_record = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"Invalid memory knowledge JSONL at line {line_number}: {error}") from error
-            if not isinstance(raw_record, dict):
-                raise ValueError(f"Invalid memory knowledge JSONL at line {line_number}: expected object")
-            entries.append(memory_knowledge_entry_from_dict(raw_record, line_number=line_number))
-    return tuple(entries)
+    return tuple(
+        memory_knowledge_entry_from_dict(raw_record, line_number=line_number)
+        for line_number, raw_record in enumerate(load_jsonl_objects(data_path, "memory knowledge"), start=1)
+    )
 
 
 def append_memory_knowledge_record(path: str | Path, record: dict[str, Any]) -> MemoryKnowledgeEntry:
     entry = memory_knowledge_entry_from_dict(record)
-    data_path = Path(path)
-    data_path.parent.mkdir(parents=True, exist_ok=True)
-    with data_path.open("a", encoding="utf-8") as file:
-        json.dump(memory_knowledge_entry_to_record(entry), file, ensure_ascii=False)
-        file.write("\n")
+    append_jsonl_object(path, memory_knowledge_entry_to_record(entry))
     return entry
 
 
@@ -304,15 +292,3 @@ def save_memory_knowledge_feedback(
     model = compile_memory_knowledge_model_from_jsonl(data_path)
     save_memory_knowledge_model(model, model_path)
     return load_memory_knowledge_jsonl(data_path)[-1], model
-
-
-def file_sha256(path: Path) -> str:
-    import hashlib
-
-    if not path.exists():
-        return ""
-    digest = hashlib.sha256()
-    with path.open("rb") as file:
-        for chunk in iter(lambda: file.read(8192), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

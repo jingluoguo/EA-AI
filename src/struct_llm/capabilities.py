@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable, Optional
+from dataclasses import dataclass, replace
+from typing import Callable, Iterable, Optional, TypeVar
 
 from .structure import Entity, Frame, Intention, Query, State, Structure
 
@@ -14,6 +14,7 @@ QueryParser = Callable[[str, tuple[Entity, ...]], Optional[Query]]
 RuleInferer = Callable[[Structure], Optional[str]]
 Answerer = Callable[[Structure], Optional[str]]
 IntentAnalyzer = Callable[[str, Structure], tuple[Intention, ...]]
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
@@ -28,11 +29,7 @@ class CognitiveCapabilities:
     memory_states: tuple[State, ...] = ()
 
     def parse_statement(self, sentence: str) -> StatementParseResult | None:
-        for parser in self.statement_parsers:
-            parsed = parser(sentence)
-            if parsed is not None:
-                return parsed
-        return None
+        return self._first_non_none(parser(sentence) for parser in self.statement_parsers)
 
     def states_from_frame(self, frame: Frame) -> tuple[State, ...]:
         states: list[State] = []
@@ -47,19 +44,14 @@ class CognitiveCapabilities:
         states.append(state)
 
     def parse_query(self, sentence: str, entities: tuple[Entity, ...]) -> Query | None:
-        for parser in self.query_parsers:
-            query = parser(sentence, entities)
-            if query is not None:
-                return query
-        return None
+        return self._first_non_none(parser(sentence, entities) for parser in self.query_parsers)
 
     def infer_rules(self, structure: Structure) -> tuple[str, ...]:
-        rules: list[str] = []
-        for inferer in self.rule_inferers:
-            rule = inferer(structure)
-            if rule is not None:
-                rules.append(rule)
-        return tuple(rules)
+        return tuple(
+            rule
+            for inferer in self.rule_inferers
+            if (rule := inferer(structure)) is not None
+        )
 
     def analyze_intentions(self, text: str, structure: Structure) -> tuple[Intention, ...]:
         intentions: list[Intention] = []
@@ -68,104 +60,41 @@ class CognitiveCapabilities:
         return tuple(intentions)
 
     def answer(self, structure: Structure) -> str | None:
-        for answerer in self.answerers:
-            answer = answerer(structure)
-            if answer is not None:
-                return answer
+        return self._first_non_none(answerer(structure) for answerer in self.answerers)
+
+    def evolve(self, **changes) -> CognitiveCapabilities:
+        return replace(self, **changes)
+
+    def _first_non_none(self, values: Iterable[T | None]) -> T | None:
+        for value in values:
+            if value is not None:
+                return value
         return None
 
+    def _with_tuple(self, field: str, *values):
+        current = getattr(self, field)
+        return self.evolve(**{field: (*current, *values)})
+
     def replace_statement_parsers(self, *parsers: StatementParser) -> CognitiveCapabilities:
-        return CognitiveCapabilities(
-            statement_parsers=parsers,
-            state_projectors=self.state_projectors,
-            state_reducers=self.state_reducers,
-            query_parsers=self.query_parsers,
-            rule_inferers=self.rule_inferers,
-            answerers=self.answerers,
-            intent_analyzers=self.intent_analyzers,
-            memory_states=self.memory_states,
-        )
+        return self.evolve(statement_parsers=parsers)
 
     def with_state_projectors(self, *projectors: StateProjector) -> CognitiveCapabilities:
-        return CognitiveCapabilities(
-            statement_parsers=self.statement_parsers,
-            state_projectors=(*self.state_projectors, *projectors),
-            state_reducers=self.state_reducers,
-            query_parsers=self.query_parsers,
-            rule_inferers=self.rule_inferers,
-            answerers=self.answerers,
-            intent_analyzers=self.intent_analyzers,
-            memory_states=self.memory_states,
-        )
+        return self._with_tuple("state_projectors", *projectors)
 
     def with_state_reducers(self, *reducers: StateReducer) -> CognitiveCapabilities:
-        return CognitiveCapabilities(
-            statement_parsers=self.statement_parsers,
-            state_projectors=self.state_projectors,
-            state_reducers=(*self.state_reducers, *reducers),
-            query_parsers=self.query_parsers,
-            rule_inferers=self.rule_inferers,
-            answerers=self.answerers,
-            intent_analyzers=self.intent_analyzers,
-            memory_states=self.memory_states,
-        )
+        return self._with_tuple("state_reducers", *reducers)
 
     def replace_query_parsers(self, *parsers: QueryParser) -> CognitiveCapabilities:
-        return CognitiveCapabilities(
-            statement_parsers=self.statement_parsers,
-            state_projectors=self.state_projectors,
-            state_reducers=self.state_reducers,
-            query_parsers=parsers,
-            rule_inferers=self.rule_inferers,
-            answerers=self.answerers,
-            intent_analyzers=self.intent_analyzers,
-            memory_states=self.memory_states,
-        )
+        return self.evolve(query_parsers=parsers)
 
     def with_rule_inferers(self, *inferers: RuleInferer) -> CognitiveCapabilities:
-        return CognitiveCapabilities(
-            statement_parsers=self.statement_parsers,
-            state_projectors=self.state_projectors,
-            state_reducers=self.state_reducers,
-            query_parsers=self.query_parsers,
-            rule_inferers=(*self.rule_inferers, *inferers),
-            answerers=self.answerers,
-            intent_analyzers=self.intent_analyzers,
-            memory_states=self.memory_states,
-        )
+        return self._with_tuple("rule_inferers", *inferers)
 
     def with_answerers(self, *answerers: Answerer) -> CognitiveCapabilities:
-        return CognitiveCapabilities(
-            statement_parsers=self.statement_parsers,
-            state_projectors=self.state_projectors,
-            state_reducers=self.state_reducers,
-            query_parsers=self.query_parsers,
-            rule_inferers=self.rule_inferers,
-            answerers=(*self.answerers, *answerers),
-            intent_analyzers=self.intent_analyzers,
-            memory_states=self.memory_states,
-        )
+        return self._with_tuple("answerers", *answerers)
 
     def with_intent_analyzers(self, *analyzers: IntentAnalyzer) -> CognitiveCapabilities:
-        return CognitiveCapabilities(
-            statement_parsers=self.statement_parsers,
-            state_projectors=self.state_projectors,
-            state_reducers=self.state_reducers,
-            query_parsers=self.query_parsers,
-            rule_inferers=self.rule_inferers,
-            answerers=self.answerers,
-            intent_analyzers=(*self.intent_analyzers, *analyzers),
-            memory_states=self.memory_states,
-        )
+        return self._with_tuple("intent_analyzers", *analyzers)
 
     def with_memory_states(self, *states: State) -> CognitiveCapabilities:
-        return CognitiveCapabilities(
-            statement_parsers=self.statement_parsers,
-            state_projectors=self.state_projectors,
-            state_reducers=self.state_reducers,
-            query_parsers=self.query_parsers,
-            rule_inferers=self.rule_inferers,
-            answerers=self.answerers,
-            intent_analyzers=self.intent_analyzers,
-            memory_states=(*self.memory_states, *states),
-        )
+        return self._with_tuple("memory_states", *states)

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from ..dataset_io import append_jsonl_object, load_jsonl_objects
 from ..structure import Intention
 
 
@@ -87,28 +87,15 @@ def build_intent_record(
 
 
 def load_intent_jsonl(path: str | Path) -> tuple[IntentDatasetRecord, ...]:
-    records: list[IntentDatasetRecord] = []
-    with Path(path).open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                raw_record = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"Invalid intent JSONL at line {line_number}: {error}") from error
-            if not isinstance(raw_record, dict):
-                raise ValueError(f"Invalid intent JSONL at line {line_number}: expected object")
-            records.append(intent_record_from_dict(raw_record, line_number=line_number))
-    return tuple(records)
+    return tuple(
+        intent_record_from_dict(raw_record, line_number=line_number)
+        for line_number, raw_record in enumerate(load_jsonl_objects(path, "intent"), start=1)
+    )
 
 
 def append_intent_record(path: str | Path, record: IntentDatasetRecord) -> None:
     validated = validate_intent_record(record)
-    target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("a", encoding="utf-8") as file:
-        file.write(json.dumps(validated.to_json_record(), ensure_ascii=False, sort_keys=True))
-        file.write("\n")
+    append_jsonl_object(path, validated.to_json_record(), sort_keys=True)
 
 
 def intent_record_from_dict(record: dict[str, Any], *, line_number: int | None = None) -> IntentDatasetRecord:

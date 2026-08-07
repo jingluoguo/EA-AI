@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from importlib import import_module
 import os
 from typing import Any, Callable, Mapping, Optional, Protocol
@@ -132,7 +133,7 @@ def with_neural_boundary(
     input_first: bool = True,
     statement_priority: str = "first",
     query_priority: str = "first",
-    answer_priority: str = "fallback",
+    answer_priority: str = "after_verified",
     query_min_confidence: float = 0.75,
     statement_min_confidence: float = 0.75,
     intent_min_confidence: float = 0.55,
@@ -143,16 +144,20 @@ def with_neural_boundary(
     intent_analyzer = NeuralIntentAnalyzer(model, min_confidence=intent_min_confidence)
     answerer = NeuralAnswerer(model, min_confidence=answer_min_confidence)
 
-    if statement_priority not in {"replace", "first", "fallback"}:
-        raise ValueError("statement_priority must be 'replace', 'first', or 'fallback'.")
+    statement_priority = normalize_priority(statement_priority, after_alias="after_existing")
+    query_priority = normalize_priority(query_priority, after_alias="after_existing")
+    answer_priority = normalize_priority(answer_priority, after_alias="after_verified")
+
+    if statement_priority not in {"replace", "first", "after_existing"}:
+        raise ValueError("statement_priority must be 'replace', 'first', or 'after_existing'.")
     if statement_priority == "replace":
         statement_parsers = (statement_parser,)
     elif statement_priority == "first":
         statement_parsers = (statement_parser, *capabilities.statement_parsers)
     else:
         statement_parsers = (*capabilities.statement_parsers, statement_parser)
-    if query_priority not in {"replace", "first", "fallback"}:
-        raise ValueError("query_priority must be 'replace', 'first', or 'fallback'.")
+    if query_priority not in {"replace", "first", "after_existing"}:
+        raise ValueError("query_priority must be 'replace', 'first', or 'after_existing'.")
     # Replacement mode keeps the active input path entirely neural. The
     # default "first" mode keeps generic boundary adapters backward-compatible.
     if query_priority == "replace":
@@ -161,8 +166,8 @@ def with_neural_boundary(
         query_parsers = (query_parser, *capabilities.query_parsers)
     else:
         query_parsers = (*capabilities.query_parsers, query_parser)
-    if answer_priority not in {"fallback", "first"}:
-        raise ValueError("answer_priority must be 'fallback' or 'first'.")
+    if answer_priority not in {"after_verified", "first"}:
+        raise ValueError("answer_priority must be 'after_verified' or 'first'.")
     answerers = (
         (answerer, *capabilities.answerers)
         if answer_priority == "first"
@@ -185,6 +190,10 @@ def with_neural_boundary(
     )
 
 
+def normalize_priority(value: str, *, after_alias: str) -> str:
+    return str(value or after_alias).replace("-", "_")
+
+
 def load_neural_boundary_model(spec: str) -> NeuralBoundaryModel:
     module_name, separator, factory_name = spec.partition(":")
     if not module_name or not separator or not factory_name:
@@ -200,6 +209,11 @@ def load_neural_boundary_model(spec: str) -> NeuralBoundaryModel:
 
 def configured_neural_boundary_model() -> NeuralBoundaryModel | None:
     provider = os.getenv(NEURAL_PROVIDER_ENV, "").strip()
+    return _configured_neural_boundary_model(provider)
+
+
+@lru_cache(maxsize=8)
+def _configured_neural_boundary_model(provider: str) -> NeuralBoundaryModel | None:
     if not provider:
         return None
     return load_neural_boundary_model(provider)

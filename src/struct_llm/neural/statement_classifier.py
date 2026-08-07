@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-import random
+from functools import lru_cache
 from dataclasses import dataclass
-from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +11,16 @@ from torch import Tensor, nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.utils.data import DataLoader, Dataset
 
+from .common import (
+    balanced_class_weights,
+    build_character_vocabulary,
+    encode_characters as encode_text,
+    file_sha256,
+    masked_max,
+    masked_mean,
+    sequence_mask,
+    set_seed,
+)
 from ..comprehension.statement import (
     STATEMENT_DATA_PATH,
     EntitySlot,
@@ -19,7 +28,6 @@ from ..comprehension.statement import (
     StatementTrainingExample,
     evaluate_statement_parser,
     extract_slots,
-    file_sha256,
     frame_template_to_dict,
     load_statement_jsonl,
     normalize_entity_value,
@@ -189,11 +197,24 @@ def default_neural_statement_parser(
     weights = Path(weights_path)
     metadata = Path(meta_path)
     source_sha = file_sha256(data_path)
+    return _default_neural_statement_parser_from_signature(str(data_path), str(weights), str(metadata), source_sha)
+
+
+@lru_cache(maxsize=8)
+def _default_neural_statement_parser_from_signature(
+    data_path: str,
+    weights_path: str,
+    meta_path: str,
+    source_sha: str,
+) -> LoadedNeuralStatementParser:
+    data = Path(data_path)
+    weights = Path(weights_path)
+    metadata = Path(meta_path)
     if weights.exists() and metadata.exists():
         state = load_statement_neural_metadata(metadata)
         if state.source_sha256 == source_sha:
             return load_statement_neural_parser(weights, metadata)
-    return train_statement_neural_model(data_path, weights, metadata).parser
+    return train_statement_neural_model(data, weights, metadata).parser
 
 
 def train_statement_neural_model(
@@ -220,7 +241,7 @@ def train_statement_neural_model(
         build_training_example(example, tag_index, label_key(example))
         for example in examples
     )
-    vocab = build_vocabulary(example.text for example in neural_examples)
+    vocab = build_character_vocabulary((example.text for example in neural_examples), sort_characters=True)
     label_index = {key: index for index, key in enumerate(label_keys)}
     dataset = NeuralStatementDataset(neural_examples, vocab, label_index)
     set_seed(STATEMENT_NEURAL_SEED)
@@ -264,7 +285,7 @@ def fit_statement_classifier(
     class_counts = torch.zeros(label_count, dtype=torch.float32)
     for _, label, _ in dataset:
         class_counts[label] += 1
-    class_weights = balanced_weights(class_counts)
+    class_weights = balanced_class_weights(class_counts)
     class_loss_fn = nn.CrossEntropyLoss(weight=class_weights)
     tag_loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
     optimizer = torch.optim.Adam(model.parameters(), lr=STATEMENT_NEURAL_LR)
@@ -617,40 +638,3 @@ def collate_statement_batch(batch: list[tuple[list[int], int, list[int]]]) -> tu
         token_ids[row, : len(tokens)] = torch.tensor(tokens, dtype=torch.long)
         tag_ids[row, : len(tags)] = torch.tensor(tags, dtype=torch.long)
     return token_ids, lengths, labels, tag_ids
-
-
-def build_vocabulary(texts: Any) -> dict[str, int]:
-    chars = sorted({char for text in texts for char in text})
-    return {STATEMENT_NEURAL_PAD: 0, STATEMENT_NEURAL_UNK: 1, **{char: index + 2 for index, char in enumerate(chars)}}
-
-
-def encode_text(text: str, vocab: dict[str, int]) -> list[int]:
-    return [vocab.get(char, vocab[STATEMENT_NEURAL_UNK]) for char in text]
-
-
-def sequence_mask(lengths: Tensor, width: int, device: torch.device) -> Tensor:
-    positions = torch.arange(width, device=device).unsqueeze(0)
-    return positions < lengths.to(device).unsqueeze(1)
-
-
-def masked_mean(values: Tensor, mask: Tensor) -> Tensor:
-    weights = mask.unsqueeze(-1).to(values.dtype)
-    return (values * weights).sum(dim=1) / weights.sum(dim=1).clamp_min(1.0)
-
-
-def masked_max(values: Tensor, mask: Tensor) -> Tensor:
-    masked = values.masked_fill(~mask.unsqueeze(-1), torch.finfo(values.dtype).min)
-    return masked.max(dim=1).values
-
-
-def balanced_weights(counts: Tensor) -> Tensor:
-    nonzero = counts > 0
-    weights = torch.ones_like(counts)
-    if nonzero.any():
-        weights[nonzero] = counts[nonzero].sum() / (counts[nonzero] * nonzero.sum())
-    return weights
-
-
-def set_seed(seed: int) -> None:
-    random.seed(seed)
-    torch.manual_seed(seed)

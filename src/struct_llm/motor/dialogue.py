@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..dataset_io import append_jsonl_object, file_sha256, load_jsonl_objects
 from ..structure import Query, Structure
 from ..comprehension.query import (
     query_from_dict,
@@ -95,9 +97,18 @@ class LearnedDialogActAnswerer:
 
 def default_learned_dialog_answerer() -> LearnedDialogActAnswerer:
     if DIALOG_ANSWER_MODEL_PATH.exists():
-        return LearnedDialogActAnswerer.from_model(DIALOG_ANSWER_MODEL_PATH)
+        return _cached_default_learned_dialog_answerer("model", str(DIALOG_ANSWER_MODEL_PATH), file_sha256(DIALOG_ANSWER_MODEL_PATH))
     if DIALOG_ANSWER_DATA_PATH.exists():
-        return LearnedDialogActAnswerer.from_jsonl(DIALOG_ANSWER_DATA_PATH)
+        return _cached_default_learned_dialog_answerer("data", str(DIALOG_ANSWER_DATA_PATH), file_sha256(DIALOG_ANSWER_DATA_PATH))
+    return _cached_default_learned_dialog_answerer("empty", "", "")
+
+
+@lru_cache(maxsize=8)
+def _cached_default_learned_dialog_answerer(source_kind: str, path: str, source_sha: str) -> LearnedDialogActAnswerer:
+    if source_kind == "model":
+        return LearnedDialogActAnswerer.from_model(path)
+    if source_kind == "data":
+        return LearnedDialogActAnswerer.from_jsonl(path)
     return LearnedDialogActAnswerer()
 
 
@@ -204,28 +215,15 @@ def dialog_answer_pattern_to_dict(pattern: CompiledDialogActAnswerPattern) -> di
 
 
 def load_dialog_answer_jsonl(path: str | Path) -> tuple[DialogActAnswerTrainingExample, ...]:
-    examples: list[DialogActAnswerTrainingExample] = []
-    with Path(path).open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                raw_record = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"Invalid dialog answer JSONL at line {line_number}: {error}") from error
-            if not isinstance(raw_record, dict):
-                raise ValueError(f"Invalid dialog answer JSONL at line {line_number}: expected object")
-            examples.append(dialog_answer_example_from_dict(raw_record, line_number=line_number))
-    return tuple(examples)
+    return tuple(
+        dialog_answer_example_from_dict(raw_record, line_number=line_number)
+        for line_number, raw_record in enumerate(load_jsonl_objects(path, "dialog answer"), start=1)
+    )
 
 
 def append_dialog_answer_record(path: str | Path, record: dict[str, Any]) -> DialogActAnswerTrainingExample:
     example = dialog_answer_example_from_dict(record)
-    data_path = Path(path)
-    data_path.parent.mkdir(parents=True, exist_ok=True)
-    with data_path.open("a", encoding="utf-8") as file:
-        json.dump(dialog_answer_example_to_record(example), file, ensure_ascii=False)
-        file.write("\n")
+    append_jsonl_object(path, dialog_answer_example_to_record(example))
     return example
 
 
@@ -315,13 +313,3 @@ def dialog_answer_example_from_dict(record: dict[str, Any], *, line_number: int 
         source=str(record.get("source") or "training").strip() or "training",
         split=str(record.get("split") or "train").strip() or "train",
     )
-
-
-def file_sha256(path: Path) -> str:
-    import hashlib
-
-    digest = hashlib.sha256()
-    with path.open("rb") as file:
-        for chunk in iter(lambda: file.read(8192), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

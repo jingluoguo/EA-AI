@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from ..dataset_io import append_jsonl_object, load_jsonl_objects
 
 
 UNRECOGNIZED_DATA_PATH = Path(__file__).resolve().parents[3] / "data" / "unrecognized_examples.jsonl"
@@ -65,35 +66,21 @@ def append_unrecognized_example(
     path: str | Path,
     example: UnrecognizedExample,
 ) -> UnrecognizedExample:
-    data_path = Path(path)
-    data_path.parent.mkdir(parents=True, exist_ok=True)
-    with data_path.open("a", encoding="utf-8") as file:
-        json.dump(
-            build_unrecognized_record(
-                example.text,
-                confidence=example.confidence,
-                reason=example.reason,
-                status=example.status,
-                source=example.source,
-            ),
-            file,
-            ensure_ascii=False,
-        )
-        file.write("\n")
+    append_jsonl_object(
+        path,
+        build_unrecognized_record(
+            example.text,
+            confidence=example.confidence,
+            reason=example.reason,
+            status=example.status,
+            source=example.source,
+        ),
+    )
     return example
 
 
 def load_unrecognized_jsonl(path: str | Path) -> tuple[UnrecognizedExample, ...]:
-    examples: list[UnrecognizedExample] = []
-    with Path(path).open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                raw_record = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"Invalid unrecognized JSONL at line {line_number}: {error}") from error
-            if not isinstance(raw_record, dict):
-                raise ValueError(f"Invalid unrecognized JSONL at line {line_number}: expected object")
-            examples.append(unrecognized_example_from_dict(raw_record, line_number=line_number))
-    return tuple(examples)
+    return tuple(
+        unrecognized_example_from_dict(raw_record, line_number=line_number)
+        for line_number, raw_record in enumerate(load_jsonl_objects(path, "unrecognized"), start=1)
+    )

@@ -2,7 +2,7 @@
 
 ## 结构智能约束
 
-本项目的目标不是穷举自然语言问法，也不是把每个失败样例补成一条端到端模板。运行时不保留问法表、正则 parser 或字符串 fallback；后续演进必须以训练数据和可替换学习能力为中心。实现和修改 `struct_llm` 时，必须遵循这条链条：
+本项目的目标不是用表层表达枚举来覆盖失败样例，也不是把每个失败样例补成一条端到端模板。运行时必须以训练数据、结构中间层和可替换学习能力为主路径；后续演进也必须沿着这条主路径推进。实现和修改 `struct_llm` 时，必须遵循这条链条：
 
 ```text
 观察现象 -> 剥离次要因素 -> 构建理想模型 -> 数学表达 -> 实验验证
@@ -12,7 +12,7 @@
 
 - 观察现象：先收集失败输入、已有结构输出、期望答案，确认失败发生在陈述解析、问题解析、规则推导还是答案生成。
 - 训练优先：遇到新失败样例时，先补训练/反馈数据，记录 `observation`、上下文、已知世界状态、信念状态、期望 `INTENT/QUERY/STATE` 或答案，再用数据集评估现有能力；只有数据证明结构标签缺失或模型槽位不足时，才改 parser、state、query 或 inference。
-- 学习主路径：陈述和 Query 默认都必须走神经输入模型，样本 schema 和标签构造仍放在 `comprehension/statement.py`、`comprehension/query.py`。JSONL 数据集只作为训练/反馈输入；默认运行时优先加载 `data/statement_neural_model.pt/json`、`data/query_neural_model.pt/json` 这类神经能力产物。新增失败样例先进入数据集、重新训练并评估，不新增问法分支。
+- 学习主路径：陈述和 Query 默认都必须走神经输入模型，样本 schema 和标签构造仍放在 `comprehension/statement.py`、`comprehension/query.py`。JSONL 数据集只作为训练/反馈输入；默认运行时优先加载 `data/statement_neural_model.pt/json`、`data/query_neural_model.pt/json` 这类神经能力产物。新增失败样例先进入数据集、重新训练并评估，不新增绕过结构中间层的表层表达分支。
 - 剥离次要因素：把主动句、被动句、换序、语气词、时间副词等表层差异视为可归一化因素，不能直接把这些差异变成互不相关的答案规则。
 - 数据集边界：意图分析样本放入 `data/intent_examples.jsonl` 或同 schema 的 JSONL 文件；Query 样本放入 `data/query_examples.jsonl` 或同 schema 的 JSONL 文件；陈述样本放入 `data/statement_examples.jsonl` 或同 schema 的 JSONL 文件。数据读写、校验、编译和模型加载放在对应 dataset/learning 模块；样本消费、模型编译或模型预测放在 `comprehension/intent.py`、`comprehension/query.py`、`comprehension/statement.py`。后续新增学习型能力也应先有 dataset/schema，再接训练产物或推理实现。
 - 槽位规范化：从句子中抽出的实体、事件角色、查询目标必须先清理首尾语气词、时间副词和“我想知道”这类提问框架，再用已知实体表校正槽位边界，然后才进入结构匹配，避免把“你可以告诉我芯片”、“我想知道芯片”或“托盘的了”之类表层残留当成实体。
@@ -24,4 +24,4 @@
 - 能力注册：陈述学习、状态投影、状态覆盖、Query 学习、规则推导、答案生成都必须以小能力函数注册到 `CognitiveCapabilities`。新增能力时优先更新数据集或替换学习能力，不能为了一个新问法改成端到端特殊分支。
 - 实验验证：每次新增能力都要加入覆盖主动、被动、换序或同义表达的测试，证明它们映射到同一个中间结构。训练相关改动还必须测试数据 loader、反馈写入、schema 校验或评估路径，不能只测试某条句子是否答对。
 
-不得新增表层问法 pattern、正则问法或字符串 fallback。表层差异只能通过通用归一化和训练样本进入统一结构。
+不得新增绕过结构中间层的表层表达分支。表层差异只能通过通用归一化和训练样本进入统一结构。

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
+from ..dataset_io import append_jsonl_object, file_sha256, load_jsonl_objects
 from ..structure import Entity, Frame, Role
 from ..capabilities import StatementParseResult
 from ..perception.normalizer import (
@@ -155,28 +155,15 @@ def evaluate_statement_parser(
 
 
 def load_statement_jsonl(path: str | Path) -> tuple[StatementTrainingExample, ...]:
-    examples: list[StatementTrainingExample] = []
-    with Path(path).open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                raw_record = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"Invalid statement JSONL at line {line_number}: {error}") from error
-            if not isinstance(raw_record, dict):
-                raise ValueError(f"Invalid statement JSONL at line {line_number}: expected object")
-            examples.append(statement_example_from_dict(raw_record, line_number=line_number))
-    return tuple(examples)
+    return tuple(
+        statement_example_from_dict(raw_record, line_number=line_number)
+        for line_number, raw_record in enumerate(load_jsonl_objects(path, "statement"), start=1)
+    )
 
 
 def append_statement_record(path: str | Path, record: dict[str, Any]) -> StatementTrainingExample:
     example = statement_example_from_dict(record)
-    data_path = Path(path)
-    data_path.parent.mkdir(parents=True, exist_ok=True)
-    with data_path.open("a", encoding="utf-8") as file:
-        json.dump(statement_example_to_record(example), file, ensure_ascii=False)
-        file.write("\n")
+    append_jsonl_object(path, statement_example_to_record(example))
     return example
 
 
@@ -428,11 +415,3 @@ def linearize_statement_result(result: StatementParseResult) -> tuple[str, ...]:
         lines.append(f"FRAME {frame.frame_type}")
         lines.extend(f"ROLE {role.name}={role.value}" for role in frame.roles)
     return tuple(lines)
-
-
-def file_sha256(path: Path) -> str:
-    digest = sha256()
-    with path.open("rb") as file:
-        for chunk in iter(lambda: file.read(65536), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

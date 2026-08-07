@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-from hashlib import sha256
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..dataset_io import append_jsonl_object, file_sha256, load_jsonl_objects
 from ..errors import ParseError
 from ..structure import Entity, Query
 from ..capabilities import QueryParser
@@ -288,28 +288,15 @@ def evaluate_query_parser(
 
 
 def load_query_jsonl(path: str | Path) -> tuple[QueryTrainingExample, ...]:
-    examples: list[QueryTrainingExample] = []
-    with Path(path).open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                raw_record = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"Invalid query JSONL at line {line_number}: {error}") from error
-            if not isinstance(raw_record, dict):
-                raise ValueError(f"Invalid query JSONL at line {line_number}: expected object")
-            examples.append(query_example_from_dict(raw_record, line_number=line_number))
-    return tuple(examples)
+    return tuple(
+        query_example_from_dict(raw_record, line_number=line_number)
+        for line_number, raw_record in enumerate(load_jsonl_objects(path, "query"), start=1)
+    )
 
 
 def append_query_record(path: str | Path, record: dict[str, Any]) -> QueryTrainingExample:
     example = query_example_from_dict(record)
-    data_path = Path(path)
-    data_path.parent.mkdir(parents=True, exist_ok=True)
-    with data_path.open("a", encoding="utf-8") as file:
-        json.dump(query_example_to_record(example), file, ensure_ascii=False)
-        file.write("\n")
+    append_jsonl_object(path, query_example_to_record(example))
     return example
 
 
@@ -433,13 +420,13 @@ def instantiate_query(
     sentence: str,
     runtime_entities: tuple[Entity, ...],
     *,
-    allow_example_fallback: bool = True,
+    allow_example_slot_values: bool = True,
 ) -> Query:
     return Query(
         template.intent,
-        instantiate_value(template.target, example_entities, sentence, runtime_entities, allow_example_fallback=allow_example_fallback),
+        instantiate_value(template.target, example_entities, sentence, runtime_entities, allow_example_slot_values=allow_example_slot_values),
         tuple(
-            instantiate_qualifier(value, example_entities, sentence, runtime_entities, allow_example_fallback=allow_example_fallback)
+            instantiate_qualifier(value, example_entities, sentence, runtime_entities, allow_example_slot_values=allow_example_slot_values)
             for value in template.qualifiers
         ),
         tuple(
@@ -448,7 +435,7 @@ def instantiate_query(
                 example_entities,
                 sentence,
                 runtime_entities,
-                allow_example_fallback=allow_example_fallback,
+                allow_example_slot_values=allow_example_slot_values,
             )
             for subquery in template.subqueries
         ),
@@ -461,12 +448,12 @@ def instantiate_qualifier(
     sentence: str,
     runtime_entities: tuple[Entity, ...],
     *,
-    allow_example_fallback: bool = True,
+    allow_example_slot_values: bool = True,
 ) -> str:
     if "=" not in qualifier:
-        return instantiate_value(qualifier, example_entities, sentence, runtime_entities, allow_example_fallback=allow_example_fallback)
+        return instantiate_value(qualifier, example_entities, sentence, runtime_entities, allow_example_slot_values=allow_example_slot_values)
     key, value = qualifier.split("=", 1)
-    return f"{key}={instantiate_value(value, example_entities, sentence, runtime_entities, allow_example_fallback=allow_example_fallback)}"
+    return f"{key}={instantiate_value(value, example_entities, sentence, runtime_entities, allow_example_slot_values=allow_example_slot_values)}"
 
 
 def instantiate_value(
@@ -475,7 +462,7 @@ def instantiate_value(
     sentence: str,
     runtime_entities: tuple[Entity, ...],
     *,
-    allow_example_fallback: bool = True,
+    allow_example_slot_values: bool = True,
 ) -> str:
     if "$" not in value:
         return value
@@ -491,7 +478,7 @@ def instantiate_value(
         if runtime_entity is not None:
             resolved = resolved.replace(example_entity.name, runtime_entity.name, 1)
             continue
-        if not allow_example_fallback:
+        if not allow_example_slot_values:
             unique_runtime_entity = unique_runtime_entity_for(example_entity, entity_examples_from_runtime(runtime_entities))
             if unique_runtime_entity is not None:
                 resolved = resolved.replace(example_entity.name, unique_runtime_entity.name, 1)
@@ -734,11 +721,3 @@ def roles_compatible(example_role: str, runtime_role: str) -> bool:
     if example_role == runtime_role:
         return True
     return {example_role, runtime_role} <= {"item", "thing"}
-
-
-def file_sha256(path: Path) -> str:
-    digest = sha256()
-    with path.open("rb") as file:
-        for chunk in iter(lambda: file.read(65536), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

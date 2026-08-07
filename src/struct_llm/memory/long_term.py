@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from hashlib import sha256
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from ..dataset_io import append_jsonl_object, load_jsonl_objects
 from ..structure import Entity, State, Structure
 from ..world.state import apply_state
 
@@ -116,28 +118,15 @@ def load_memory_jsonl(path: str | Path) -> tuple[MemoryEntry, ...]:
     data_path = Path(path)
     if not data_path.exists():
         return ()
-    entries: list[MemoryEntry] = []
-    with data_path.open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                raw_record = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"Invalid memory JSONL at line {line_number}: {error}") from error
-            if not isinstance(raw_record, dict):
-                raise ValueError(f"Invalid memory JSONL at line {line_number}: expected object")
-            entries.append(memory_entry_from_dict(raw_record, line_number=line_number))
-    return tuple(entries)
+    return tuple(
+        memory_entry_from_dict(raw_record, line_number=line_number)
+        for line_number, raw_record in enumerate(load_jsonl_objects(data_path, "memory"), start=1)
+    )
 
 
 def append_memory_record(path: str | Path, record: dict[str, Any]) -> MemoryEntry:
     entry = memory_entry_from_dict(record)
-    data_path = Path(path)
-    data_path.parent.mkdir(parents=True, exist_ok=True)
-    with data_path.open("a", encoding="utf-8") as file:
-        json.dump(memory_entry_to_record(entry), file, ensure_ascii=False)
-        file.write("\n")
+    append_jsonl_object(path, memory_entry_to_record(entry))
     return entry
 
 
@@ -219,6 +208,14 @@ def memory_model_to_dict(model: CompiledMemoryModel) -> dict[str, Any]:
 
 
 def default_memory_states(path: str | Path = MEMORY_MODEL_PATH) -> tuple[State, ...]:
+    model_path = Path(path)
+    if not model_path.exists():
+        return ()
+    return _cached_default_memory_states(str(model_path), combined_file_sha256((model_path,)))
+
+
+@lru_cache(maxsize=8)
+def _cached_default_memory_states(path: str, source_sha: str) -> tuple[State, ...]:
     model_path = Path(path)
     if not model_path.exists():
         return ()

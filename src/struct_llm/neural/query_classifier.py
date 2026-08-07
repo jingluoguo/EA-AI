@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-import random
+from functools import lru_cache
 from dataclasses import dataclass
-from hashlib import sha256
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -12,6 +11,17 @@ from torch import Tensor, nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.utils.data import DataLoader, Dataset
 
+from .common import (
+    balanced_class_weights,
+    build_character_vocabulary as build_vocabulary,
+    collate_classification_batch as collate_query_batch,
+    encode_characters as encode_text,
+    file_sha256,
+    masked_max,
+    masked_mean,
+    sequence_mask,
+    set_seed,
+)
 from ..perception.lexer import split_query_candidate
 from ..comprehension.query import (
     QUERY_DATA_PATH,
@@ -231,11 +241,24 @@ def default_neural_query_parser(
     model_path = Path(weights_path)
     metadata_path = Path(meta_path)
     source_sha = file_sha256(data_path)
+    return _default_neural_query_parser_from_signature(str(data_path), str(model_path), str(metadata_path), source_sha)
+
+
+@lru_cache(maxsize=8)
+def _default_neural_query_parser_from_signature(
+    data_path: str,
+    weights_path: str,
+    meta_path: str,
+    source_sha: str,
+) -> LoadedNeuralQueryParser:
+    data = Path(data_path)
+    model_path = Path(weights_path)
+    metadata_path = Path(meta_path)
     if model_path.exists() and metadata_path.exists():
         metadata = load_query_neural_metadata(metadata_path)
         if metadata.source_sha256 == source_sha:
             return load_query_neural_parser(model_path, metadata_path)
-    result = train_query_neural_model(data_path, model_path, metadata_path)
+    result = train_query_neural_model(data, model_path, metadata_path)
     return result.parser
 
 
@@ -308,7 +331,7 @@ def fit_query_classifier(
     class_counts = torch.zeros(label_count, dtype=torch.float32)
     for _, label in dataset:
         class_counts[label] += 1
-    weights = class_weights(class_counts)
+    weights = balanced_class_weights(class_counts, minimum=0.25, maximum=3.0)
     loss_fn = nn.CrossEntropyLoss(weight=weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=QUERY_NEURAL_LR)
     loader = DataLoader(dataset, batch_size=QUERY_NEURAL_BATCH_SIZE, shuffle=True, collate_fn=collate_query_batch)
@@ -644,7 +667,7 @@ def materialize_query_from_pattern(
         pattern.entities,
         sentence,
         (*entities, *inferred_entities),
-        allow_example_fallback=False,
+        allow_example_slot_values=False,
     )
     if query_has_unresolved_slot(query):
         return None
@@ -659,68 +682,3 @@ def neural_query_rank(confidence: float, structural_score: float) -> float:
 
 def canonical_text(text: str) -> str:
     return str(text).translate(_STRIP_CHARS).replace("\u3000", "").strip()
-
-
-def encode_text(text: str, vocab: dict[str, int]) -> list[int]:
-    if not text:
-        return [vocab[QUERY_NEURAL_UNK]]
-    return [vocab.get(character, vocab[QUERY_NEURAL_UNK]) for character in text]
-
-
-def build_vocabulary(texts: Iterable[str]) -> dict[str, int]:
-    vocab = {QUERY_NEURAL_PAD: 0, QUERY_NEURAL_UNK: 1}
-    for text in texts:
-        for character in text:
-            if character not in vocab:
-                vocab[character] = len(vocab)
-    return vocab
-
-
-def collate_query_batch(batch: list[tuple[list[int], int]]) -> tuple[Tensor, Tensor, Tensor]:
-    sequences, labels = zip(*batch)
-    lengths = torch.tensor([len(sequence) for sequence in sequences], dtype=torch.long)
-    max_length = int(lengths.max().item()) if lengths.numel() else 0
-    token_ids = torch.zeros((len(sequences), max_length), dtype=torch.long)
-    for row_index, sequence in enumerate(sequences):
-        if sequence:
-            token_ids[row_index, : len(sequence)] = torch.tensor(sequence, dtype=torch.long)
-    return token_ids, lengths, torch.tensor(labels, dtype=torch.long)
-
-
-def sequence_mask(lengths: Tensor, width: int, device: torch.device) -> Tensor:
-    positions = torch.arange(width, device=device).unsqueeze(0)
-    return positions < lengths.unsqueeze(1)
-
-
-def masked_mean(values: Tensor, mask: Tensor) -> Tensor:
-    masked = values * mask.unsqueeze(-1)
-    summed = masked.sum(dim=1)
-    lengths = mask.sum(dim=1).clamp(min=1).unsqueeze(-1)
-    return summed / lengths
-
-
-def masked_max(values: Tensor, mask: Tensor) -> Tensor:
-    masked = values.masked_fill(~mask.unsqueeze(-1), float("-inf"))
-    return masked.max(dim=1).values
-
-
-def class_weights(class_counts: Tensor) -> Tensor:
-    total = class_counts.sum().clamp(min=1.0)
-    weights = total / (len(class_counts) * class_counts.clamp(min=1.0))
-    return weights.clamp(min=0.25, max=3.0)
-
-
-def set_seed(seed: int) -> None:
-    random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-
-def file_sha256(path: Path) -> str:
-    if not path.exists():
-        return ""
-    digest = sha256()
-    with path.open("rb") as file:
-        for chunk in iter(lambda: file.read(8192), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
