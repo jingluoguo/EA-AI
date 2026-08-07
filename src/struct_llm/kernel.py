@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .capabilities import CognitiveCapabilities
-from .comprehension.query import query_candidate_is_learned_unit, resolve_query_candidates
+from .comprehension.query import query_candidate_is_learned_unit, resolve_query_candidate, resolve_query_candidates
 from .comprehension.structure_helpers import dedupe_entities, with_time
 from .errors import ParseError
 from .motor.dialogue import default_learned_dialog_answerer
@@ -11,14 +11,14 @@ from .neural import NeuralBoundaryModel, configured_neural_boundary_model, with_
 from .neural.query_classifier import default_neural_query_parser
 from .neural.statement_classifier import default_neural_statement_parser
 from .memory.long_term import default_memory_states, memory_entities_from_states
-from .perception.lexer import is_query_like_fragment, split_query_candidate, split_sentences
+from .perception.lexer import split_query_candidate, split_sentences
 from .perception.reference import resolve_references
 from .reasoning.pipeline import (
     DEFAULT_ANSWERERS,
     DEFAULT_RULE_INFERERS,
     answer_from_structure,
 )
-from .structure import Entity, Frame, State, Structure
+from .structure import Entity, Frame, Query, State, Structure
 from .world.causal import expand_conditionals
 from .world.state import (
     DEFAULT_STATE_PROJECTORS,
@@ -85,16 +85,25 @@ def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities)
     for sentence, is_question in split_sentences(text):
         raw_sentence = sentence
         resolved_sentence = resolve_references(raw_sentence, dedupe_entities(entities))
-        extracted = (
-            None
-            if is_question or is_query_like_fragment(resolved_sentence)
-            else capabilities.parse_statement(resolved_sentence)
-        )
-        if extracted is not None:
-            add_extracted(extracted)
-            continue
 
-        if is_question and query_candidate_is_learned_unit(
+        if not is_question:
+            sentence_extracted = capabilities.parse_statement(resolved_sentence)
+            if sentence_extracted is not None:
+                sentence_query = resolve_query_candidate(resolved_sentence, dedupe_entities(entities), capabilities.query_parsers)
+                if sentence_query is not None and profile_statement_should_yield_to_query(
+                    sentence_extracted,
+                    sentence_query,
+                ) and query_candidate_is_learned_unit(
+                    resolved_sentence,
+                    dedupe_entities(entities),
+                    capabilities.query_parsers,
+                ):
+                    query_candidates.append(resolved_sentence)
+                    continue
+                add_extracted(sentence_extracted)
+                continue
+
+        if query_candidate_is_learned_unit(
             resolved_sentence,
             dedupe_entities(entities),
             capabilities.query_parsers,
@@ -104,15 +113,26 @@ def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities)
 
         for fragment in split_query_candidate(raw_sentence):
             resolved_fragment = resolve_references(fragment, dedupe_entities(entities))
-            fragment_extracted = (
-                None
-                if is_query_like_fragment(resolved_fragment)
-                else capabilities.parse_statement(resolved_fragment)
-            )
-            if fragment_extracted is not None:
-                add_extracted(fragment_extracted)
+            if is_question:
+                if resolve_query_candidate(resolved_fragment, dedupe_entities(entities), capabilities.query_parsers) is not None:
+                    query_candidates.append(resolved_fragment)
+                    continue
+
+                fragment_extracted = capabilities.parse_statement(resolved_fragment)
+                if fragment_extracted is not None:
+                    add_extracted(fragment_extracted)
+                else:
+                    query_candidates.append(resolved_fragment)
             else:
-                query_candidates.append(resolved_fragment)
+                fragment_extracted = capabilities.parse_statement(resolved_fragment)
+                if fragment_extracted is not None:
+                    add_extracted(fragment_extracted)
+                    continue
+
+                if resolve_query_candidate(resolved_fragment, dedupe_entities(entities), capabilities.query_parsers) is not None:
+                    query_candidates.append(resolved_fragment)
+                else:
+                    query_candidates.append(resolved_fragment)
 
     deduped_entities = dedupe_entities(entities)
     query = resolve_query_candidates(query_candidates, deduped_entities, capabilities.query_parsers)
@@ -149,6 +169,47 @@ def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities)
         states=structure.states,
         intentions=structure.intentions,
     )
+
+
+def profile_statement_should_yield_to_query(
+    extracted: tuple[list[Entity], list[Frame]],
+    query: Query,
+) -> bool:
+    if query.intent != "profile":
+        return False
+    statement_attributes = profile_statement_attributes(extracted)
+    if not statement_attributes:
+        return False
+    query_attribute = profile_query_attribute(query)
+    if query_attribute and query_attribute not in statement_attributes:
+        return True
+    return profile_statement_value_is_under_specified(extracted)
+
+
+def profile_statement_attributes(extracted: tuple[list[Entity], list[Frame]]) -> set[str]:
+    _, frames = extracted
+    attributes: set[str] = set()
+    for frame in frames:
+        if frame.frame_type == "profile_name":
+            attributes.add("name")
+        elif frame.frame_type == "profile_like":
+            attributes.add("likes")
+        elif frame.frame_type == "profile_dislike":
+            attributes.add("dislikes")
+    return attributes
+
+
+def profile_query_attribute(query: Query) -> str | None:
+    for qualifier in query.qualifiers:
+        if qualifier.startswith("attribute="):
+            return qualifier.split("=", 1)[1]
+    return None
+
+
+def profile_statement_value_is_under_specified(extracted: tuple[list[Entity], list[Frame]]) -> bool:
+    entities, _ = extracted
+    profile_values = [entity.name for entity in entities if entity.role == "profile_value"]
+    return bool(profile_values) and all(len(value.strip()) <= 1 for value in profile_values)
 
 
 def parse_text(text: str, capabilities: CognitiveCapabilities | None = None) -> Structure:

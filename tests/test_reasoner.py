@@ -47,14 +47,12 @@ from struct_llm.memory.knowledge import (
     load_memory_knowledge_model,
 )
 from struct_llm.comprehension.query import (
-    LearnedQueryParser,
     evaluate_query_parser,
     load_query_jsonl,
 )
 from struct_llm.comprehension.statement import (
     EntitySlot,
     FrameTemplate,
-    LearnedStatementParser,
     evaluate_statement_parser,
     linearize_statement_result,
     load_statement_jsonl,
@@ -64,8 +62,16 @@ from struct_llm.comprehension.statement import (
 from struct_llm.world.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, states_for_frame_schema
 from struct_llm.structure import Entity, Intention, Query, Structure
 from struct_llm.structure import State
-from struct_llm.neural.query_classifier import default_neural_query_parser, train_query_neural_model
-from struct_llm.neural.statement_classifier import default_neural_statement_parser, train_statement_neural_model
+from struct_llm.neural.query_classifier import (
+    LoadedNeuralQueryParser,
+    default_neural_query_parser,
+    train_query_neural_model,
+)
+from struct_llm.neural.statement_classifier import (
+    LoadedNeuralStatementParser,
+    default_neural_statement_parser,
+    train_statement_neural_model,
+)
 
 
 def predict(text: str, capabilities: CognitiveCapabilities | None = None):
@@ -89,6 +95,7 @@ class ReasonerTest(unittest.TestCase):
 
         self.assertEqual(len(capabilities.query_parsers), 1)
         parser = capabilities.query_parsers[0]
+        assert isinstance(parser, LoadedNeuralQueryParser)
         self.assertGreater(len(parser.patterns), 0)
 
     def test_default_statement_capability_uses_neural_model(self) -> None:
@@ -96,6 +103,7 @@ class ReasonerTest(unittest.TestCase):
 
         self.assertEqual(len(capabilities.statement_parsers), 1)
         parser = capabilities.statement_parsers[0]
+        assert isinstance(parser, LoadedNeuralStatementParser)
         self.assertGreater(len(parser.patterns), 0)
 
     def test_neural_query_parser_can_replace_input_boundary_without_kernel_branch(self) -> None:
@@ -212,6 +220,19 @@ class ReasonerTest(unittest.TestCase):
 
         self.assertIn("QUERY why(铁会生锈,type=why)", prediction.structure.linearize())
         self.assertEqual(prediction.answer, "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。")
+
+    def test_neural_provider_answers_cause_form_from_verified_knowledge(self) -> None:
+        model = make_model()
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        capabilities = capabilities.with_answerers(
+            default_learned_memory_knowledge_answerer("data/memory_knowledge_model.json")
+        )
+        capabilities = with_neural_boundary(capabilities, model)
+
+        prediction = predict("苹果会掉到地上的原因是什么", capabilities)
+
+        self.assertIn("QUERY why(苹果会掉到地上,type=why)", prediction.structure.linearize())
+        self.assertEqual(prediction.answer, "地球对物体有引力，把苹果拉向地面，这就是重力作用。")
 
     def test_default_neural_query_parser_handles_close_variants_of_the_same_question(self) -> None:
         parser = default_neural_query_parser()

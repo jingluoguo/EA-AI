@@ -1,6 +1,6 @@
 {
   "schema": "struct_llm.query_neural_model.v1",
-  "source_sha256": "3488886bb836af865f754917a76404b9dbe9419d50bce1da0f8ecc4ae1a3b925",
+  "source_sha256": "da7cc8acfabed934c9cdfaf843cc46e7080d94437ee050ff93f4851f259954f9",
   "vocab": {
     "<pad>": 0,
     "<unk>": 1,
@@ -403,7 +403,122 @@
     "铁": 398,
     "锈": 399,
     "家": 400,
-    "咋": 401
+    "咋": 401,
+    "苹": 402,
+    "掉": 403,
+    "因": 404,
+    "浮": 405,
+    "产": 406,
+    "影": 407,
+    "短": 408,
+    "忽": 409,
+    "镜": 410,
+    "照": 411,
+    "像": 412,
+    "火": 413,
+    "空": 414,
+    "气": 415,
+    "才": 416,
+    "燃": 417,
+    "烧": 418,
+    "灭": 419,
+    "时": 420,
+    "冒": 421,
+    "泡": 422,
+    "湿": 423,
+    "就": 424,
+    "闪": 425,
+    "雷": 426,
+    "球": 427,
+    "飞": 428,
+    "肥": 429,
+    "皂": 430,
+    "吹": 431,
+    "磁": 432,
+    "吸": 433,
+    "盐": 434,
+    "撒": 435,
+    "夏": 436,
+    "热": 437,
+    "冷": 438,
+    "那": 439,
+    "高": 440,
+    "尾": 441,
+    "迹": 442,
+    "线": 443,
+    "汗": 444,
+    "睡": 445,
+    "肚": 446,
+    "饿": 447,
+    "咕": 448,
+    "喷": 449,
+    "嚏": 450,
+    "伤": 451,
+    "愈": 452,
+    "血": 453,
+    "液": 454,
+    "老": 455,
+    "树": 456,
+    "叶": 457,
+    "秋": 458,
+    "黄": 459,
+    "花": 460,
+    "香": 461,
+    "味": 462,
+    "鸟": 463,
+    "鱼": 464,
+    "淹": 465,
+    "死": 466,
+    "猫": 467,
+    "睛": 468,
+    "夜": 469,
+    "蜜": 470,
+    "蜂": 471,
+    "换": 472,
+    "牙": 473,
+    "震": 474,
+    "山": 475,
+    "潮": 476,
+    "汐": 477,
+    "涨": 478,
+    "退": 479,
+    "四": 480,
+    "季": 481,
+    "春": 482,
+    "极": 483,
+    "形": 484,
+    "顶": 485,
+    "赤": 486,
+    "附": 487,
+    "年": 488,
+    "流": 489,
+    "鼻": 490,
+    "涕": 491,
+    "吃": 492,
+    "糖": 493,
+    "容": 494,
+    "易": 495,
+    "蛀": 496,
+    "晒": 497,
+    "皮": 498,
+    "肤": 499,
+    "坐": 500,
+    "车": 501,
+    "晕": 502,
+    "跳": 503,
+    "加": 504,
+    "快": 505,
+    "饭": 506,
+    "洗": 507,
+    "棍": 508,
+    "痛": 509,
+    "解": 510,
+    "释": 511,
+    "升": 512,
+    "必": 513,
+    "须": 514,
+    "究": 515,
+    "竟": 516
   },
   "label_keys": [
     "{\"intent\": \"actions_by_actors\", \"qualifiers\": [\"actor=$person#1\"], \"subqueries\": [], \"target\": \"$person#1\"}",
@@ -541,24 +656,67 @@
     "{\"intent\": \"polar_existence\", \"qualifiers\": [], \"subqueries\": [], \"target\": \"$thing#1\"}",
     "{\"intent\": \"polar_location\", \"qualifiers\": [\"expected=$container#1\", \"kind=in\"], \"subqueries\": [], \"target\": \"$item#1\"}",
     "{\"intent\": \"polar_location\", \"qualifiers\": [\"expected=$place#1\", \"kind=at\"], \"subqueries\": [], \"target\": \"$item#1\"}",
+    "{\"intent\": \"polar_location\", \"qualifiers\": [\"expected=$place#1\", \"kind=at\"], \"subqueries\": [], \"target\": \"$person#1\"}",
     "{\"intent\": \"polar_location\", \"qualifiers\": [\"expected=盒子\", \"kind=in\"], \"subqueries\": [], \"target\": \"$item#1\"}",
-    "{\"intent\": \"polar_location\", \"qualifiers\": [\"item=$item#1\", \"place=$container#1\"], \"subqueries\": [], \"target\": \"$item#1\"}",
-    "{\"intent\": \"polar_location\", \"qualifiers\": [\"item=$item#1\", \"place=$place#1\"], \"subqueries\": [], \"target\": \"$item#1\"}",
-    "{\"intent\": \"polar_location\", \"qualifiers\": [\"item=$person#1\", \"place=$place#1\"], \"subqueries\": [], \"target\": \"$person#1\"}",
     "{\"intent\": \"profile\", \"qualifiers\": [\"attribute=dislikes\"], \"subqueries\": [], \"target\": \"$self#1\"}",
     "{\"intent\": \"profile\", \"qualifiers\": [\"attribute=likes\"], \"subqueries\": [], \"target\": \"$self#1\"}",
     "{\"intent\": \"profile\", \"qualifiers\": [\"attribute=name\"], \"subqueries\": [], \"target\": \"$self#1\"}",
     "{\"intent\": \"same_location\", \"qualifiers\": [\"left=$container#1\", \"right=$container#2\"], \"subqueries\": [], \"target\": \"$container#1和$container#2\"}",
     "{\"intent\": \"same_location\", \"qualifiers\": [\"left=$item#1\", \"right=$item#2\"], \"subqueries\": [], \"target\": \"$item#1和$item#2\"}",
     "{\"intent\": \"same_location\", \"qualifiers\": [\"left=$person#1\", \"right=$person#2\"], \"subqueries\": [], \"target\": \"$person#1和$person#2\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"人会出汗\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"人会发烧\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"人会打喷嚏\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"人会换牙\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"人会老\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"人要睡觉\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"会产生回声\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"会发生地震\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"会有四季\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"会有极光\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"会有潮汐\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"会有火山喷发\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"会有白天和黑夜\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"伤口会自己愈合\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"先看到闪电后听到雷\"}",
     "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"冬天会下雪\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"冰会浮在水面上\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"吃冰棍太快会头痛\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"吃太多糖容易蛀牙\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"坐车会晕车\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"夏天热冬天冷\"}",
     "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"天是蓝的\"}",
     "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"太阳会发光\"}",
     "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"彩虹有七种颜色\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"影子会变长变短\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"感冒会流鼻涕\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"晒太阳皮肤会变黑\"}",
     "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"月亮有圆缺变化\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"树叶秋天会变黄\"}",
     "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"植物需要阳光\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"气球能飞上天\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"水烧开时会冒泡\"}",
     "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"海水是咸的\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"湿衣服会变干\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"火需要空气才能燃烧\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"猫的眼睛在夜里会发光\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"盐撒进水里水会变咸\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"磁铁能吸铁\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"肚子饿了会咕咕叫\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"肥皂水能吹出泡泡\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"花会有香味\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"苹果会掉到地上\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"蜜蜂会采蜜\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"血液是红色的\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"赤道附近全年都很热\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"运动后心跳会加快\"}",
     "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"铁会生锈\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"镜子能照出人像\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"飞机有白色尾迹\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"饭前要洗手\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"高山顶上更冷\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"鱼不会淹死在水里\"}",
+    "{\"intent\": \"why\", \"qualifiers\": [\"type=why\"], \"subqueries\": [], \"target\": \"鸟会飞\"}",
     "{\"intent\": \"why\", \"qualifiers\": [], \"subqueries\": [], \"target\": \"$item#1在$container#1里\"}",
     "{\"intent\": \"why\", \"qualifiers\": [], \"subqueries\": [], \"target\": \"$item#1在$place#1的$container#1里\"}",
     "{\"intent\": \"why\", \"qualifiers\": [], \"subqueries\": [], \"target\": \"$item#1拥有\"}",
@@ -4181,7 +4339,7 @@
       "support": 2
     },
     {
-      "abstract_question": "你不能做什么",
+      "abstract_question": "你不会干什么",
       "entities": [],
       "query": {
         "intent": "dialog_act",
@@ -4190,11 +4348,11 @@
         "subqueries": []
       },
       "feature_units": [
-        "不能",
+        "不会",
         "什么",
+        "会干",
         "你不",
-        "做什",
-        "能做"
+        "干什"
       ],
       "support": 1
     },
@@ -5764,7 +5922,7 @@
       "support": 1
     },
     {
-      "abstract_question": "<item>在<container>里",
+      "abstract_question": "<item>是不是在<container>里面",
       "entities": [
         {
           "role": "item",
@@ -5787,7 +5945,7 @@
       "feature_units": [
         "<c",
         "<i",
-        ">在",
+        ">是",
         ">里",
         "ai",
         "co",
@@ -5802,9 +5960,13 @@
         "r>",
         "ta",
         "te",
-        "在<"
+        "不是",
+        "在<",
+        "是不",
+        "是在",
+        "里面"
       ],
-      "support": 1
+      "support": 2
     },
     {
       "abstract_question": "<item>在<place>",
@@ -5845,6 +6007,49 @@
       "support": 1
     },
     {
+      "abstract_question": "<person>是不是去了<place>",
+      "entities": [
+        {
+          "role": "person",
+          "name": "小李"
+        },
+        {
+          "role": "place",
+          "name": "实验室"
+        }
+      ],
+      "query": {
+        "intent": "polar_location",
+        "target": "$person#1",
+        "qualifiers": [
+          "expected=$place#1",
+          "kind=at"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<p",
+        ">是",
+        "ac",
+        "ce",
+        "e>",
+        "er",
+        "la",
+        "n>",
+        "on",
+        "pe",
+        "pl",
+        "rs",
+        "so",
+        "不是",
+        "了<",
+        "去了",
+        "是不",
+        "是去"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "<item>在盒子里",
       "entities": [
         {
@@ -5871,133 +6076,6 @@
         "在盒",
         "子里",
         "盒子"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<item>是不是在<container>里",
-      "entities": [
-        {
-          "role": "item",
-          "name": "芯片"
-        },
-        {
-          "role": "container",
-          "name": "托盘"
-        }
-      ],
-      "query": {
-        "intent": "polar_location",
-        "target": "$item#1",
-        "qualifiers": [
-          "item=$item#1",
-          "place=$container#1"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<c",
-        "<i",
-        ">是",
-        ">里",
-        "ai",
-        "co",
-        "em",
-        "er",
-        "in",
-        "it",
-        "m>",
-        "ne",
-        "nt",
-        "on",
-        "r>",
-        "ta",
-        "te",
-        "不是",
-        "在<",
-        "是不",
-        "是在"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<item>在<place>",
-      "entities": [
-        {
-          "role": "item",
-          "name": "药瓶"
-        },
-        {
-          "role": "place",
-          "name": "实验室"
-        }
-      ],
-      "query": {
-        "intent": "polar_location",
-        "target": "$item#1",
-        "qualifiers": [
-          "item=$item#1",
-          "place=$place#1"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<i",
-        "<p",
-        ">在",
-        "ac",
-        "ce",
-        "e>",
-        "em",
-        "it",
-        "la",
-        "m>",
-        "pl",
-        "te",
-        "在<"
-      ],
-      "support": 1
-    },
-    {
-      "abstract_question": "<person>是不是去了<place>",
-      "entities": [
-        {
-          "role": "person",
-          "name": "小李"
-        },
-        {
-          "role": "place",
-          "name": "实验室"
-        }
-      ],
-      "query": {
-        "intent": "polar_location",
-        "target": "$person#1",
-        "qualifiers": [
-          "item=$person#1",
-          "place=$place#1"
-        ],
-        "subqueries": []
-      },
-      "feature_units": [
-        "<p",
-        ">是",
-        "ac",
-        "ce",
-        "e>",
-        "er",
-        "la",
-        "n>",
-        "on",
-        "pe",
-        "pl",
-        "rs",
-        "so",
-        "不是",
-        "了<",
-        "去了",
-        "是不",
-        "是去"
       ],
       "support": 1
     },
@@ -6215,6 +6293,441 @@
       "entities": [
         {
           "role": "topic",
+          "name": "人会出汗"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "人会出汗",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "人会发烧"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "人会发烧",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "人会打喷嚏"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "人会打喷嚏",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "人会换牙"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "人会换牙",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "人会老"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "人会老",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "人要睡觉"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "人要睡觉",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "会产生回声"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "会产生回声",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "会发生地震"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "会发生地震",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "会有四季"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "会有四季",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "会有极光"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "会有极光",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "会有潮汐"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "会有潮汐",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "会有火山喷发"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "会有火山喷发",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "会有白天和黑夜"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "会有白天和黑夜",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "伤口会自己愈合"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "伤口会自己愈合",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "先看到闪电后听到雷"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "先看到闪电后听到雷",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 2
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
           "name": "冬天会下雪"
         }
       ],
@@ -6236,6 +6749,154 @@
         "为什",
         "么<",
         "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "冰会浮在水面上"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "冰会浮在水面上",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "吃冰棍太快会头痛"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "吃冰棍太快会头痛",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "吃太多糖容易蛀牙"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "吃太多糖容易蛀牙",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "坐车会晕车"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "坐车会晕车",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<topic>的原因是什么",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "夏天热冬天冷"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "夏天热冬天冷",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        ">的",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "什么",
+        "原因",
+        "因是",
+        "是什",
+        "的原"
       ],
       "support": 1
     },
@@ -6321,6 +6982,93 @@
       "support": 1
     },
     {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "影子会变长变短"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "影子会变长变短",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "感冒会流鼻涕"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "感冒会流鼻涕",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "晒太阳皮肤会变黑"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "晒太阳皮肤会变黑",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "月亮为什么有圆缺变化",
       "entities": [
         {
@@ -6350,6 +7098,35 @@
       "support": 1
     },
     {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "树叶秋天会变黄"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "树叶秋天会变黄",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
       "abstract_question": "植物为什么需要阳光",
       "entities": [
         {
@@ -6374,6 +7151,64 @@
         "要阳",
         "阳光",
         "需要"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "气球能飞上天"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "气球能飞上天",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "水烧开时会冒泡"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "水烧开时会冒泡",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
       ],
       "support": 1
     },
@@ -6408,6 +7243,385 @@
       "entities": [
         {
           "role": "topic",
+          "name": "湿衣服会变干"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "湿衣服会变干",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "火需要空气才能燃烧"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "火需要空气才能燃烧",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "猫的眼睛在夜里会发光"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "猫的眼睛在夜里会发光",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "盐撒进水里水会变咸"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "盐撒进水里水会变咸",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "磁铁能吸铁"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "磁铁能吸铁",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "肚子饿了会咕咕叫"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "肚子饿了会咕咕叫",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "肥皂水能吹出泡泡"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "肥皂水能吹出泡泡",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "花会有香味"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "花会有香味",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<topic>的原因是什么",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "苹果会掉到地上"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "苹果会掉到地上",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        ">的",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "什么",
+        "原因",
+        "因是",
+        "是什",
+        "的原"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "蜜蜂会采蜜"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "蜜蜂会采蜜",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<topic>原因",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "血液是红色的"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "血液是红色的",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        ">原",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "原因"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "赤道附近全年都很热"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "赤道附近全年都很热",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "运动后心跳会加快"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "运动后心跳会加快",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
           "name": "铁会生锈"
         }
       ],
@@ -6429,6 +7643,187 @@
         "为什",
         "么<",
         "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<topic>的原因",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "镜子能照出人像"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "镜子能照出人像",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        ">的",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "原因",
+        "的原"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么高空飞行的<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "飞机有白色尾迹"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "飞机有白色尾迹",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么高",
+        "什么",
+        "的<",
+        "空飞",
+        "行的",
+        "飞行",
+        "高空"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "饭前要洗手"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "饭前要洗手",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "高山顶上更冷"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "高山顶上更冷",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "为什么<topic>",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "鱼不会淹死在水里"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "鱼不会淹死在水里",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "为什",
+        "么<",
+        "什么"
+      ],
+      "support": 1
+    },
+    {
+      "abstract_question": "<topic>是怎么回事",
+      "entities": [
+        {
+          "role": "topic",
+          "name": "鸟会飞"
+        }
+      ],
+      "query": {
+        "intent": "why",
+        "target": "鸟会飞",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "feature_units": [
+        "<t",
+        ">是",
+        "c>",
+        "ic",
+        "op",
+        "pi",
+        "to",
+        "么回",
+        "回事",
+        "怎么",
+        "是怎"
       ],
       "support": 1
     },
@@ -7359,5 +8754,5 @@
   "hidden_dim": 128,
   "dropout": 0.2,
   "min_confidence": 0.5,
-  "example_count": 647
+  "example_count": 791
 }

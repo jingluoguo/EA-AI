@@ -10,18 +10,7 @@ requires-python = ">=3.9"
 
 [project.scripts]
 ea-ai = "ea_ai:main"
-struct-demo = "struct_llm.cli:run_symbolic_demo"
-struct-ask = "struct_llm.cli:ask_symbolic"
-struct-add-intent-example = "struct_llm.cli:add_intent_example"
-struct-eval-intent = "struct_llm.cli:eval_intent_examples"
-struct-eval-query = "struct_llm.cli:eval_query_examples"
-struct-eval-statement = "struct_llm.cli:eval_statement_examples"
-struct-compile-dialog-answer = "struct_llm.cli:compile_dialog_answer_model"
-struct-compile-memory = "struct_llm.cli:compile_memory_model"
-struct-compile-memory-knowledge = "struct_llm.cli:compile_memory_knowledge_model"
-struct-add-memory = "struct_llm.cli:add_memory_entry"
-struct-add-knowledge = "struct_llm.cli:add_memory_knowledge_entry"
-struct-train-neural = "my_neural:train"
+struct = "struct_llm.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]

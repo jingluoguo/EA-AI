@@ -9,16 +9,13 @@ from typing import Any
 from ..errors import ParseError
 from ..structure import Entity, Query
 from ..capabilities import QueryParser
-from ..metacognition.confidence import DIRECT_CONFIDENCE_THRESHOLD
 from ..perception.lexer import split_query_candidate
 from ..perception.normalizer import is_question_noise, normalize_question
 
 
 QUERY_DATA_PATH = Path(__file__).resolve().parents[3] / "data" / "query_examples.jsonl"
 QUERY_MODEL_SCHEMA = "struct_llm.query_model.v1"
-QUERY_DIRECT_CONFIDENCE = DIRECT_CONFIDENCE_THRESHOLD
-UNRESOLVED_REFERENCE_WORDS = ("前者", "后者", "前一个", "后一个", "它", "他", "她", "这个", "那个")
-QUESTION_MARKER_WORDS = ("谁", "什么", "哪里", "哪儿", "哪", "几个", "多少", "几")
+UNRESOLVED_REFERENCE_WORDS = ("前者", "后者", "前一个", "后一个", "它", "他", "她")
 
 
 @dataclass(frozen=True)
@@ -64,52 +61,6 @@ class QueryEvaluationResult:
         return self.matched / self.total if self.total else 0.0
 
 
-@dataclass(frozen=True)
-class LearnedQueryParser:
-    examples: tuple[QueryTrainingExample, ...] = ()
-    min_score: float = QUERY_DIRECT_CONFIDENCE
-    patterns: tuple[CompiledQueryPattern, ...] = ()
-
-    def __post_init__(self) -> None:
-        if self.examples and not self.patterns:
-            model = compile_query_examples(self.examples)
-            object.__setattr__(self, "patterns", model.patterns)
-
-    @classmethod
-    def from_jsonl(cls, path: str | Path, min_score: float = QUERY_DIRECT_CONFIDENCE) -> LearnedQueryParser:
-        return cls.from_examples(load_query_jsonl(path), min_score=min_score)
-
-    @classmethod
-    def from_examples(
-        cls,
-        examples: tuple[QueryTrainingExample, ...],
-        min_score: float = QUERY_DIRECT_CONFIDENCE,
-    ) -> LearnedQueryParser:
-        return cls((), min_score=min_score, patterns=compile_query_examples(examples).patterns)
-
-    def __call__(self, sentence: str, entities: tuple[Entity, ...]) -> Query | None:
-        best = self.best_match(sentence, entities)
-        if best is None:
-            return None
-        _, example = best
-        abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities))
-        inferred_entities = infer_entities_from_abstract_pattern(example.abstract_question, abstract_sentence, entities)
-        return instantiate_query(example.query, example.entities, sentence, (*entities, *inferred_entities))
-
-    def best_match(
-        self,
-        sentence: str,
-        entities: tuple[Entity, ...],
-    ) -> tuple[float, CompiledQueryPattern] | None:
-        if not self.patterns:
-            return None
-
-        abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities))
-        scored = [(query_pattern_score(pattern, abstract_sentence), pattern) for pattern in self.patterns]
-        score, example = max(scored, key=lambda item: item[0])
-        if score < self.min_score:
-            return None
-        return score, example
 def compile_query_examples(
     examples: tuple[QueryTrainingExample, ...],
     source_sha256: str = "",
@@ -213,10 +164,11 @@ def resolve_query_candidates(
     meaningful_queries = [
         query
         for query in parsed_queries
-        if not (query.intent == "dialog_act" and query.target in {"greeting", "thanks", "farewell"})
+        if not (query.intent == "dialog_act" and query.target in {"greeting", "thanks", "farewell", "clarification"})
     ]
     if meaningful_queries:
         parsed_queries = meaningful_queries
+    parsed_queries = dedupe_queries(parsed_queries)
 
     if len(parsed_queries) > 1:
         return Query("compound", "multi", subqueries=tuple(parsed_queries))
@@ -240,12 +192,18 @@ def resolve_query_candidate(
     parsers: tuple[QueryParser, ...],
 ) -> Query | None:
     normalized = normalize_question(sentence)
+    if contains_unresolved_reference(normalized, entities):
+        return None
     for parser in parsers:
         for candidate in dict.fromkeys((sentence, normalized)):
             query = parser(candidate, entities)
             if query is not None:
                 return query
     return None
+
+
+def contains_unresolved_reference(sentence: str, entities: tuple[Entity, ...]) -> bool:
+    return any(word in sentence for word in UNRESOLVED_REFERENCE_WORDS)
 
 
 def resolve_query_candidate_or_raise(
@@ -289,7 +247,6 @@ def suggest_query_pattern(
     parsers: tuple[QueryParser, ...],
     min_score: float = 0.12,
 ) -> tuple[float, CompiledQueryPattern] | None:
-    abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities))
     suggestions: list[tuple[float, CompiledQueryPattern]] = []
     for parser in parsers:
         best_match = getattr(parser, "best_match", None)
@@ -299,19 +256,25 @@ def suggest_query_pattern(
                 score, pattern = best
                 if score >= min_score:
                     suggestions.append((score, pattern))
-                    continue
-        patterns = getattr(parser, "patterns", ())
-        for pattern in patterns:
-            score = query_pattern_score(pattern, abstract_sentence)
-            if score >= min_score:
-                suggestions.append((score, pattern))
     if not suggestions:
         return None
     return max(suggestions, key=lambda item: item[0])
 
 
+def dedupe_queries(queries: list[Query]) -> list[Query]:
+    seen: set[tuple[Any, ...]] = set()
+    deduped: list[Query] = []
+    for query in queries:
+        signature = query_signature(query)
+        if signature in seen:
+            continue
+        seen.add(signature)
+        deduped.append(query)
+    return deduped
+
+
 def evaluate_query_parser(
-    parser: LearnedQueryParser,
+    parser: QueryParser,
     examples: tuple[QueryTrainingExample, ...],
 ) -> QueryEvaluationResult:
     matched = 0
@@ -675,7 +638,7 @@ def extract_role_token_slots(template: str, sentence: str) -> tuple[tuple[str, s
             if value_role is not None:
                 if not roles_compatible(role, value_role):
                     return None
-            elif slot_value_is_unresolved_reference(value) or slot_value_contains_question_marker(value):
+            elif slot_value_is_unresolved_reference(value):
                 return None
             slots.append((role, value))
             continue
@@ -739,11 +702,6 @@ def role_from_token(value: str) -> str | None:
 def slot_value_is_unresolved_reference(value: str) -> bool:
     normalized = normalize_question(value).strip()
     return normalized in UNRESOLVED_REFERENCE_WORDS
-
-
-def slot_value_contains_question_marker(value: str) -> bool:
-    normalized = normalize_question(value).strip()
-    return any(marker in normalized for marker in QUESTION_MARKER_WORDS)
 
 
 def entity_examples_from_runtime(entities: tuple[Entity, ...]) -> tuple[EntityExample, ...]:

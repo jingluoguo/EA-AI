@@ -118,6 +118,8 @@ def strip_question_frames(sentence: str) -> str:
     while changed:
         changed = False
         for frame in sorted(QUESTION_FRAMES, key=len, reverse=True):
+            if normalized == frame:
+                return ""
             if normalized.startswith(frame) and len(normalized) > len(frame):
                 normalized = normalized[len(frame) :]
                 changed = True

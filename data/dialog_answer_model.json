@@ -1,8 +1,8 @@
 {
   "schema": "struct_llm.dialog_answer_model.v1",
-  "source_sha256": "60de4a04a01bd26379ee6b461d8cf1a4a0f37a7f0bd9cdfde5363e3a877ba924",
-  "example_count": 155,
-  "pattern_count": 12,
+  "source_sha256": "b70c585e6fab87125dd6b7c782b3e36c8e815fa337aaa99fe272e35d8fd8f62e",
+  "example_count": 174,
+  "pattern_count": 20,
   "patterns": [
     {
       "query": {
@@ -123,6 +123,86 @@
       },
       "answer": "没关系，不用放在心上，能说开就好。",
       "support": 8
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "encouragement",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "你已经走了这么远，比想象中厉害，相信自己，我看好你。",
+      "support": 3
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "suggestion",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "先把情况说清楚，我们一起理一理，再决定从哪一步开始，好吗？",
+      "support": 3
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "reminder",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "好的，我记下了，下午开会前会提醒你，放心忙别的吧。",
+      "support": 3
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "opinion",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "我的看法是先了解清楚再下判断，不过最终怎么选还是看你自己。",
+      "support": 3
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "joke",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "为什么数学书很忧郁？因为它有太多问题解不开。希望这个能让你笑一下。",
+      "support": 2
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "confirmation",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "是的，就是今天，如果你需要我再确认细节也可以。",
+      "support": 2
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "refusal",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "没关系的，不想做就先放一放，愿意告诉我是什么让你不想做吗？",
+      "support": 2
+    },
+    {
+      "query": {
+        "intent": "dialog_act",
+        "target": "feedback_request",
+        "qualifiers": [],
+        "subqueries": []
+      },
+      "answer": "你做得很用心，几个关键点都抓住了，要不要我具体说说哪里可以更好？",
+      "support": 1
     }
   ]
 }

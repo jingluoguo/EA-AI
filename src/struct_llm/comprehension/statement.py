@@ -70,52 +70,6 @@ class StatementEvaluationResult:
         return self.matched / self.total if self.total else 0.0
 
 
-@dataclass(frozen=True)
-class LearnedStatementParser:
-    examples: tuple[StatementTrainingExample, ...] = ()
-    min_score: float = 0.58
-    patterns: tuple[CompiledStatementPattern, ...] = ()
-
-    def __post_init__(self) -> None:
-        if self.examples and not self.patterns:
-            model = compile_statement_examples(self.examples)
-            object.__setattr__(self, "patterns", model.patterns)
-
-    @classmethod
-    def from_jsonl(cls, path: str | Path, min_score: float = 0.58) -> LearnedStatementParser:
-        return cls.from_examples(load_statement_jsonl(path), min_score=min_score)
-
-    @classmethod
-    def from_examples(
-        cls,
-        examples: tuple[StatementTrainingExample, ...],
-        min_score: float = 0.58,
-    ) -> LearnedStatementParser:
-        return cls((), min_score=min_score, patterns=compile_statement_examples(examples).patterns)
-
-    def __call__(self, sentence: str) -> StatementParseResult | None:
-        if not self.patterns:
-            return None
-        normalized = normalize_statement_text(sentence)
-        candidates: list[tuple[int, float, int, CompiledStatementPattern, dict[str, str]]] = []
-        for pattern in self.patterns:
-            slots = extract_slots(pattern.sentence_template, normalized)
-            if slots is None:
-                continue
-            candidates.append(
-                (
-                    len(remove_slots(pattern.sentence_template)),
-                    max(statement_pattern_score(pattern, normalized), 0.95),
-                    pattern.support,
-                    pattern,
-                    slots,
-                )
-            )
-        for _, score, _, pattern, slots in sorted(candidates, key=lambda item: item[:3], reverse=True):
-            if score < self.min_score:
-                return None
-            return instantiate_statement(pattern, slots)
-        return None
 def compile_statement_examples(
     examples: tuple[StatementTrainingExample, ...],
     source_sha256: str = "",
@@ -188,7 +142,7 @@ def statement_pattern_to_dict(pattern: CompiledStatementPattern) -> dict[str, An
 
 
 def evaluate_statement_parser(
-    parser: LearnedStatementParser,
+    parser,
     examples: tuple[StatementTrainingExample, ...],
 ) -> StatementEvaluationResult:
     matched = 0

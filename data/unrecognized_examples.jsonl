@@ -1,2 +1,4 @@
 {"schema": "struct_llm.unrecognized_example.v1", "text": "我家的铁咋生锈了", "confidence": 0.6666666666666666, "reason": "user_rejected_suggestion", "status": "pending", "source": "runtime"}
 {"schema": "struct_llm.unrecognized_example.v1", "text": "三角洲在哪", "confidence": 0.0, "reason": "low_confidence", "status": "pending", "source": "runtime"}
+{"schema": "struct_llm.unrecognized_example.v1", "text": "苹果会掉到地上的原因是什么", "confidence": 0.0, "reason": "low_confidence", "status": "pending", "source": "runtime"}
+{"schema": "struct_llm.unrecognized_example.v1", "text": "苹果会掉到地上的原因是什么", "confidence": 0.0, "reason": "low_confidence", "status": "pending", "source": "runtime"}

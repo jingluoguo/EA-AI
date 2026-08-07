@@ -13,7 +13,7 @@ same boundary contract as an external neural backend.
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from struct_llm.capabilities import CognitiveCapabilities
 from struct_llm.comprehension.intent import InMemoryIntentAnalyzer
@@ -61,7 +61,7 @@ class LocalNeuralBoundaryModel:
         # reasoning still consumes the resulting Entity/Frame/Query objects.
         object.__setattr__(self, "_capabilities", build_trained_capabilities())
 
-    def predict(self, task: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+    def predict(self, task: str, payload: Mapping[str, Any]) -> Mapping[str, Any] | None:
         if task == "parse_query":
             return self._parse_query(payload)
         if task == "parse_statement":
@@ -85,7 +85,7 @@ class LocalNeuralBoundaryModel:
             return None
         return best_match(sentence, entities)
 
-    def _parse_query(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+    def _parse_query(self, payload: Mapping[str, Any]) -> Mapping[str, Any] | None:
         sentence = str(payload.get("sentence") or "").strip()
         entities = tuple(entity_from_dict(value) for value in payload.get("entities", ()) if isinstance(value, dict))
         query = self._capabilities.parse_query(sentence, entities)
@@ -93,7 +93,7 @@ class LocalNeuralBoundaryModel:
             return None
         return {"confidence": 0.99, "query": query_to_dict(query)}
 
-    def _parse_statement(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+    def _parse_statement(self, payload: Mapping[str, Any]) -> Mapping[str, Any] | None:
         sentence = str(payload.get("sentence") or "").strip()
         parsed = self._capabilities.parse_statement(sentence)
         if parsed is None:
@@ -105,7 +105,7 @@ class LocalNeuralBoundaryModel:
             "frames": [frame_to_dict(frame) for frame in frames],
         }
 
-    def _analyze_intent(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+    def _analyze_intent(self, payload: Mapping[str, Any]) -> Mapping[str, Any] | None:
         text = str(payload.get("text") or "").strip()
         structure = structure_from_dict(payload.get("structure"))
         if structure is None:
@@ -118,7 +118,7 @@ class LocalNeuralBoundaryModel:
             "intentions": [intention_to_dict(intention) for intention in intentions],
         }
 
-    def _answer(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+    def _answer(self, payload: Mapping[str, Any]) -> Mapping[str, Any] | None:
         structure = structure_from_dict(payload.get("structure"))
         if structure is None:
             return None

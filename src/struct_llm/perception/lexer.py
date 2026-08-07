@@ -1,32 +1,5 @@
 from __future__ import annotations
 
-QUERY_HINTS = (
-    "谁",
-    "什么",
-    "哪里",
-    "哪儿",
-    "在哪",
-    "什么地方",
-    "为什么",
-    "为啥",
-    "为何",
-    "怎么",
-    "几个",
-    "多少",
-    "数量",
-    "是否",
-    "是不是",
-    "有没有",
-    "会不会",
-    "能不能",
-    "可不可以",
-    "还是",
-    "吗",
-    "嘛",
-    "呢",
-)
-
-
 def split_sentences(text: str) -> tuple[tuple[str, bool], ...]:
     stripped = text.strip()
     parts: list[tuple[str, bool]] = []
@@ -80,11 +53,6 @@ def split_query_candidate(candidate: str) -> tuple[str, ...]:
         index += 1
 
     return tuple(merged)
-
-
-def is_query_like_fragment(fragment: str) -> bool:
-    normalized = fragment.strip().rstrip("。！？!?")
-    return any(hint in normalized for hint in QUERY_HINTS)
 
 
 def should_merge_with_next_fragment(fragment: str, next_fragment: str) -> bool:
