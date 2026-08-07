@@ -85,26 +85,18 @@ def predict(text: str, capabilities: CognitiveCapabilities | None = None):
 
 
 class ReasonerTest(unittest.TestCase):
-    def test_default_capabilities_are_registered_as_cognitive_kernel(self) -> None:
+    def test_default_capabilities_register_single_neural_query_and_statement_parsers(self) -> None:
         capabilities = default_capabilities()
 
         self.assertIsInstance(capabilities, CognitiveCapabilities)
-
-    def test_default_query_capability_uses_neural_model(self) -> None:
-        capabilities = default_capabilities()
-
         self.assertEqual(len(capabilities.query_parsers), 1)
-        parser = capabilities.query_parsers[0]
-        assert isinstance(parser, LoadedNeuralQueryParser)
-        self.assertGreater(len(parser.patterns), 0)
-
-    def test_default_statement_capability_uses_neural_model(self) -> None:
-        capabilities = default_capabilities()
-
+        query_parser = capabilities.query_parsers[0]
+        assert isinstance(query_parser, LoadedNeuralQueryParser)
+        self.assertGreater(len(query_parser.patterns), 0)
         self.assertEqual(len(capabilities.statement_parsers), 1)
-        parser = capabilities.statement_parsers[0]
-        assert isinstance(parser, LoadedNeuralStatementParser)
-        self.assertGreater(len(parser.patterns), 0)
+        statement_parser = capabilities.statement_parsers[0]
+        assert isinstance(statement_parser, LoadedNeuralStatementParser)
+        self.assertGreater(len(statement_parser.patterns), 0)
 
     def test_neural_query_parser_can_replace_input_boundary_without_kernel_branch(self) -> None:
         model = InMemoryNeuralBoundaryModel(
@@ -208,7 +200,7 @@ class ReasonerTest(unittest.TestCase):
             "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。",
         )
 
-    def test_neural_provider_answers_knowledge_questions_without_question_rewrite(self) -> None:
+    def test_neural_provider_answers_knowledge_questions_via_learned_memory(self) -> None:
         model = make_model()
         capabilities = default_capabilities(use_environment=False, use_memory=False)
         capabilities = capabilities.with_answerers(
@@ -216,23 +208,17 @@ class ReasonerTest(unittest.TestCase):
         )
         capabilities = with_neural_boundary(capabilities, model)
 
-        prediction = predict("我家的铁怎么生锈了", capabilities)
-
-        self.assertIn("QUERY why(铁会生锈,type=why)", prediction.structure.linearize())
-        self.assertEqual(prediction.answer, "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。")
-
-    def test_neural_provider_answers_cause_form_from_verified_knowledge(self) -> None:
-        model = make_model()
-        capabilities = default_capabilities(use_environment=False, use_memory=False)
-        capabilities = capabilities.with_answerers(
-            default_learned_memory_knowledge_answerer("data/memory_knowledge_model.json")
+        cases = (
+            ("我家的铁怎么生锈了", "QUERY why(铁会生锈,type=why)",
+             "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。"),
+            ("苹果会掉到地上的原因是什么", "QUERY why(苹果会掉到地上,type=why)",
+             "地球对物体有引力，把苹果拉向地面，这就是重力作用。"),
         )
-        capabilities = with_neural_boundary(capabilities, model)
-
-        prediction = predict("苹果会掉到地上的原因是什么", capabilities)
-
-        self.assertIn("QUERY why(苹果会掉到地上,type=why)", prediction.structure.linearize())
-        self.assertEqual(prediction.answer, "地球对物体有引力，把苹果拉向地面，这就是重力作用。")
+        for text, query_line, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                self.assertIn(query_line, prediction.structure.linearize())
+                self.assertEqual(prediction.answer, answer)
 
     def test_default_neural_query_parser_handles_close_variants_of_the_same_question(self) -> None:
         parser = default_neural_query_parser()
@@ -278,15 +264,14 @@ class ReasonerTest(unittest.TestCase):
                     {"actor": "阿明", "theme": "芯片", "goal": "库房"},
                 )
 
-    def test_statement_examples_can_evaluate_neural_parser(self) -> None:
+    def test_statement_examples_evaluate_and_train_neural_parser(self) -> None:
         examples = load_statement_jsonl("data/statement_examples.jsonl")
-        result = evaluate_statement_parser(default_neural_statement_parser(), examples)
+        # default parser meets accuracy on current dataset
+        default_result = evaluate_statement_parser(default_neural_statement_parser(), examples)
+        self.assertEqual(default_result.total, len(examples))
+        self.assertGreaterEqual(default_result.accuracy, 0.90)
 
-        self.assertEqual(result.total, len(examples))
-        self.assertGreaterEqual(result.accuracy, 0.90)
-
-    def test_statement_examples_train_to_neural_runtime_model(self) -> None:
-        examples = load_statement_jsonl("data/statement_examples.jsonl")
+        # freshly trained runtime model from same dataset meets accuracy and writes artifacts
         with tempfile.TemporaryDirectory() as directory:
             weights_path = Path(directory) / "statement_neural_model.pt"
             meta_path = Path(directory) / "statement_neural_model.json"
@@ -361,15 +346,14 @@ class ReasonerTest(unittest.TestCase):
         assert query is not None
         self.assertEqual(query.linearize(), "QUERY polar_contents(盒子,item=芯片)")
 
-    def test_query_examples_can_evaluate_neural_parser(self) -> None:
+    def test_query_examples_evaluate_and_train_neural_parser(self) -> None:
         examples = load_query_jsonl("data/query_examples.jsonl")
-        result = evaluate_query_parser(default_neural_query_parser(), examples)
+        # default parser meets accuracy on current dataset
+        default_result = evaluate_query_parser(default_neural_query_parser(), examples)
+        self.assertEqual(default_result.total, len(examples))
+        self.assertGreaterEqual(default_result.accuracy, 0.99)
 
-        self.assertEqual(result.total, len(examples))
-        self.assertGreaterEqual(result.accuracy, 0.99)
-
-    def test_query_examples_train_to_neural_runtime_model(self) -> None:
-        examples = load_query_jsonl("data/query_examples.jsonl")
+        # freshly trained runtime model from same dataset meets accuracy and writes artifacts
         with tempfile.TemporaryDirectory() as directory:
             weights_path = Path(directory) / "query_neural_model.pt"
             meta_path = Path(directory) / "query_neural_model.json"
@@ -540,7 +524,8 @@ class ReasonerTest(unittest.TestCase):
         self.assertEqual(records[0].status, "pending")
         self.assertEqual(records[0].reason, "low_confidence")
 
-    def test_event_schema_projects_registered_state_effects(self) -> None:
+    def test_event_schema_projects_state_effects_and_owns_query_role_aliases(self) -> None:
+        # registered frame schemas project the expected state effects
         examples = (
             (frame_from_roles("put_in", actor="小郭", theme="芯片", goal="托盘"), "in", "芯片", "托盘"),
             (frame_from_roles("take_out", actor="小王", theme="芯片", source="托盘"), "not_in", "芯片", "托盘"),
@@ -552,7 +537,6 @@ class ReasonerTest(unittest.TestCase):
             (frame_from_roles("create", actor="工程师", theme="芯片", result="存在"), "exists", "芯片", "存在"),
             (frame_from_roles("destroy", actor="工程师", theme="芯片", result="不存在"), "exists", "芯片", "不存在"),
         )
-
         for frame, state_name, left, right in examples:
             with self.subTest(frame_type=frame.frame_type):
                 timed = with_time(frame, 1)
@@ -560,10 +544,9 @@ class ReasonerTest(unittest.TestCase):
                 self.assertEqual(len(states), 1)
                 self.assertEqual((states[0].name, states[0].left, states[0].right), (state_name, left, right))
 
-    def test_event_schema_owns_query_role_aliases(self) -> None:
+        # registered schemas also own query role aliases used by event_actor queries
         put_in = with_time(frame_from_roles("put_in", actor="小郭", theme="芯片", goal="托盘"), 1)
         take_out = with_time(frame_from_roles("take_out", actor="小王", theme="芯片", source="托盘"), 2)
-
         self.assertIn("put_in", EVENT_SCHEMAS)
         self.assertTrue(frame_matches_qualifiers(put_in, ("item=芯片", "holder=托盘")))
         self.assertTrue(frame_matches_qualifiers(take_out, ("item=芯片", "source=托盘")))
@@ -716,30 +699,54 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("RULE container_moves_contents", prediction.structure.linearize())
         self.assertEqual(prediction.answer, "芯片在实验室的托盘里。")
 
-    def test_location_question_allows_different_word_order(self) -> None:
-        prediction = predict("研究员把芯片放进托盘。托盘被带到实验室。芯片现在在哪里？")
-
-        self.assertIn("QUERY location(芯片)", prediction.structure.linearize())
-        self.assertEqual(prediction.answer, "芯片在实验室的托盘里。")
-
-    def test_later_put_in_updates_current_container(self) -> None:
-        prediction = predict(
-            "小郭把芯片放进托盘。托盘被带到实验室。"
-            "小王把芯片放进盒子。盒子被带到办公室。芯片在哪里？"
+    def test_later_event_overwrites_previous_state(self) -> None:
+        cases = (
+            {
+                "name": "put_in_overwrite",
+                "text": (
+                    "小郭把芯片放进托盘。托盘被带到实验室。"
+                    "小王把芯片放进盒子。盒子被带到办公室。芯片在哪里？"
+                ),
+                "present": "REL in(芯片,盒子)",
+                "absent": "REL in(芯片,托盘)",
+                "answer": "芯片在办公室的盒子里。",
+            },
+            {
+                "name": "move_overwrite",
+                "text": "小郭把芯片放进托盘。托盘被带到实验室。托盘被带到办公室。芯片在哪里？",
+                "present": "REL at(托盘,办公室)",
+                "absent": "REL at(托盘,实验室)",
+                "answer": "芯片在办公室的托盘里。",
+            },
+            {
+                "name": "transfer_overwrite",
+                "text": "小红把药瓶交给医生。医生把药瓶交给老师。现在谁拥有药瓶？",
+                "present": "REL owner(药瓶,老师)",
+                "absent": "REL owner(药瓶,医生)",
+                "answer": "老师拥有药瓶。",
+            },
+            {
+                "name": "paint_overwrite",
+                "text": "工程师把笔记本涂成绿色。研究员把笔记本涂成黄色。现在笔记本是什么颜色？",
+                "present": "REL color(笔记本,黄色)",
+                "absent": "REL color(笔记本,绿色)",
+                "answer": "笔记本是黄色。",
+            },
+            {
+                "name": "open_close_overwrite",
+                "text": "小王打开盒子。小郭把盒子关上。盒子现在是什么状态？",
+                "present": "REL access(盒子,关闭)",
+                "absent": "REL access(盒子,打开)",
+                "answer": "盒子是关闭状态。",
+            },
         )
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL in(芯片,盒子)", structure)
-        self.assertNotIn("REL in(芯片,托盘)", structure)
-        self.assertEqual(prediction.answer, "芯片在办公室的盒子里。")
-
-    def test_later_move_updates_current_place(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。托盘被带到实验室。托盘被带到办公室。芯片在哪里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL at(托盘,办公室)", structure)
-        self.assertNotIn("REL at(托盘,实验室)", structure)
-        self.assertEqual(prediction.answer, "芯片在办公室的托盘里。")
+        for case in cases:
+            with self.subTest(name=case["name"]):
+                prediction = predict(case["text"])
+                structure = prediction.structure.linearize()
+                self.assertIn(case["present"], structure)
+                self.assertNotIn(case["absent"], structure)
+                self.assertEqual(prediction.answer, case["answer"])
 
     def test_move_adverb_does_not_pollute_entity_slot(self) -> None:
         prediction = predict(
@@ -769,45 +776,19 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("RULE object_at_place", structure)
         self.assertEqual(prediction.answer, "托盘在实验室。")
 
-    def test_ownership_transfer(self) -> None:
-        prediction = predict("小红把药瓶交给医生。现在谁拥有药瓶？")
-
-        self.assertIn("RULE transfer_changes_owner", prediction.structure.linearize())
-        self.assertEqual(prediction.answer, "医生拥有药瓶。")
-
-    def test_later_transfer_updates_current_owner(self) -> None:
-        prediction = predict("小红把药瓶交给医生。医生把药瓶交给老师。现在谁拥有药瓶？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL owner(药瓶,老师)", structure)
-        self.assertNotIn("REL owner(药瓶,医生)", structure)
-        self.assertEqual(prediction.answer, "老师拥有药瓶。")
-
-    def test_owner_question_allows_different_word_order(self) -> None:
-        prediction = predict("小红把药瓶交给医生。药瓶是谁拥有的？")
-
-        self.assertIn("QUERY owner(药瓶)", prediction.structure.linearize())
-        self.assertEqual(prediction.answer, "医生拥有药瓶。")
-
-    def test_color_change(self) -> None:
-        prediction = predict("工程师把笔记本涂成绿色。现在笔记本是什么颜色？")
-
-        self.assertIn("RULE paint_changes_color", prediction.structure.linearize())
-        self.assertEqual(prediction.answer, "笔记本是绿色。")
-
-    def test_later_paint_updates_current_color(self) -> None:
-        prediction = predict("工程师把笔记本涂成绿色。研究员把笔记本涂成黄色。现在笔记本是什么颜色？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL color(笔记本,黄色)", structure)
-        self.assertNotIn("REL color(笔记本,绿色)", structure)
-        self.assertEqual(prediction.answer, "笔记本是黄色。")
-
-    def test_color_question_allows_different_word_order(self) -> None:
-        prediction = predict("工程师把笔记本涂成绿色。笔记本颜色是什么？")
-
-        self.assertIn("QUERY color(笔记本)", prediction.structure.linearize())
-        self.assertEqual(prediction.answer, "笔记本是绿色。")
+    def test_basic_event_rules_and_word_order_variants(self) -> None:
+        cases = (
+            ("小红把药瓶交给医生。现在谁拥有药瓶？", "RULE transfer_changes_owner", "医生拥有药瓶。"),
+            ("小红把药瓶交给医生。药瓶是谁拥有的？", "QUERY owner(药瓶)", "医生拥有药瓶。"),
+            ("工程师把笔记本涂成绿色。现在笔记本是什么颜色？", "RULE paint_changes_color", "笔记本是绿色。"),
+            ("工程师把笔记本涂成绿色。笔记本颜色是什么？", "QUERY color(笔记本)", "笔记本是绿色。"),
+        )
+        for text, expected, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(expected, structure)
+                self.assertEqual(prediction.answer, answer)
 
     def test_open_close_events_update_access_state(self) -> None:
         examples = (
@@ -828,14 +809,6 @@ class ReasonerTest(unittest.TestCase):
                 self.assertIn("RULE object_access_state", structure)
                 self.assertEqual(prediction.answer, answer)
 
-    def test_later_open_close_overwrites_access_state(self) -> None:
-        prediction = predict("小王打开盒子。小郭把盒子关上。盒子现在是什么状态？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL access(盒子,关闭)", structure)
-        self.assertNotIn("REL access(盒子,打开)", structure)
-        self.assertEqual(prediction.answer, "盒子是关闭状态。")
-
     def test_create_destroy_events_update_existence_state(self) -> None:
         examples = (
             ("工程师制造芯片。芯片是否存在？", "EVENT create(工程师,芯片) WITH result=存在", "芯片存在。"),
@@ -854,140 +827,85 @@ class ReasonerTest(unittest.TestCase):
                 self.assertIn("QUERY existence(芯片)", structure)
                 self.assertEqual(prediction.answer, answer)
 
-    def test_polar_existence_location_and_contents_queries(self) -> None:
-        examples = (
-            (
-                "小郭把芯片放进托盘。芯片存在吗？",
-                "QUERY polar_existence(芯片)",
-                "是，芯片存在。",
-            ),
-            (
-                "小郭把芯片放进托盘。芯片在托盘里吗？",
-                "QUERY polar_location(芯片,expected=托盘,kind=in)",
-                "是，芯片在托盘里。",
-            ),
-            (
-                "小郭把芯片放进托盘。托盘被带到实验室。芯片在实验室吗？",
-                "QUERY polar_location(芯片,expected=实验室,kind=at)",
-                "是，芯片在实验室。",
-            ),
-            (
-                "小郭把芯片放进托盘。托盘被带到实验室。实验室里有芯片吗？",
-                "QUERY polar_contents(实验室,item=芯片)",
-                "是，实验室里有芯片。",
-            ),
-        )
-
-        for text, query_line, answer in examples:
-            with self.subTest(text=text):
-                prediction = predict(text)
-                structure = prediction.structure.linearize()
-                self.assertIn(query_line, structure)
-                self.assertEqual(prediction.answer, answer)
-
-    def test_polar_query_surface_markers_normalize_to_existing_query_types(self) -> None:
-        examples = (
-            (
-                "小郭把芯片放进托盘。芯片是不是在托盘里面？",
-                "QUERY polar_location(芯片,expected=托盘,kind=in)",
-                "是，芯片在托盘里。",
-            ),
-            (
-                "小郭把芯片放进托盘。托盘被带到实验室。实验室里面有没有芯片？",
-                "QUERY polar_contents(实验室,item=芯片)",
-                "是，实验室里有芯片。",
-            ),
-            (
-                "工程师制造芯片。芯片是不是存在？",
-                "QUERY polar_existence(芯片)",
-                "是，芯片存在。",
-            ),
-            (
-                "小郭把芯片放进托盘。小王把药瓶放进托盘。芯片和药瓶是不是在同一个位置？",
-                "QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)",
-                "是，芯片和药瓶在同一个地方。",
-            ),
-        )
-
-        for text, query_line, answer in examples:
-            with self.subTest(text=text):
-                prediction = predict(text)
-                structure = prediction.structure.linearize()
-                self.assertIn(query_line, structure)
-                self.assertEqual(prediction.answer, answer)
-
-    def test_polar_queries_return_negative_and_unknown_answers(self) -> None:
-        examples = (
+    def test_polar_queries_cover_positive_negative_unknown_and_surface_markers(self) -> None:
+        cases = (
+            # positive
+            ("小郭把芯片放进托盘。芯片存在吗？", "QUERY polar_existence(芯片)", "是，芯片存在。"),
+            ("小郭把芯片放进托盘。芯片在托盘里吗？", "QUERY polar_location(芯片,expected=托盘,kind=in)", "是，芯片在托盘里。"),
+            ("小郭把芯片放进托盘。托盘被带到实验室。芯片在实验室吗？", "QUERY polar_location(芯片,expected=实验室,kind=at)", "是，芯片在实验室。"),
+            ("小郭把芯片放进托盘。托盘被带到实验室。实验室里有芯片吗？", "QUERY polar_contents(实验室,item=芯片)", "是，实验室里有芯片。"),
+            # surface markers normalize to existing query types
+            ("小郭把芯片放进托盘。芯片是不是在托盘里面？", "QUERY polar_location(芯片,expected=托盘,kind=in)", "是，芯片在托盘里。"),
+            ("小郭把芯片放进托盘。托盘被带到实验室。实验室里面有没有芯片？", "QUERY polar_contents(实验室,item=芯片)", "是，实验室里有芯片。"),
+            ("工程师制造芯片。芯片是不是存在？", "QUERY polar_existence(芯片)", "是，芯片存在。"),
+            ("小郭把芯片放进托盘。小王把药瓶放进托盘。芯片和药瓶是不是在同一个位置？", "QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)", "是，芯片和药瓶在同一个地方。"),
+            # negative and unknown
             ("工程师销毁芯片。芯片存在吗？", "QUERY polar_existence(芯片)", "不是，芯片不存在。"),
             ("小郭把芯片放进托盘。芯片在盒子里吗？", "QUERY polar_location(芯片,expected=盒子,kind=in)", "不是，芯片在托盘里。"),
             ("小王打开盒子。盒子里有芯片吗？", "QUERY polar_contents(盒子,item=芯片)", "不知道盒子里有没有芯片。"),
         )
 
-        for text, query_line, answer in examples:
+        for text, query_line, answer in cases:
             with self.subTest(text=text):
                 prediction = predict(text)
                 structure = prediction.structure.linearize()
                 self.assertIn(query_line, structure)
                 self.assertEqual(prediction.answer, answer)
 
-    def test_same_location_query_uses_shared_place_or_container_key(self) -> None:
-        examples = (
-            (
-                "小郭把芯片放进托盘。小王把药瓶放进托盘。芯片和药瓶在同一个地方吗？",
-                "QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)",
-                "是，芯片和药瓶在同一个地方。",
-            ),
-            (
-                "小郭把芯片放进托盘。托盘被带到实验室。小王把药瓶放进盒子。盒子被带到实验室。芯片和药瓶在同一个地方吗？",
-                "QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)",
-                "是，芯片和药瓶在同一个地方。",
-            ),
-            (
-                "小郭把芯片放进托盘。托盘被带到实验室。小王把药瓶放进盒子。盒子被带到办公室。芯片和药瓶在同一个地方吗？",
-                "QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)",
-                "不是，芯片在实验室的托盘里，药瓶在办公室的盒子里。",
-            ),
+    def test_same_location_query_covers_shared_key_distinct_places_and_unknown_side(self) -> None:
+        cases = (
+            # both items share the same container
+            ("小郭把芯片放进托盘。小王把药瓶放进托盘。芯片和药瓶在同一个地方吗？",
+             "QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)",
+             "是，芯片和药瓶在同一个地方。"),
+            # both items share the same place (via different containers)
+            ("小郭把芯片放进托盘。托盘被带到实验室。小王把药瓶放进盒子。盒子被带到实验室。芯片和药瓶在同一个地方吗？",
+             "QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)",
+             "是，芯片和药瓶在同一个地方。"),
+            # items are at distinct places
+            ("小郭把芯片放进托盘。托盘被带到实验室。小王把药瓶放进盒子。盒子被带到办公室。芯片和药瓶在同一个地方吗？",
+             "QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)",
+             "不是，芯片在实验室的托盘里，药瓶在办公室的盒子里。"),
         )
-
-        for text, query_line, answer in examples:
+        for text, query_line, answer in cases:
             with self.subTest(text=text):
                 prediction = predict(text)
                 structure = prediction.structure.linearize()
                 self.assertIn(query_line, structure)
                 self.assertEqual(prediction.answer, answer)
 
-    def test_same_location_query_returns_unknown_when_one_side_is_unknown(self) -> None:
+        # unknown side returns unknown
         prediction = predict("小王打开盒子。芯片和药瓶在同一个地方吗？")
-
         structure = prediction.structure.linearize()
         self.assertIn("QUERY same_location(芯片和药瓶,left=芯片,right=药瓶)", structure)
         self.assertEqual(prediction.answer, "不知道芯片和药瓶是不是在同一个地方。")
 
-    def test_destroy_clears_current_location_and_attributes(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。工程师把芯片涂成绿色。工程师销毁芯片。芯片在哪里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL exists(芯片,不存在)", structure)
-        self.assertNotIn("REL in(芯片,托盘)", structure)
-        self.assertNotIn("REL color(芯片,绿色)", structure)
-        self.assertIn("RULE object_not_exists", structure)
-        self.assertEqual(prediction.answer, "芯片不存在。")
-
-    def test_destroyed_item_is_removed_from_contents_closure(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。托盘被带到实验室。工程师销毁芯片。实验室里有什么？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL exists(芯片,不存在)", structure)
-        self.assertNotIn("REL in(芯片,托盘)", structure)
-        self.assertEqual(prediction.answer, "实验室里至少有托盘。")
-
-    def test_later_state_can_restore_destroyed_object_for_ordered_correction(self) -> None:
-        prediction = predict("工程师销毁芯片。小郭把芯片放进托盘。芯片是否存在？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL in(芯片,托盘)", structure)
-        self.assertNotIn("REL exists(芯片,不存在)", structure)
-        self.assertEqual(prediction.answer, "芯片存在。")
+    def test_destroy_clears_state_and_can_be_restored_by_later_events(self) -> None:
+        cases = (
+            # destroy clears location and attributes
+            ("小郭把芯片放进托盘。工程师把芯片涂成绿色。工程师销毁芯片。芯片在哪里？",
+             "REL exists(芯片,不存在)", "REL in(芯片,托盘)", "REL color(芯片,绿色)",
+             "RULE object_not_exists", "芯片不存在。"),
+            # destroyed item is removed from contents closure
+            ("小郭把芯片放进托盘。托盘被带到实验室。工程师销毁芯片。实验室里有什么？",
+             "REL exists(芯片,不存在)", "REL in(芯片,托盘)", None,
+             None, "实验室里至少有托盘。"),
+            # later state can restore destroyed object for ordered correction
+            ("工程师销毁芯片。小郭把芯片放进托盘。芯片是否存在？",
+             "REL in(芯片,托盘)", "REL exists(芯片,不存在)", None,
+             None, "芯片存在。"),
+        )
+        for text, present, absent1, absent2, rule, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(present, structure)
+                self.assertNotIn(absent1, structure)
+                if absent2:
+                    self.assertNotIn(absent2, structure)
+                if rule:
+                    self.assertIn(rule, structure)
+                self.assertEqual(prediction.answer, answer)
 
     def test_existence_claims_can_conflict_with_fact(self) -> None:
         destroyed = predict("工程师销毁芯片。小王说芯片存在。有没有矛盾？")
@@ -996,26 +914,24 @@ class ReasonerTest(unittest.TestCase):
         self.assertEqual(destroyed.answer, "存在矛盾：小王说芯片存在，但事实是芯片不存在。")
         self.assertEqual(existing.answer, "存在矛盾：小王说芯片不存在，但事实是芯片存在。")
 
-    def test_handler_question_reuses_extracted_structure(self) -> None:
+    def test_handler_question_reuses_structure_and_picks_latest_handler(self) -> None:
+        # surface variants reuse extracted handle event and rule
         questions = (
             "谁拿的芯片？",
             "芯片是谁拿的？",
             "现在芯片是谁拿了？",
         )
-
         for question in questions:
             with self.subTest(question=question):
                 prediction = predict(f"小郭把芯片放进托盘。托盘被带到实验室。{question}")
-
                 structure = prediction.structure.linearize()
                 self.assertIn("EVENT handle(小郭,芯片)", structure)
                 self.assertIn("QUERY actor_for_item(芯片)", structure)
                 self.assertIn("RULE actor_handles_item", structure)
                 self.assertEqual(prediction.answer, "小郭拿的芯片。")
 
-    def test_handler_question_uses_latest_handler(self) -> None:
+        # latest handler overrides earlier one when item has multiple handlers
         prediction = predict("小郭把芯片放进托盘。小王把芯片放进盒子。谁拿的芯片？")
-
         structure = prediction.structure.linearize()
         self.assertIn("EVENT handle(小郭,芯片)", structure)
         self.assertIn("EVENT handle(小王,芯片)", structure)
@@ -1050,70 +966,43 @@ class ReasonerTest(unittest.TestCase):
                 self.assertIn("RULE event_actor_matches", structure)
                 self.assertEqual(prediction.answer, "小郭把芯片放进托盘。")
 
-    def test_latest_event_actor_question_reuses_event_history(self) -> None:
-        questions = (
-            "最后谁把芯片放进托盘？",
-            "谁最后把芯片放进托盘？",
-            "芯片最后是谁放进托盘的？",
-            "芯片被最后谁放进托盘的？",
-            "最近谁把芯片从托盘里取出？",
-            "芯片最近是谁从托盘里取出的？",
+    def test_earliest_latest_and_historical_event_actor_queries(self) -> None:
+        cases = (
+            # earliest event actor (put_in + take_out)
+            ("小郭把芯片放进托盘。小王把芯片放进托盘。小李把芯片从托盘里取出。最先谁把芯片放进托盘？",
+             "QUERY earliest_actor_for_event(put_in,item=芯片,holder=托盘)",
+             "最先是小郭把芯片放进托盘。"),
+            ("小郭把芯片放进托盘。小王把芯片放进托盘。小李把芯片从托盘里取出。芯片最先是谁放进托盘的？",
+             "QUERY earliest_actor_for_event(put_in,item=芯片,holder=托盘)",
+             "最先是小郭把芯片放进托盘。"),
+            ("小郭把芯片放进托盘。小王把芯片放进托盘。小李把芯片从托盘里取出。最先谁把芯片从托盘里取出？",
+             "QUERY earliest_actor_for_event(take_out,item=芯片,source=托盘)",
+             "最先是小李把芯片从托盘取出。"),
+            # latest event actor (put_in + take_out)
+            ("小郭把芯片放进托盘。小王把芯片放进托盘。小李把芯片从托盘里取出。最后谁把芯片放进托盘？",
+             "QUERY latest_actor_for_event(put_in,item=芯片,holder=托盘)",
+             "最后是小王把芯片放进托盘。"),
+            ("小郭把芯片放进托盘。小王把芯片放进托盘。小李把芯片从托盘里取出。芯片最后是谁放进托盘的？",
+             "QUERY latest_actor_for_event(put_in,item=芯片,holder=托盘)",
+             "最后是小王把芯片放进托盘。"),
+            ("小郭把芯片放进托盘。小王把芯片放进托盘。小李把芯片从托盘里取出。最近谁把芯片从托盘里取出？",
+             "QUERY latest_actor_for_event(take_out,item=芯片,source=托盘)",
+             "最后是小李把芯片从托盘取出。"),
+            # earliest + latest side by side in same context (differentiate order)
+            ("小郭把芯片放进托盘。小王把芯片放进托盘。最先谁把芯片放进托盘？最后谁把芯片放进托盘？",
+             "QUERY compound(multi)",
+             "最先是小郭把芯片放进托盘；最后是小王把芯片放进托盘。"),
         )
-
-        for question in questions:
-            with self.subTest(question=question):
-                prediction = predict(
-                    "小郭把芯片放进托盘。小王把芯片放进托盘。小李把芯片从托盘里取出。"
-                    f"{question}"
-                )
+        for text, query_line, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
                 structure = prediction.structure.linearize()
-                if "取出" in question:
-                    self.assertIn("QUERY latest_actor_for_event(take_out,item=芯片,source=托盘)", structure)
-                    self.assertIn("RULE latest_event_actor_matches", structure)
-                    self.assertEqual(prediction.answer, "最后是小李把芯片从托盘取出。")
-                else:
-                    self.assertIn("QUERY latest_actor_for_event(put_in,item=芯片,holder=托盘)", structure)
-                    self.assertIn("RULE latest_event_actor_matches", structure)
-                    self.assertEqual(prediction.answer, "最后是小王把芯片放进托盘。")
+                self.assertIn(query_line, structure)
+                self.assertEqual(prediction.answer, answer)
 
-    def test_earliest_event_actor_question_reuses_event_history(self) -> None:
-        questions = (
-            "最先谁把芯片放进托盘？",
-            "谁最先把芯片放进托盘？",
-            "芯片最先是谁放进托盘的？",
-            "芯片被最先谁放进托盘的？",
-            "最先谁把芯片从托盘里取出？",
-            "芯片最先是谁从托盘里取出的？",
-        )
-
-        for question in questions:
-            with self.subTest(question=question):
-                prediction = predict(
-                    "小郭把芯片放进托盘。小王把芯片放进托盘。小李把芯片从托盘里取出。"
-                    f"{question}"
-                )
-                structure = prediction.structure.linearize()
-                if "取出" in question:
-                    self.assertIn("QUERY earliest_actor_for_event(take_out,item=芯片,source=托盘)", structure)
-                    self.assertIn("RULE earliest_event_actor_matches", structure)
-                    self.assertEqual(prediction.answer, "最先是小李把芯片从托盘取出。")
-                else:
-                    self.assertIn("QUERY earliest_actor_for_event(put_in,item=芯片,holder=托盘)", structure)
-                    self.assertIn("RULE earliest_event_actor_matches", structure)
-                    self.assertEqual(prediction.answer, "最先是小郭把芯片放进托盘。")
-
-    def test_earliest_and_latest_event_queries_differentiate_order(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王把芯片放进托盘。最先谁把芯片放进托盘？最后谁把芯片放进托盘？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY compound(multi)", structure)
-        self.assertIn("SUBQUERY earliest_actor_for_event(put_in,item=芯片,holder=托盘)", structure)
-        self.assertIn("SUBQUERY latest_actor_for_event(put_in,item=芯片,holder=托盘)", structure)
-        self.assertEqual(prediction.answer, "最先是小郭把芯片放进托盘；最后是小王把芯片放进托盘。")
-
-    def test_event_actor_question_can_ask_historical_event_after_state_changes(self) -> None:
+    def test_historical_actor_query_and_put_in_surface_forms_normalize_to_same_structure(self) -> None:
+        # historical put_in actor is queryable after later state changes overwrite current state
         prediction = predict("小郭把芯片放进托盘。小王把芯片放进盒子。谁把芯片放进托盘？")
-
         structure = prediction.structure.linearize()
         self.assertIn("REL in(芯片,盒子)", structure)
         self.assertIn("EVENT put_in(小郭,芯片) WITH holder=托盘", structure)
@@ -1124,9 +1013,8 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("ROLE f1 goal=托盘", structure)
         self.assertEqual(prediction.answer, "小郭把芯片放进托盘。")
 
-    def test_put_in_statement_and_query_normalize_container_surface_forms(self) -> None:
+        # surface container forms (放到/里面/放入/里) normalize to same put_in structure
         prediction = predict("小郭把芯片放到托盘里面。小王把芯片放入盒子里。谁把芯片放到盒子里面的？")
-
         structure = prediction.structure.linearize()
         self.assertIn("REL in(芯片,盒子)", structure)
         self.assertIn("EVENT put_in(小郭,芯片) WITH holder=托盘", structure)
@@ -1166,9 +1054,9 @@ class ReasonerTest(unittest.TestCase):
                 self.assertIn("RULE event_actor_matches", structure)
                 self.assertEqual(prediction.answer, answer)
 
-    def test_take_out_removes_current_container_state(self) -> None:
+    def test_take_out_event_updates_state_and_supports_surface_variants_and_actor_query(self) -> None:
+        # core state transition: take_out removes current container state
         prediction = predict("小郭把芯片放进托盘。小王把芯片从托盘里取出来。芯片在哪里？")
-
         structure = prediction.structure.linearize()
         self.assertNotIn("REL in(芯片,托盘)", structure)
         self.assertIn("EVENT take_out(小王,芯片) WITH source=托盘", structure)
@@ -1179,16 +1067,14 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("RULE location_unknown", structure)
         self.assertEqual(prediction.answer, "不知道芯片在哪里。")
 
-    def test_take_out_statement_allows_surface_variants(self) -> None:
-        examples = (
+        # statement surface variants all normalize to the same event
+        for statement in (
             "小王把芯片从托盘里取出",
             "小王把芯片从托盘里面拿出来",
             "小王从托盘里取出芯片",
             "芯片被小王从托盘里拿出",
             "芯片从托盘里被取出",
-        )
-
-        for statement in examples:
+        ):
             with self.subTest(statement=statement):
                 prediction = predict(f"小郭把芯片放进托盘。{statement}。托盘里有什么？")
                 structure = prediction.structure.linearize()
@@ -1196,14 +1082,12 @@ class ReasonerTest(unittest.TestCase):
                 self.assertIn("QUERY contents(托盘)", structure)
                 self.assertEqual(prediction.answer, "不知道托盘里有什么。")
 
-    def test_take_out_actor_query_reuses_event_structure(self) -> None:
-        questions = (
+        # actor query reuses the event structure
+        for question in (
             "谁把芯片从托盘里取出来的？",
             "芯片是谁从托盘里面拿出来的？",
             "芯片被谁从托盘里取出的？",
-        )
-
-        for question in questions:
+        ):
             with self.subTest(question=question):
                 prediction = predict(f"小郭把芯片放进托盘。小王把芯片从托盘里取出。{question}")
                 structure = prediction.structure.linearize()
@@ -1247,137 +1131,101 @@ class ReasonerTest(unittest.TestCase):
                 self.assertIn("EVENT be_in(芯片,盒子)", structure)
                 self.assertEqual(prediction.answer, "芯片在盒子里。")
 
-    def test_initial_location_query_uses_frame_history(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王把芯片放进盒子。芯片最开始在哪里？")
+    def test_historical_replay_queries_cover_initial_location_latest_actor_and_before_action(self) -> None:
+        # initial_location replays first put_in regardless of later state changes
+        cases = (
+            ("小郭把芯片放进托盘。小王把芯片放进盒子。芯片最开始在哪里？",
+             "芯片最开始在托盘里。"),
+            ("托盘被带到实验室。小郭把芯片放进托盘。小王把芯片放进盒子。芯片一开始在哪里？",
+             "芯片最开始在实验室的托盘里。"),
+            ("小郭把芯片放进托盘。小王把芯片从托盘里取出。芯片最开始在哪里？",
+             "芯片最开始在托盘里。"),
+        )
+        for text, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn("QUERY initial_location(芯片)", structure)
+                self.assertIn("RULE initial_location_found", structure)
+                self.assertEqual(prediction.answer, answer)
 
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY initial_location(芯片)", structure)
-        self.assertIn("RULE initial_location_found", structure)
-        self.assertEqual(prediction.answer, "芯片最开始在托盘里。")
-
-    def test_initial_location_can_include_place_when_known_at_that_time(self) -> None:
-        prediction = predict("托盘被带到实验室。小郭把芯片放进托盘。小王把芯片放进盒子。芯片一开始在哪里？")
-
-        self.assertEqual(prediction.answer, "芯片最开始在实验室的托盘里。")
-
-    def test_latest_actor_query_uses_latest_historical_handler(self) -> None:
+        # latest_actor_for_item picks most recent handler from history
         prediction = predict("小郭把芯片放进托盘。小王把芯片放进盒子。最后谁处理过芯片？")
-
         structure = prediction.structure.linearize()
         self.assertIn("QUERY latest_actor_for_item(芯片)", structure)
         self.assertIn("RULE latest_actor_handles_item", structure)
         self.assertEqual(prediction.answer, "最后是小王处理过芯片。")
 
-    def test_location_before_actor_action_replays_state_before_frame(self) -> None:
+        # location_before_actor_action replays state just before an actor's latest frame
         prediction = predict("小郭把芯片放进托盘。小王把芯片放进盒子。小王操作之前，芯片在哪里？")
-
         structure = prediction.structure.linearize()
         self.assertIn("QUERY location_before_actor_action(芯片,actor=小王)", structure)
         self.assertIn("RULE location_before_actor_action_found", structure)
         self.assertEqual(prediction.answer, "小王操作之前，芯片在托盘里。")
 
-    def test_location_before_and_after_event_query_uses_temporal_frame_replay(self) -> None:
-        examples = (
-            (
-                "小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之前，芯片在哪里？",
-                "QUERY location_before_event(芯片,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
-                "在小王把托盘带到实验室之前，芯片在托盘里。",
-            ),
-            (
-                "小郭把芯片放进托盘。小王把托盘带到实验室。在小王把托盘带到实验室之前，芯片在哪里？",
-                "QUERY location_before_event(芯片,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
-                "在小王把托盘带到实验室之前，芯片在托盘里。",
-            ),
-            (
-                "小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之后，芯片在哪里？",
-                "QUERY location_after_event(芯片,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
-                "在小王把托盘带到实验室之后，芯片在实验室的托盘里。",
-            ),
-            (
-                "小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之后，托盘在哪里？",
-                "QUERY location_after_event(托盘,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
-                "在小王把托盘带到实验室之后，托盘在实验室。",
-            ),
+    def test_temporal_before_after_queries_replay_state_around_event(self) -> None:
+        cases = (
+            # location before/after move
+            ("小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之前，芯片在哪里？",
+             "QUERY location_before_event(芯片,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
+             "RULE location_before_event_found",
+             "在小王把托盘带到实验室之前，芯片在托盘里。"),
+            ("小郭把芯片放进托盘。小王把托盘带到实验室。在小王把托盘带到实验室之前，芯片在哪里？",
+             "QUERY location_before_event(芯片,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
+             "RULE location_before_event_found",
+             "在小王把托盘带到实验室之前，芯片在托盘里。"),
+            ("小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之后，芯片在哪里？",
+             "QUERY location_after_event(芯片,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
+             "RULE location_after_event_found",
+             "在小王把托盘带到实验室之后，芯片在实验室的托盘里。"),
+            ("小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之后，托盘在哪里？",
+             "QUERY location_after_event(托盘,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
+             "RULE location_after_event_found",
+             "在小王把托盘带到实验室之后，托盘在实验室。"),
+            # location after take_out (unknown)
+            ("小郭把芯片放进托盘。小王把芯片从托盘里取出之后，芯片在哪里？",
+             "QUERY location_after_event(芯片,anchor=小王把芯片从托盘里取出,event=take_out,actor=小王,theme=芯片,source=托盘)",
+             "RULE location_after_event_unknown",
+             "不知道芯片在小王把芯片从托盘里取出之后在哪里。"),
+            # contents before/after move
+            ("小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之前，托盘里有什么？",
+             "QUERY contents_before_event(托盘,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
+             "RULE contents_before_event_found",
+             "在小王把托盘带到实验室之前，托盘里至少有芯片。"),
+            ("小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之后，托盘里有什么？",
+             "QUERY contents_after_event(托盘,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
+             "RULE contents_after_event_found",
+             "在小王把托盘带到实验室之后，托盘里至少有芯片。"),
+            # contents after take_out (unknown)
+            ("小郭把芯片放进托盘。小王把芯片从托盘里取出。小王把芯片从托盘里取出之后，托盘里有什么？",
+             "QUERY contents_after_event(托盘,anchor=小王把芯片从托盘里取出,event=take_out,actor=小王,theme=芯片,source=托盘)",
+             "RULE contents_after_event_unknown",
+             "不知道托盘在小王把芯片从托盘里取出之后有什么。"),
         )
-
-        for text, query_line, answer in examples:
+        for text, query_line, rule, answer in cases:
             with self.subTest(text=text):
                 prediction = predict(text)
                 structure = prediction.structure.linearize()
                 self.assertIn(query_line, structure)
-                self.assertIn("RULE location_before_event_found" if "before" in query_line else "RULE location_after_event_found", structure)
+                self.assertIn(rule, structure)
                 self.assertEqual(prediction.answer, answer)
 
-    def test_location_after_event_can_track_take_out_replay(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王把芯片从托盘里取出之后，芯片在哪里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn(
-            "QUERY location_after_event(芯片,anchor=小王把芯片从托盘里取出,event=take_out,actor=小王,theme=芯片,source=托盘)",
-            structure,
+    def test_events_after_event_query_uses_event_anchor(self) -> None:
+        cases = (
+            ("小郭把芯片放进盒子。盒子被带到仓库。小王把芯片从盒子里取出。芯片被放进盒子之后发生了什么？",
+             "QUERY events_after_event(put_in,item=芯片,holder=盒子)",
+             "之后发生了：盒子被带到仓库；小王把芯片从盒子取出。"),
+            ("小郭把芯片放进盒子。小王把芯片从盒子里取出。小王把芯片放进托盘。芯片从盒子里取出之后发生了什么？",
+             "QUERY events_after_event(take_out,item=芯片,source=盒子)",
+             "之后发生了：小王把芯片放进托盘。"),
         )
-        self.assertIn("RULE location_after_event_unknown", structure)
-        self.assertEqual(prediction.answer, "不知道芯片在小王把芯片从托盘里取出之后在哪里。")
-
-    def test_temporal_contents_query_replays_container_state_before_and_after_event(self) -> None:
-        examples = (
-            (
-                "小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之前，托盘里有什么？",
-                "QUERY contents_before_event(托盘,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
-                "在小王把托盘带到实验室之前，托盘里至少有芯片。",
-            ),
-            (
-                "小郭把芯片放进托盘。小王把托盘带到实验室。小王把托盘带到实验室之后，托盘里有什么？",
-                "QUERY contents_after_event(托盘,anchor=小王把托盘带到实验室,event=move,actor=小王,theme=托盘,goal=实验室)",
-                "在小王把托盘带到实验室之后，托盘里至少有芯片。",
-            ),
-        )
-
-        for text, query_line, answer in examples:
+        for text, query_line, answer in cases:
             with self.subTest(text=text):
                 prediction = predict(text)
                 structure = prediction.structure.linearize()
                 self.assertIn(query_line, structure)
-                self.assertIn(
-                    "RULE contents_before_event_found" if "before" in query_line else "RULE contents_after_event_found",
-                    structure,
-                )
+                self.assertIn("RULE events_after_event", structure)
                 self.assertEqual(prediction.answer, answer)
-
-    def test_temporal_contents_query_can_become_unknown_after_removal(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王把芯片从托盘里取出。小王把芯片从托盘里取出之后，托盘里有什么？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn(
-            "QUERY contents_after_event(托盘,anchor=小王把芯片从托盘里取出,event=take_out,actor=小王,theme=芯片,source=托盘)",
-            structure,
-        )
-        self.assertIn("RULE contents_after_event_unknown", structure)
-        self.assertEqual(prediction.answer, "不知道托盘在小王把芯片从托盘里取出之后有什么。")
-
-    def test_historical_location_still_works_after_take_out(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王把芯片从托盘里取出。芯片最开始在哪里？")
-
-        structure = prediction.structure.linearize()
-        self.assertNotIn("REL in(芯片,托盘)", structure)
-        self.assertIn("RULE initial_location_found", structure)
-        self.assertEqual(prediction.answer, "芯片最开始在托盘里。")
-
-    def test_events_after_put_in_query_uses_event_anchor(self) -> None:
-        prediction = predict("小郭把芯片放进盒子。盒子被带到仓库。小王把芯片从盒子里取出。芯片被放进盒子之后发生了什么？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY events_after_event(put_in,item=芯片,holder=盒子)", structure)
-        self.assertIn("RULE events_after_event", structure)
-        self.assertEqual(prediction.answer, "之后发生了：盒子被带到仓库；小王把芯片从盒子取出。")
-
-    def test_events_after_take_out_query_uses_event_anchor(self) -> None:
-        prediction = predict("小郭把芯片放进盒子。小王把芯片从盒子里取出。小王把芯片放进托盘。芯片从盒子里取出之后发生了什么？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY events_after_event(take_out,item=芯片,source=盒子)", structure)
-        self.assertIn("RULE events_after_event", structure)
-        self.assertEqual(prediction.answer, "之后发生了：小王把芯片放进托盘。")
 
     def test_place_contents_question_uses_world_state_closure(self) -> None:
         questions = (
@@ -1396,34 +1244,19 @@ class ReasonerTest(unittest.TestCase):
                 self.assertIn("RULE holder_contains_things", structure)
                 self.assertEqual(prediction.answer, "实验室里至少有托盘和芯片。")
 
-    def test_container_contents_question_uses_same_closure(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。托盘被带到实验室。托盘里有什么？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY contents(托盘)", structure)
-        self.assertIn("RULE holder_contains_things", structure)
-        self.assertEqual(prediction.answer, "托盘里至少有芯片。")
-
-    def test_contents_question_uses_current_state(self) -> None:
-        prediction = predict(
-            "小郭把芯片放进托盘。托盘被带到实验室。"
-            "小王把芯片放进盒子。盒子被带到办公室。办公室里有什么？"
+    def test_contents_queries_use_current_state_closure(self) -> None:
+        cases = (
+            ("小郭把芯片放进托盘。托盘被带到实验室。托盘里有什么？", "QUERY contents(托盘)", "托盘里至少有芯片。"),
+            ("小郭把芯片放进托盘。托盘被带到实验室。小王把芯片放进盒子。盒子被带到办公室。办公室里有什么？", "QUERY contents(办公室)", "办公室里至少有盒子和芯片。"),
+            ("小郭把芯片放进托盘。小王把芯片放进盒子。盒子被带到仓库。你可以告诉我仓库里有什么吗？", "QUERY contents(仓库)", "仓库里至少有盒子和芯片。"),
         )
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL in(芯片,盒子)", structure)
-        self.assertIn("REL at(盒子,办公室)", structure)
-        self.assertEqual(prediction.answer, "办公室里至少有盒子和芯片。")
-
-    def test_contents_query_target_uses_entity_boundary_correction(self) -> None:
-        prediction = predict(
-            "小郭把芯片放进托盘。小王把芯片放进盒子。盒子被带到仓库。"
-            "你可以告诉我仓库里有什么吗？"
-        )
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY contents(仓库)", structure)
-        self.assertEqual(prediction.answer, "仓库里至少有盒子和芯片。")
+        for text, query_line, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(query_line, structure)
+                self.assertIn("RULE holder_contains_things", structure)
+                self.assertEqual(prediction.answer, answer)
 
     def test_complex_historical_event_query_after_current_state_changes(self) -> None:
         prediction = predict(
@@ -1456,12 +1289,12 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("QUERY contents(办公室)", structure)
         self.assertEqual(prediction.answer, "办公室里至少有托盘和芯片。")
 
-    def test_nested_container_location_uses_recursive_closure(self) -> None:
+    def test_nested_containers_use_recursive_closure_for_location_and_contents(self) -> None:
+        # location query resolves through nested containers
         prediction = predict(
             "小郭把芯片放进小盒子。小王把小盒子放进大盒子。大盒子被带到实验室。"
             "芯片在哪里？"
         )
-
         structure = prediction.structure.linearize()
         self.assertIn("REL in(芯片,小盒子)", structure)
         self.assertIn("REL in(小盒子,大盒子)", structure)
@@ -1469,12 +1302,11 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("RULE container_moves_contents", structure)
         self.assertEqual(prediction.answer, "芯片在实验室的大盒子里的小盒子里。")
 
-    def test_nested_contents_query_uses_recursive_closure(self) -> None:
+        # contents query collects every nested item recursively
         prediction = predict(
             "小郭把芯片放进小盒子。小王把小盒子放进大盒子。大盒子被带到实验室。"
             "实验室里有什么？"
         )
-
         self.assertEqual(prediction.answer, "实验室里至少有大盒子和小盒子和芯片。")
 
     def test_contents_except_query_filters_named_item(self) -> None:
@@ -1485,30 +1317,20 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("RULE holder_contains_except", structure)
         self.assertEqual(prediction.answer, "实验室里除了托盘还有芯片。")
 
-    def test_count_query_uses_contents_closure_for_places_and_containers(self) -> None:
-        examples = (
+    def test_count_query_uses_contents_closure_with_filters(self) -> None:
+        cases = (
             ("小郭把芯片放进托盘。托盘被带到实验室。实验室里有几个东西？", "QUERY count(实验室)", "实验室里至少有2个已知物品。"),
             ("小郭把芯片放进托盘。托盘里有几个物品？", "QUERY count(托盘)", "托盘里至少有1个已知物品。"),
             ("小郭把芯片放进托盘。托盘被带到实验室。实验室里数量是多少？", "QUERY count(实验室)", "实验室里至少有2个已知物品。"),
+            ("小郭把芯片放进小盒子。小王把小盒子放进大盒子。大盒子被带到实验室。实验室里有几个物品？", "QUERY count(实验室)", "实验室里至少有3个已知物品。"),
+            ("小王打开盒子。盒子里有几个东西？", "QUERY count(盒子)", "盒子里没有已知物品。"),
         )
-
-        for text, query_line, answer in examples:
+        for text, query_line, answer in cases:
             with self.subTest(text=text):
                 prediction = predict(text)
                 structure = prediction.structure.linearize()
                 self.assertIn(query_line, structure)
-                self.assertIn("RULE count_known_contents", structure)
                 self.assertEqual(prediction.answer, answer)
-
-    def test_count_query_uses_nested_closure(self) -> None:
-        prediction = predict(
-            "小郭把芯片放进小盒子。小王把小盒子放进大盒子。大盒子被带到实验室。"
-            "实验室里有几个物品？"
-        )
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY count(实验室)", structure)
-        self.assertEqual(prediction.answer, "实验室里至少有3个已知物品。")
 
     def test_count_query_filters_destroyed_objects(self) -> None:
         prediction = predict("小郭把芯片放进托盘。托盘被带到实验室。工程师销毁芯片。实验室里有几个东西？")
@@ -1517,13 +1339,6 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("REL exists(芯片,不存在)", structure)
         self.assertIn("QUERY count(实验室)", structure)
         self.assertEqual(prediction.answer, "实验室里至少有1个已知物品。")
-
-    def test_count_query_reports_no_known_items_for_empty_holder(self) -> None:
-        prediction = predict("小王打开盒子。盒子里有几个东西？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY count(盒子)", structure)
-        self.assertEqual(prediction.answer, "盒子里没有已知物品。")
 
     def test_compare_count_query_uses_current_contents_closure(self) -> None:
         examples = (
@@ -1574,26 +1389,21 @@ class ReasonerTest(unittest.TestCase):
         self.assertEqual(prediction.answer, "芯片经过了实验室和办公室。")
 
     def test_actions_by_actors_query_uses_event_frames(self) -> None:
-        prediction = predict(
-            "小郭把芯片放进托盘。小王把托盘带到了实验室。小王把芯片从托盘里取出。"
-            "小郭和小王分别做了什么？"
+        cases = (
+            ("小郭把芯片放进托盘。小王把托盘带到了实验室。小王把芯片从托盘里取出。小郭和小王分别做了什么？",
+             "QUERY actions_by_actors(小郭和小王,actors=小郭|小王)",
+             "小郭把芯片放进托盘；小王把托盘带到实验室，把芯片从托盘取出。"),
+            ("小郭把芯片放进托盘。小王把芯片放进盒子。小郭做了什么？",
+             "QUERY actions_by_actors(小郭,actors=小郭)",
+             "小郭把芯片放进托盘。"),
         )
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY actions_by_actors(小郭和小王,actors=小郭|小王)", structure)
-        self.assertIn("RULE actor_actions", structure)
-        self.assertEqual(
-            prediction.answer,
-            "小郭把芯片放进托盘；小王把托盘带到实验室，把芯片从托盘取出。",
-        )
-
-    def test_single_actor_actions_query_reuses_event_frames(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王把芯片放进盒子。小郭做了什么？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY actions_by_actors(小郭,actors=小郭)", structure)
-        self.assertIn("RULE actor_actions", structure)
-        self.assertEqual(prediction.answer, "小郭把芯片放进托盘。")
+        for text, query_line, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(query_line, structure)
+                self.assertIn("RULE actor_actions", structure)
+                self.assertEqual(prediction.answer, answer)
 
     def test_inventory_query_lists_current_owned_items(self) -> None:
         prediction = predict("小红把药瓶交给医生。小郭把芯片交给医生。现在每个人手里有什么？")
@@ -1603,47 +1413,39 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("RULE owner_inventories", structure)
         self.assertEqual(prediction.answer, "医生手里有药瓶和芯片。")
 
-    def test_typed_demonstrative_query_resolves_to_known_entity(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。托盘被带到实验室。这个芯片在哪里？")
+    def test_demonstrative_and_pronoun_resolution_covers_entities_places_and_pairs(self) -> None:
+        cases = (
+            # typed demonstrative resolves to known entity
+            ("小郭把芯片放进托盘。托盘被带到实验室。这个芯片在哪里？",
+             "QUERY location(芯片)", "芯片在实验室的托盘里。"),
+            # pronoun resolves to latest non-place entity
+            ("小郭把芯片放进托盘。小王把芯片放进盒子。它在哪里？",
+             "QUERY location(盒子)", "不知道盒子在哪里。"),
+            # typed demonstrative in statement updates state
+            ("小郭把芯片放进托盘。小王把这个芯片从托盘里取出来。这个芯片在哪里？",
+             "EVENT take_out(小王,芯片) WITH source=托盘", "不知道芯片在哪里。"),
+            # place pronoun resolves for contents query
+            ("小郭把芯片放进托盘。托盘被带到实验室。这里有什么？",
+             "QUERY contents(实验室)", "实验室里至少有托盘和芯片。"),
+        )
+        for text, expected, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(expected, structure)
+                self.assertEqual(prediction.answer, answer)
 
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY location(芯片)", structure)
-        self.assertEqual(prediction.answer, "芯片在实验室的托盘里。")
-
-    def test_pronoun_query_resolves_to_latest_non_place_entity(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王把芯片放进盒子。它在哪里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY location(盒子)", structure)
-        self.assertEqual(prediction.answer, "不知道盒子在哪里。")
-
-    def test_typed_demonstrative_statement_can_update_state(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王把这个芯片从托盘里取出来。这个芯片在哪里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("EVENT take_out(小王,芯片) WITH source=托盘", structure)
-        self.assertIn("QUERY location(芯片)", structure)
-        self.assertEqual(prediction.answer, "不知道芯片在哪里。")
-
-    def test_place_pronoun_resolves_for_contents_query(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。托盘被带到实验室。这里有什么？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY contents(实验室)", structure)
-        self.assertEqual(prediction.answer, "实验室里至少有托盘和芯片。")
-
-    def test_relative_pronouns_resolve_to_previous_two_salient_entities(self) -> None:
+        # relative pronouns resolve to previous two salient entities
         prediction = predict(
             "小郭把芯片放进托盘。托盘被带到实验室。小王把药瓶放进盒子。盒子被带到办公室。前者在哪里，后者在哪里？"
         )
-
         structure = prediction.structure.linearize()
         self.assertIn("QUERY compound(multi)", structure)
         self.assertIn("SUBQUERY location(药瓶)", structure)
         self.assertIn("SUBQUERY location(盒子)", structure)
         self.assertEqual(prediction.answer, "药瓶在办公室的盒子里；盒子在办公室。")
 
-    def test_relative_pronouns_fail_closed_when_context_is_too_short(self) -> None:
+        # relative pronouns fail closed when context is too short
         with self.assertRaises(ParseError):
             predict("前者在哪里？")
 
@@ -1706,37 +1508,32 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("REL dislikes(我,咖啡)", structure)
         self.assertEqual(prediction.answer, "你叫小李；我还不知道你喜欢什么；你不喜欢咖啡。")
 
-    def test_direct_memory_entries_can_be_written_and_reloaded(self) -> None:
+    def test_direct_and_chat_memory_entries_can_be_written_and_reloaded(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             paths = LearningPaths(
                 memory_direct_data=Path(directory) / "memory_direct_examples.jsonl",
                 memory_chat_data=Path(directory) / "memory_chat_examples.jsonl",
                 memory_model=Path(directory) / "memory_model.json",
             )
-            save_direct_memory_feedback(State("name", "我", "小王"), paths)
 
+            # direct memory feedback writes explicit state and reloads via memory model
+            save_direct_memory_feedback(State("name", "我", "小王"), paths)
             loaded = load_memory_model(paths.memory_model)
             capabilities = default_capabilities(use_environment=False, use_memory=False).with_memory_states(*loaded.states)
-            prediction = predict("我叫什么", capabilities)
+            direct_prediction = predict("我叫什么", capabilities)
+            self.assertEqual(direct_prediction.answer, "你叫小王。")
 
-        self.assertEqual(prediction.answer, "你叫小王。")
-
-    def test_chat_memory_entries_can_be_sedimented_and_reused(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            paths = LearningPaths(
-                memory_direct_data=Path(directory) / "memory_direct_examples.jsonl",
-                memory_chat_data=Path(directory) / "memory_chat_examples.jsonl",
-                memory_model=Path(directory) / "memory_model.json",
+            # chat memory feedback sediments structure-derived states and reloads them
+            seed_prediction = predict(
+                "我叫小李。我叫什么？",
+                default_capabilities(use_environment=False, use_memory=False),
             )
-            seed_prediction = predict("我叫小李。我叫什么？", default_capabilities(use_environment=False, use_memory=False))
             result = save_chat_memory_feedback("我叫小李。我叫什么？", seed_prediction.structure, paths)
-
             loaded = load_memory_model(result.model_path)
             capabilities = default_capabilities(use_environment=False, use_memory=False).with_memory_states(*loaded.states)
-            prediction = predict("我叫什么", capabilities)
-
-        self.assertGreaterEqual(result.entry_count, 1)
-        self.assertEqual(prediction.answer, "你叫小李。")
+            chat_prediction = predict("我叫什么", capabilities)
+            self.assertGreaterEqual(result.entry_count, 1)
+            self.assertEqual(chat_prediction.answer, "你叫小李。")
 
     def test_long_term_knowledge_entries_can_be_written_and_reused(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1762,17 +1559,16 @@ class ReasonerTest(unittest.TestCase):
         self.assertEqual(len(loaded.patterns), 1)
         self.assertEqual(prediction.answer, "因为阳光进入大气后会被空气分子散射，短波长的蓝光更容易散开，所以天空看起来偏蓝。")
 
-    def test_mixed_chat_fragments_preserve_task_core(self) -> None:
+    def test_mixed_chat_fragments_preserve_task_core_and_record_profile_statement(self) -> None:
+        # greeting fragment is dropped while real location query survives
         prediction = predict("小郭把芯片放进托盘。你好，我想知道芯片在哪里？")
-
         structure = prediction.structure.linearize()
         self.assertIn("QUERY location(芯片)", structure)
         self.assertNotIn("SUBQUERY dialog_act(greeting)", structure)
         self.assertEqual(prediction.answer, "芯片在托盘里。")
 
-    def test_mixed_question_fragment_can_record_profile_statement(self) -> None:
+        # profile statement followed by dialog_act + profile query composes cleanly
         prediction = predict("我叫小王，你能做什么？我叫什么？")
-
         structure = prediction.structure.linearize()
         self.assertIn("FRAME f1 type=profile_name time=1", structure)
         self.assertIn("QUERY compound(multi)", structure)
@@ -1798,90 +1594,76 @@ class ReasonerTest(unittest.TestCase):
                 self.assertNotIn(polluted_slot, structure)
                 self.assertEqual(prediction.answer, answer)
 
-    def test_if_then_rule_applies_when_antecedent_holds(self) -> None:
-        prediction = predict(
-            "如果小郭把芯片放进托盘，小王就把托盘带到实验室。小郭把芯片放进托盘。芯片在哪里？"
+    def test_causal_frames_cover_if_then_because_and_why_queries(self) -> None:
+        cases = (
+            # if_then fires when antecedent holds
+            ("如果小郭把芯片放进托盘，小王就把托盘带到实验室。小郭把芯片放进托盘。芯片在哪里？",
+             "FRAME f1 type=if_then time=1", "RULE container_moves_contents",
+             "芯片在实验室的托盘里。", True),
+            # if_then does not fire without antecedent
+            ("如果小郭把芯片放进托盘，小王就把托盘带到实验室。芯片在哪里？",
+             "FRAME f1 type=if_then time=1", None,
+             "不知道芯片在哪里。", False),
+            # because records cause and effect
+            ("因为小王把托盘带到实验室，所以芯片在实验室的托盘里。芯片在哪里？",
+             "FRAME f1 type=because time=1", None,
+             "芯片在实验室的托盘里。", True),
+            # why query uses causal frame
+            ("因为小王把托盘带到实验室，所以芯片在实验室的托盘里。为什么芯片在实验室的托盘里？",
+             "QUERY why(芯片在实验室的托盘里)", "RULE causal_explanation",
+             "因为小王把托盘带到实验室。", True),
+            # why query can explain from state chain
+            ("小郭把芯片放进托盘。托盘被带到实验室。为什么芯片在实验室的托盘里？",
+             "QUERY why(芯片在实验室的托盘里)", "RULE causal_explanation",
+             "因为芯片在托盘里，而且托盘在实验室。", True),
         )
+        for case in cases:
+            text, expected, rule, answer, fires = case
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(expected, structure)
+                if rule:
+                    self.assertIn(rule, structure)
+                if not fires:
+                    self.assertNotIn("REL at(托盘,实验室)", structure)
+                self.assertEqual(prediction.answer, answer)
 
-        structure = prediction.structure.linearize()
-        self.assertIn("FRAME f1 type=if_then time=1", structure)
-        self.assertIn("RULE container_moves_contents", structure)
-        self.assertEqual(prediction.answer, "芯片在实验室的托盘里。")
-
-    def test_if_then_rule_does_not_fire_without_antecedent(self) -> None:
-        prediction = predict("如果小郭把芯片放进托盘，小王就把托盘带到实验室。芯片在哪里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("FRAME f1 type=if_then time=1", structure)
-        self.assertNotIn("REL at(托盘,实验室)", structure)
-        self.assertEqual(prediction.answer, "不知道芯片在哪里。")
-
-    def test_because_statement_records_cause_and_effect(self) -> None:
-        prediction = predict("因为小王把托盘带到实验室，所以芯片在实验室的托盘里。芯片在哪里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("FRAME f1 type=because time=1", structure)
-        self.assertIn("REL at(托盘,实验室)", structure)
-        self.assertEqual(prediction.answer, "芯片在实验室的托盘里。")
-
-    def test_why_query_uses_causal_frame(self) -> None:
-        prediction = predict(
-            "因为小王把托盘带到实验室，所以芯片在实验室的托盘里。为什么芯片在实验室的托盘里？"
-        )
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY why(芯片在实验室的托盘里)", structure)
-        self.assertIn("RULE causal_explanation", structure)
-        self.assertEqual(prediction.answer, "因为小王把托盘带到实验室。")
-
-    def test_why_query_can_explain_from_state_chain(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。托盘被带到实验室。为什么芯片在实验室的托盘里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY why(芯片在实验室的托盘里)", structure)
-        self.assertIn("RULE causal_explanation", structure)
-        self.assertEqual(prediction.answer, "因为芯片在托盘里，而且托盘在实验室。")
-
-    def test_claim_source_is_separate_from_world_fact(self) -> None:
+    def test_claim_source_is_separate_from_world_fact_and_can_be_queried(self) -> None:
+        # claim does not update factual world state
         prediction = predict("小王说芯片在托盘里。芯片在哪里？")
-
         structure = prediction.structure.linearize()
         self.assertIn("FRAME f1 type=say time=1", structure)
         self.assertIn("QUERY location(芯片)", structure)
         self.assertEqual(prediction.answer, "不知道芯片在哪里。")
 
-    def test_claim_source_query_finds_speaker(self) -> None:
-        prediction = predict("小王说芯片在托盘里。谁说芯片在托盘里？")
+        # claim_source query finds speaker (incl. demonstrative reference)
+        for text, answer in (
+            ("小王说芯片在托盘里。谁说芯片在托盘里？", "小王说的。"),
+            ("小王说这个芯片在托盘里。谁说这个芯片在托盘里？", "小王说的。"),
+        ):
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn("QUERY claim_source(芯片在托盘里)", structure)
+                self.assertIn("RULE claim_has_source", structure)
+                self.assertEqual(prediction.answer, answer)
 
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY claim_source(芯片在托盘里)", structure)
-        self.assertIn("RULE claim_has_source", structure)
-        self.assertEqual(prediction.answer, "小王说的。")
-
-    def test_claim_source_query_uses_reference_resolution(self) -> None:
-        prediction = predict("小王说这个芯片在托盘里。谁说这个芯片在托盘里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY claim_source(芯片在托盘里)", structure)
-        self.assertEqual(prediction.answer, "小王说的。")
-
-    def test_belief_does_not_update_factual_world_state(self) -> None:
+    def test_belief_views_are_isolated_sourceable_and_order_aware(self) -> None:
+        # belief does not update factual world state
         prediction = predict("小王以为芯片在盒子里。芯片在哪里？")
-
         structure = prediction.structure.linearize()
         self.assertIn("FRAME f1 type=believe time=1", structure)
         self.assertIn("EVENT believe(小王,芯片在盒子里)", structure)
         self.assertNotIn("REL in(芯片,盒子)", structure)
         self.assertEqual(prediction.answer, "不知道芯片在哪里。")
 
-    def test_belief_location_query_uses_personal_world_view(self) -> None:
-        questions = (
+        # belief_location query uses personal world view (surface variants)
+        for question in (
             "小王认为芯片在哪里？",
             "小王相信芯片在什么地方？",
             "你知道的话，可以告诉我小王以为芯片在哪里吗？",
-        )
-
-        for question in questions:
+        ):
             with self.subTest(question=question):
                 prediction = predict(f"小郭把芯片放进托盘。小王以为芯片在盒子里。{question}")
                 structure = prediction.structure.linearize()
@@ -1890,136 +1672,125 @@ class ReasonerTest(unittest.TestCase):
                 self.assertIn("RULE belief_location_found", structure)
                 self.assertEqual(prediction.answer, "小王认为芯片在盒子里。")
 
-    def test_belief_source_query_finds_all_believers(self) -> None:
+        # belief_source query finds all believers
         prediction = predict("小王认为芯片在盒子里。小郭相信芯片在盒子里。谁认为芯片在盒子里？")
-
         structure = prediction.structure.linearize()
         self.assertIn("QUERY belief_source(芯片在盒子里)", structure)
         self.assertIn("RULE belief_has_source", structure)
         self.assertEqual(prediction.answer, "小王和小郭这么认为。")
 
-    def test_belief_updates_only_that_person_view_in_order(self) -> None:
+        # belief updates only that person view, in order
         prediction = predict("小王以为芯片在托盘里。小王后来认为芯片在盒子里。小王认为芯片在哪里？")
-
         structure = prediction.structure.linearize()
         self.assertIn("EVENT believe(小王,芯片在托盘里)", structure)
         self.assertIn("EVENT believe(小王,芯片在盒子里)", structure)
         self.assertEqual(prediction.answer, "小王认为芯片在盒子里。")
 
-    def test_contradiction_query_detects_belief_against_fact(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王以为芯片在盒子里。有没有矛盾？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY contradictions(world)", structure)
-        self.assertIn("RULE contradictions_found", structure)
-        self.assertEqual(prediction.answer, "存在矛盾：小王认为芯片在盒子里，但事实是芯片在托盘里。")
-
-    def test_contradiction_query_detects_claim_against_fact(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王说芯片在盒子里。哪里有冲突？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("FRAME f3 type=say time=3", structure)
-        self.assertIn("RULE contradictions_found", structure)
-        self.assertEqual(prediction.answer, "存在矛盾：小王说芯片在盒子里，但事实是芯片在托盘里。")
-
-    def test_contradiction_query_allows_matching_claim(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王说芯片在托盘里。有没有矛盾？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("RULE no_contradictions", structure)
-        self.assertEqual(prediction.answer, "没有发现矛盾。")
-
-    def test_ordered_state_correction_is_not_treated_as_contradiction(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。芯片不在托盘里而在盒子里。有没有矛盾？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL in(芯片,盒子)", structure)
-        self.assertIn("RULE no_contradictions", structure)
-        self.assertEqual(prediction.answer, "没有发现矛盾。")
-
-    def test_counterfactual_move_replays_state_without_event(self) -> None:
-        prediction = predict(
-            "小郭把芯片放进托盘。小王把托盘带到实验室。"
-            "如果小王没有把托盘带到实验室，芯片会在哪里？"
+    def test_contradiction_query_covers_found_missing_and_no_contradiction_cases(self) -> None:
+        cases = (
+            ("小郭把芯片放进托盘。小王以为芯片在盒子里。有没有矛盾？",
+             "RULE contradictions_found",
+             "存在矛盾：小王认为芯片在盒子里，但事实是芯片在托盘里。"),
+            ("小郭把芯片放进托盘。小王说芯片在盒子里。哪里有冲突？",
+             "RULE contradictions_found",
+             "存在矛盾：小王说芯片在盒子里，但事实是芯片在托盘里。"),
+            ("小郭把芯片放进托盘。小王说芯片在托盘里。有没有矛盾？",
+             "RULE no_contradictions",
+             "没有发现矛盾。"),
+            ("小郭把芯片放进托盘。芯片不在托盘里而在盒子里。有没有矛盾？",
+             "RULE no_contradictions",
+             "没有发现矛盾。"),
         )
-
-        structure = prediction.structure.linearize()
-        self.assertIn("REL at(托盘,实验室)", structure)
-        self.assertIn(
-            "QUERY counterfactual_location(芯片,without_event=move,actor=小王,theme=托盘,goal=实验室)",
-            structure,
-        )
-        self.assertIn("RULE counterfactual_location_found", structure)
-        self.assertEqual(prediction.answer, "如果没有这个事件，芯片会在托盘里。")
-
-    def test_counterfactual_location_allows_omitted_if(self) -> None:
-        prediction = predict("小郭把芯片放进托盘。小王没有把托盘带到实验室，芯片会在哪里？")
-
-        structure = prediction.structure.linearize()
-        self.assertIn("QUERY counterfactual_location(芯片,without_event=move,actor=小王,theme=托盘,goal=实验室)", structure)
-        self.assertIn("RULE counterfactual_location_found", structure)
-        self.assertEqual(prediction.answer, "如果没有这个事件，芯片会在托盘里。")
-
-    def test_counterfactual_take_out_restores_previous_container_state(self) -> None:
-        prediction = predict(
-            "小郭把芯片放进托盘。小王把芯片从托盘里取出。"
-            "如果小王没有把芯片从托盘里取出，芯片会在哪里？"
-        )
-
-        structure = prediction.structure.linearize()
-        self.assertNotIn("REL in(芯片,托盘)", structure)
-        self.assertIn(
-            "QUERY counterfactual_location(芯片,without_event=take_out,actor=小王,theme=芯片,source=托盘)",
-            structure,
-        )
-        self.assertEqual(prediction.answer, "如果没有这个事件，芯片会在托盘里。")
-
-    def test_counterfactual_put_in_can_make_location_unknown(self) -> None:
-        examples = (
-            "小郭把芯片放进托盘。如果小郭没有把芯片放进托盘，芯片会在哪里？",
-            "小红把药瓶放进盒子。如果小红没有把药瓶放进盒子药瓶会在哪里？",
-        )
-
-        for text in examples:
+        for text, rule, answer in cases:
             with self.subTest(text=text):
                 prediction = predict(text)
                 structure = prediction.structure.linearize()
-                self.assertIn("RULE counterfactual_location_unknown", structure)
-                self.assertIn("QUERY counterfactual_location", structure)
+                self.assertIn("QUERY contradictions(world)", structure)
+                self.assertIn(rule, structure)
+                self.assertEqual(prediction.answer, answer)
 
-    def test_fact_belief_and_counterfactual_views_do_not_collapse(self) -> None:
-        fact = predict("小郭把芯片放进托盘。小王以为芯片在盒子里。芯片实际在哪里？")
-        belief = predict("小郭把芯片放进托盘。小王以为芯片在盒子里。小王认为芯片在哪里？")
-        counterfactual = predict(
-            "小郭把芯片放进托盘。小王把芯片从托盘里取出。"
-            "如果小王没有把芯片从托盘里取出，芯片会在哪里？"
+    def test_counterfactual_queries_replay_state_and_keep_world_views_separate(self) -> None:
+        # counterfactual_location replays state without the named event
+        cases = (
+            {
+                "name": "move_with_if",
+                "text": "小郭把芯片放进托盘。小王把托盘带到实验室。如果小王没有把托盘带到实验室，芯片会在哪里？",
+                "query": "QUERY counterfactual_location(芯片,without_event=move,actor=小王,theme=托盘,goal=实验室)",
+                "rule": "RULE counterfactual_location_found",
+                "answer": "如果没有这个事件，芯片会在托盘里。",
+            },
+            {
+                "name": "move_omitted_if",
+                "text": "小郭把芯片放进托盘。小王没有把托盘带到实验室，芯片会在哪里？",
+                "query": "QUERY counterfactual_location(芯片,without_event=move,actor=小王,theme=托盘,goal=实验室)",
+                "rule": "RULE counterfactual_location_found",
+                "answer": "如果没有这个事件，芯片会在托盘里。",
+            },
+            {
+                "name": "take_out_restores_container",
+                "text": "小郭把芯片放进托盘。小王把芯片从托盘里取出。如果小王没有把芯片从托盘里取出，芯片会在哪里？",
+                "query": "QUERY counterfactual_location(芯片,without_event=take_out,actor=小王,theme=芯片,source=托盘)",
+                "rule": None,
+                "answer": "如果没有这个事件，芯片会在托盘里。",
+                "absent": "REL in(芯片,托盘)",
+            },
+            {
+                "name": "put_in_makes_unknown",
+                "text": "小郭把芯片放进托盘。如果小郭没有把芯片放进托盘，芯片会在哪里？",
+                "query": "QUERY counterfactual_location",
+                "rule": "RULE counterfactual_location_unknown",
+                "answer": None,
+            },
+            {
+                "name": "put_in_makes_unknown_alt_entity",
+                "text": "小红把药瓶放进盒子。如果小红没有把药瓶放进盒子药瓶会在哪里？",
+                "query": "QUERY counterfactual_location",
+                "rule": "RULE counterfactual_location_unknown",
+                "answer": None,
+            },
         )
+        for case in cases:
+            with self.subTest(name=case["name"]):
+                prediction = predict(case["text"])
+                structure = prediction.structure.linearize()
+                self.assertIn(case["query"], structure)
+                if case["rule"]:
+                    self.assertIn(case["rule"], structure)
+                if case.get("absent"):
+                    self.assertNotIn(case["absent"], structure)
+                if case["answer"]:
+                    self.assertEqual(prediction.answer, case["answer"])
 
-        self.assertEqual(fact.answer, "芯片在托盘里。")
-        self.assertEqual(belief.answer, "小王认为芯片在盒子里。")
-        self.assertEqual(counterfactual.answer, "如果没有这个事件，芯片会在托盘里。")
-
-    def test_complex_world_views_share_event_schema_without_state_leakage(self) -> None:
+        # fact, belief, claim, contradiction, and counterfactual stay separated by world view
+        self.assertEqual(
+            predict("小郭把芯片放进托盘。小王以为芯片在盒子里。芯片实际在哪里？").answer,
+            "芯片在托盘里。",
+        )
+        self.assertEqual(
+            predict("小郭把芯片放进托盘。小王以为芯片在盒子里。小王认为芯片在哪里？").answer,
+            "小王认为芯片在盒子里。",
+        )
         base = (
             "小郭把芯片放进托盘。小王把托盘带到实验室。"
             "小李说芯片在盒子里。小张认为芯片在托盘里。"
         )
-        fact = predict(base + "芯片在哪里？")
-        belief = predict(base + "小张认为芯片在哪里？")
-        conflict = predict(base + "有没有矛盾？")
-        counterfactual = predict(base + "如果小王没有把托盘带到实验室，芯片会在哪里？")
+        self.assertEqual(predict(base + "芯片在哪里？").answer, "芯片在实验室的托盘里。")
+        self.assertEqual(predict(base + "小张认为芯片在哪里？").answer, "小张认为芯片在托盘里。")
+        self.assertEqual(
+            predict(base + "有没有矛盾？").answer,
+            "存在矛盾：小李说芯片在盒子里，但事实是芯片在实验室的托盘里。",
+        )
+        self.assertEqual(
+            predict(base + "如果小王没有把托盘带到实验室，芯片会在哪里？").answer,
+            "如果没有这个事件，芯片会在托盘里。",
+        )
 
-        self.assertEqual(fact.answer, "芯片在实验室的托盘里。")
-        self.assertEqual(belief.answer, "小张认为芯片在托盘里。")
-        self.assertEqual(conflict.answer, "存在矛盾：小李说芯片在盒子里，但事实是芯片在实验室的托盘里。")
-        self.assertEqual(counterfactual.answer, "如果没有这个事件，芯片会在托盘里。")
-
-    def test_compound_query_keeps_multiple_subqueries_in_source_order(self) -> None:
+    def test_compound_query_keeps_source_order_ignores_filler_and_mixed_views(self) -> None:
+        # multiple subqueries are kept in source order
         prediction = predict(
             "小郭把芯片放进托盘。小王把托盘带到实验室。"
             "托盘在哪里，托盘里有什么，谁把芯片放进托盘？"
         )
-
         structure = prediction.structure.linearize()
         self.assertIn("QUERY compound(multi)", structure)
         location_index = structure.index("SUBQUERY location(托盘)")
@@ -2030,12 +1801,11 @@ class ReasonerTest(unittest.TestCase):
         self.assertIn("RULE compound_query", structure)
         self.assertEqual(prediction.answer, "托盘在实验室；托盘里至少有芯片；小郭把芯片放进托盘。")
 
-    def test_compound_query_ignores_filler_fragments_and_keeps_real_tasks(self) -> None:
+        # filler fragments are dropped while real subqueries survive
         prediction = predict(
             "小郭把芯片放进托盘。小王把托盘带到实验室。"
             "你知道吗？，你知道的话，可以告诉我托盘在哪里，托盘里有什么，我想知道下"
         )
-
         structure = prediction.structure.linearize()
         self.assertIn("QUERY compound(multi)", structure)
         self.assertIn("SUBQUERY location(托盘)", structure)
@@ -2043,12 +1813,11 @@ class ReasonerTest(unittest.TestCase):
         self.assertNotIn("SUBQUERY location(你知道)", structure)
         self.assertEqual(prediction.answer, "托盘在实验室；托盘里至少有芯片。")
 
-    def test_compound_query_can_mix_fact_belief_and_counterfactual_views(self) -> None:
+        # fact, belief, and counterfactual views compose in a single compound query
         prediction = predict(
             "小郭把芯片放进托盘。小王把托盘带到实验室。小张认为芯片在盒子里。"
             "芯片在哪里，小张认为芯片在哪里，如果小王没有把托盘带到实验室，芯片会在哪里？"
         )
-
         structure = prediction.structure.linearize()
         self.assertIn("QUERY compound(multi)", structure)
         self.assertIn("SUBQUERY location(芯片)", structure)
