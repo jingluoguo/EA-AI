@@ -17,6 +17,7 @@ from .world.state import materialize_events, materialize_relations
 @dataclass
 class ParseContext:
     entities: list[Entity]
+    discourse_entities: tuple[Entity, ...]
     frames: list[Frame]
     states: list[State]
     query_candidates: list[str]
@@ -27,8 +28,13 @@ class ParseContext:
 
 
 def initial_parse_context(capabilities: CognitiveCapabilities) -> ParseContext:
+    memory_entities = list(memory_entities_from_states(capabilities.memory_states))
+    discourse_entities = (Entity("self", "我"),)
     return ParseContext(
-        entities=list(memory_entities_from_states(capabilities.memory_states)),
+        entities=memory_entities,
+        discourse_entities=tuple(
+            entity for entity in discourse_entities if all(entity.name != known.name for known in memory_entities)
+        ),
         frames=[],
         states=list(capabilities.memory_states),
         query_candidates=[],
@@ -42,14 +48,19 @@ def ingest_sentence(
     capabilities: CognitiveCapabilities,
 ) -> None:
     resolved_sentence = resolve_references(sentence, context.known_entities())
+    fragments = split_query_candidate(sentence)
 
     if not is_question and ingest_mixed_statement_fragments(sentence, context, capabilities):
         return
 
-    if not is_question and ingest_statement_sentence(resolved_sentence, context, capabilities):
+    if not is_question and ingest_statement_sentence(
+        resolved_sentence,
+        context,
+        capabilities,
+    ):
         return
 
-    if query_candidate_is_learned_unit(
+    if not is_question and query_candidate_is_learned_unit(
         resolved_sentence,
         context.known_entities(),
         capabilities.query_parsers,
@@ -57,7 +68,15 @@ def ingest_sentence(
         context.query_candidates.append(resolved_sentence)
         return
 
-    for fragment in split_query_candidate(sentence):
+    if is_question and query_candidate_is_learned_unit(
+        resolved_sentence,
+        context.known_entities(),
+        capabilities.query_parsers,
+    ):
+        context.query_candidates.append(resolved_sentence)
+        return
+
+    for fragment in fragments:
         ingest_query_fragment(fragment, is_question, context, capabilities)
 
 
@@ -76,6 +95,13 @@ def ingest_mixed_statement_fragments(
     for fragment in fragments:
         resolved_fragment = resolve_references(fragment, known_entities)
         extracted = capabilities.parse_statement(resolved_fragment)
+        fragment_query = resolve_query_candidate(resolved_fragment, known_entities, capabilities.query_parsers)
+        if extracted is not None and fragment_query is not None and statement_should_yield_to_query(
+            extracted,
+            fragment_query,
+            resolved_fragment,
+        ):
+            extracted = None
         parsed_fragments.append((fragment, extracted))
         if extracted is not None:
             has_statement = True
@@ -100,18 +126,6 @@ def ingest_statement_sentence(
     if extracted is None:
         return False
 
-    sentence_query = resolve_query_candidate(sentence, context.known_entities(), capabilities.query_parsers)
-    if sentence_query is not None and statement_should_yield_to_query(
-        extracted,
-        sentence_query,
-    ) and query_candidate_is_learned_unit(
-        sentence,
-        context.known_entities(),
-        capabilities.query_parsers,
-    ):
-        context.query_candidates.append(sentence)
-        return True
-
     add_extracted_structure(extracted, context, capabilities)
     return True
 
@@ -119,8 +133,11 @@ def ingest_statement_sentence(
 def statement_should_yield_to_query(
     extracted: tuple[list[Entity], list[Frame]],
     query: Query,
+    sentence: str = "",
 ) -> bool:
     if profile_statement_should_yield_to_query(extracted, query):
+        return True
+    if query.intent not in {"dialog_act", "profile"}:
         return True
     if query.intent == "dialog_act" and query.target in {
         "thanks",
@@ -156,11 +173,19 @@ def ingest_query_fragment(
         return
 
     extracted = capabilities.parse_statement(resolved_fragment)
+    fragment_query = resolve_query_candidate(resolved_fragment, context.known_entities(), capabilities.query_parsers)
+    if extracted is not None and fragment_query is not None and statement_should_yield_to_query(
+        extracted,
+        fragment_query,
+        resolved_fragment,
+    ):
+        context.query_candidates.append(resolved_fragment)
+        return
     if extracted is not None:
         add_extracted_structure(extracted, context, capabilities)
         return
 
-    if resolve_query_candidate(resolved_fragment, context.known_entities(), capabilities.query_parsers) is not None:
+    if fragment_query is not None:
         context.query_candidates.append(resolved_fragment)
     else:
         context.query_candidates.append(resolved_fragment)
@@ -187,13 +212,46 @@ def finalize_parse_context(
     capabilities: CognitiveCapabilities,
 ) -> Structure:
     deduped_entities = context.known_entities()
-    query = resolve_query_candidates(context.query_candidates, deduped_entities, capabilities.query_parsers)
-    if not context.entities and not context.states and not context.frames and query is None:
-        raise ParseError(f"Cannot extract structure from text: {text}")
-    structure = structure_from_context(context, deduped_entities, query)
+    query_error: ParseError | None = None
+    try:
+        query = resolve_query_candidates(context.query_candidates, deduped_entities, capabilities.query_parsers)
+    except ParseError as error:
+        query_error = error
+        query = None
+    structure = structure_from_context(context, output_entities(context, query), query)
     structure = expand_conditionals(structure, capabilities)
     structure = structure_with_intentions(text, structure, capabilities)
+    structure = structure_with_pragmatics(text, structure, capabilities)
+    if (
+        not context.entities
+        and not context.states
+        and not context.frames
+        and query is None
+        and not structure.pragmatic_acts
+    ):
+        if query_error is not None:
+            raise query_error
+        raise ParseError(f"Cannot extract structure from text: {text}")
     return structure_with_rules(structure, capabilities)
+
+
+def output_entities(context: ParseContext, query: Query | None) -> tuple[Entity, ...]:
+    entities = list(context.entities)
+    if query is not None:
+        entities.extend(query_referenced_discourse_entities(query, context.discourse_entities))
+    return dedupe_entities(entities)
+
+
+def query_referenced_discourse_entities(query: Query, discourse_entities: tuple[Entity, ...]) -> tuple[Entity, ...]:
+    values = query_values(query)
+    return tuple(entity for entity in discourse_entities if entity.name in values)
+
+
+def query_values(query: Query) -> tuple[str, ...]:
+    values = [query.target, *query.qualifiers]
+    for subquery in query.subqueries:
+        values.extend(query_values(subquery))
+    return tuple(values)
 
 
 def structure_from_context(
@@ -218,6 +276,14 @@ def structure_with_intentions(
     capabilities: CognitiveCapabilities,
 ) -> Structure:
     return replace(structure, intentions=capabilities.analyze_intentions(text, structure))
+
+
+def structure_with_pragmatics(
+    text: str,
+    structure: Structure,
+    capabilities: CognitiveCapabilities,
+) -> Structure:
+    return replace(structure, pragmatic_acts=capabilities.analyze_pragmatics(text, structure))
 
 
 def structure_with_rules(

@@ -17,6 +17,7 @@ from struct_llm.comprehension.intent_dataset import (
 from struct_llm.kernel import default_capabilities, parse_text, predict as _predict
 from struct_llm.neural import (
     InMemoryNeuralBoundaryModel,
+    NeuralPragmaticAnalyzer,
     NeuralQueryParser,
     NeuralStatementParser,
     load_neural_boundary_model,
@@ -31,10 +32,23 @@ from struct_llm.motor.feedback import (
     save_chat_memory_feedback,
     save_direct_memory_feedback,
     save_manual_query_feedback,
+    save_manual_episode_feedback,
     save_manual_statement_feedback,
     save_new_dialog_capability_feedback,
     save_unrecognized_feedback,
     suggest_query_feedback,
+)
+from struct_llm.comprehension.episode import (
+    ActionResult,
+    DialogueTurn,
+    FeedbackDiagnosis,
+    InMemoryPragmaticAnalyzer,
+    append_episode_record,
+    build_episode_record,
+    compile_episode_model_from_jsonl,
+    episode_example_from_dict,
+    evaluate_pragmatic_analyzer,
+    load_episode_jsonl,
 )
 from struct_llm.motor.dialogue import (
     LearnedDialogActAnswerer,
@@ -45,6 +59,7 @@ from struct_llm.motor.feedback import save_memory_knowledge_feedback
 from struct_llm.comprehension.intent import InMemoryIntentAnalyzer, evaluate_intent_analyzer
 from struct_llm.motor.learning_queue import load_unrecognized_jsonl
 from struct_llm.memory.long_term import load_memory_model
+from struct_llm.memory.working import capabilities_with_last_user_utterance, capabilities_with_working_turn
 from struct_llm.memory.knowledge import (
     LearnedMemoryKnowledgeAnswerer,
     default_learned_memory_knowledge_answerer,
@@ -53,6 +68,7 @@ from struct_llm.memory.knowledge import (
 from struct_llm.comprehension.query import (
     evaluate_query_parser,
     load_query_jsonl,
+    query_example_from_dict,
 )
 from struct_llm.comprehension.statement import (
     EntitySlot,
@@ -64,7 +80,7 @@ from struct_llm.comprehension.statement import (
     statement_example_from_dict,
 )
 from struct_llm.world.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, states_for_frame_schema
-from struct_llm.structure import Entity, Intention, Query, Structure
+from struct_llm.structure import Entity, Intention, PragmaticAct, Query, Structure
 from struct_llm.structure import State
 from struct_llm.neural.query_classifier import (
     LoadedNeuralQueryParser,
@@ -86,5 +102,3 @@ def predict(text: str, capabilities: CognitiveCapabilities | None = None):
         raise
     print(f"{text} -> {prediction.answer}", flush=True)
     return prediction
-
-

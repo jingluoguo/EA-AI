@@ -5,6 +5,15 @@ from pathlib import Path
 
 from ..structure import Query
 from ..capabilities import QueryParser
+from ..comprehension.episode import (
+    EPISODE_DATA_PATH,
+    ActionResult,
+    DialogueTurn,
+    FeedbackDiagnosis,
+    append_episode_record,
+    build_episode_record,
+    compile_episode_model_from_jsonl,
+)
 from .learning_queue import (
     UnrecognizedExample,
     append_unrecognized_example,
@@ -79,6 +88,7 @@ class LearningPaths:
     memory_model: Path = MEMORY_MODEL_PATH
     memory_knowledge_data: Path = MEMORY_KNOWLEDGE_DATA_PATH
     memory_knowledge_model: Path = MEMORY_KNOWLEDGE_MODEL_PATH
+    episode_data: Path = EPISODE_DATA_PATH
 
 
 @dataclass(frozen=True)
@@ -332,6 +342,63 @@ def save_manual_statement_feedback(
         model_path=paths.statement_neural_weights,
         example_count=bundle.result.example_count,
         pattern_count=bundle.result.label_count,
+    )
+
+
+def save_manual_episode_feedback(
+    text: str,
+    response_policy: str,
+    paths: LearningPaths,
+    *,
+    pragmatic_acts,
+    episode_id: str = "",
+    dialogue_turn: int = 0,
+    speaker: str = "user",
+    scene: str = "",
+    previous_turns: tuple[DialogueTurn, ...] = (),
+    known_world_state=(),
+    belief_state=(),
+    relationship_state=(),
+    focus=(),
+    expected_query: Query | None = None,
+    expected_frames=(),
+    expected_state_delta=(),
+    expected_answer: str = "",
+    action_result: ActionResult | None = None,
+    feedback_diagnosis: FeedbackDiagnosis | None = None,
+    source: str = "human_feedback",
+) -> LearningWriteResult:
+    append_episode_record(
+        paths.episode_data,
+        build_episode_record(
+            text,
+            response_policy,
+            pragmatic_acts=tuple(pragmatic_acts),
+            episode_id=episode_id,
+            dialogue_turn=dialogue_turn,
+            speaker=speaker,
+            scene=scene,
+            previous_turns=previous_turns,
+            known_world_state=tuple(known_world_state),
+            belief_state=tuple(belief_state),
+            relationship_state=tuple(relationship_state),
+            focus=focus,
+            expected_query=expected_query,
+            expected_frames=tuple(expected_frames),
+            expected_state_delta=tuple(expected_state_delta),
+            expected_answer=expected_answer,
+            action_result=action_result,
+            feedback_diagnosis=feedback_diagnosis,
+            source=source,
+        ),
+    )
+    model = compile_episode_model_from_jsonl(paths.episode_data)
+    return LearningWriteResult(
+        kind="episode",
+        data_path=paths.episode_data,
+        model_path=None,
+        example_count=model.example_count,
+        pattern_count=len(model.patterns),
     )
 
 

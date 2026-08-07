@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .capabilities import CognitiveCapabilities
+from .comprehension.episode import EPISODE_DATA_PATH, InMemoryPragmaticAnalyzer
 from .kernel_flow import finalize_parse_context, ingest_sentence, initial_parse_context
 from .motor.dialogue import default_learned_dialog_answerer
 from .neural import NeuralBoundaryModel, configured_neural_boundary_model, with_neural_boundary
@@ -47,6 +48,10 @@ def default_capabilities(
         memory_states = default_memory_states()
         if memory_states:
             capabilities = capabilities.with_memory_states(*memory_states)
+    if EPISODE_DATA_PATH.exists():
+        capabilities = capabilities.with_pragmatic_analyzers(
+            InMemoryPragmaticAnalyzer.from_jsonl(EPISODE_DATA_PATH)
+        )
     if neural_model is None and use_environment:
         neural_model = configured_neural_boundary_model()
     if neural_model is None:

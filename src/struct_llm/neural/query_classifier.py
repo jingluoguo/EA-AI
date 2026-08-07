@@ -169,7 +169,13 @@ class LoadedNeuralQueryParser:
         if prediction is None:
             return None
         _, pattern = prediction
-        return materialize_query_from_pattern(sentence, entities, pattern)
+        if pattern.query is None:
+            return None
+        query_entities = query_entities_for_sentence(sentence, entities)
+        query = materialize_query_from_pattern(sentence, query_entities, pattern)
+        if query is None:
+            return None
+        return query_with_topic_evidence(sentence, query_entities, pattern, query)
 
     def best_match(
         self,
@@ -177,11 +183,19 @@ class LoadedNeuralQueryParser:
         entities: tuple[Entity, ...],
     ) -> tuple[float, CompiledQueryPattern] | None:
         candidates: list[tuple[float, float, CompiledQueryPattern]] = []
-        for label_index, confidence in self.predict_labels(sentence, entities):
+        query_entities = query_entities_for_sentence(sentence, entities)
+        predictions = self.predict_labels(sentence, entities)
+        if predictions:
+            top_label_index, top_confidence = predictions[0]
+            if self.patterns[top_label_index].query is None and top_confidence >= self.min_confidence:
+                return top_confidence, self.patterns[top_label_index]
+        for label_index, confidence in predictions:
             if confidence < QUERY_NEURAL_RERANK_CONFIDENCE:
                 continue
             pattern = self.patterns[label_index]
-            structural_score = query_structural_score(sentence, entities, pattern)
+            if pattern.query is None:
+                continue
+            structural_score = query_structural_score(sentence, query_entities, pattern)
             if confidence < QUERY_NEURAL_STRICT_CONFIDENCE and structural_score < QUERY_NEURAL_WHOLE_CANDIDATE_SCORE:
                 continue
             if confidence < QUERY_NEURAL_STRICT_CONFIDENCE and structural_score < QUERY_NEURAL_MIN_PROTOTYPE_OVERLAP:
@@ -189,7 +203,8 @@ class LoadedNeuralQueryParser:
             # Top-k reranking is still neural-led: only labels emitted by the
             # classifier are considered, then invalid slot materializations are
             # discarded before a structure can reach the kernel.
-            if materialize_query_from_pattern(sentence, entities, pattern) is None:
+            query = materialize_query_from_pattern(sentence, query_entities, pattern)
+            if query is None or query_with_topic_evidence(sentence, query_entities, pattern, query) is None:
                 continue
             candidates.append((neural_query_rank(confidence, structural_score), confidence, pattern))
         if not candidates:
@@ -207,7 +222,7 @@ class LoadedNeuralQueryParser:
     def predict_labels(self, sentence: str, entities: tuple[Entity, ...], top_k: int = QUERY_NEURAL_TOP_K) -> tuple[tuple[int, float], ...]:
         self.model.eval()
         with torch.no_grad():
-            text = build_query_input(sentence, entities_referenced_by_text(sentence, entities))
+            text = build_query_input(sentence, entities_referenced_by_text(sentence, query_entities_for_sentence(sentence, entities)))
             token_ids = torch.tensor([encode_text(text, self.vocab)], dtype=torch.long)
             lengths = torch.tensor([token_ids.shape[1]], dtype=torch.long)
             logits = self.model(token_ids, lengths)
@@ -220,6 +235,8 @@ class LoadedNeuralQueryParser:
         if prediction is None:
             return False
         confidence, pattern = prediction
+        if pattern.query is None:
+            return False
         is_fragmented = len(split_query_candidate(sentence)) > 1
         if is_fragmented:
             if pattern.query.intent not in QUERY_NEURAL_INTEGRATED_FRAGMENT_INTENTS:
@@ -228,7 +245,11 @@ class LoadedNeuralQueryParser:
                 return False
         elif confidence < QUERY_NEURAL_WHOLE_CANDIDATE_CONFIDENCE:
             return False
-        abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities_referenced_by_text(sentence, entities)))
+        query_entities = query_entities_for_sentence(sentence, entities)
+        abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities_referenced_by_text(sentence, query_entities)))
+        query = materialize_query_from_pattern(sentence, query_entities, pattern)
+        if query is None or query_with_topic_evidence(sentence, query_entities, pattern, query) is None:
+            return False
         return query_pattern_score(pattern, abstract_sentence) >= QUERY_NEURAL_WHOLE_CANDIDATE_SCORE
 
 
@@ -530,12 +551,14 @@ def load_query_neural_model(
     return model, metadata
 
 
-def query_label_key(query: Query) -> str:
-    return json.dumps(query_to_dict(query), ensure_ascii=False, sort_keys=True)
+def query_label_key(query: Query | None) -> str:
+    payload = query_to_dict(query) if query is not None else None
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
 
-def query_from_label_key(label_key: str) -> Query:
-    return query_from_dict(json.loads(label_key), "Neural query label")
+def query_from_label_key(label_key: str) -> Query | None:
+    payload = json.loads(label_key)
+    return query_from_dict(payload, "Neural query label") if payload is not None else None
 
 
 def representative_patterns_by_label(patterns: Iterable[CompiledQueryPattern]) -> dict[str, CompiledQueryPattern]:
@@ -556,7 +579,9 @@ def representative_patterns_by_label(patterns: Iterable[CompiledQueryPattern]) -
     return grouped
 
 
-def materialize_topic_query(query: Query, entities: Iterable[Any]) -> Query:
+def materialize_topic_query(query: Query | None, entities: Iterable[Any]) -> Query | None:
+    if query is None:
+        return None
     topic_slots = topic_placeholder_values(entities)
     return Query(
         query.intent,
@@ -622,6 +647,61 @@ def entities_referenced_by_text(sentence: str, entities: Iterable[Any]) -> tuple
     return tuple(sorted(referenced, key=lambda entity: text.index(canonical_text(getattr(entity, "name")))))
 
 
+def query_entities_for_sentence(sentence: str, entities: tuple[Entity, ...]) -> tuple[Entity, ...]:
+    if any(entity.role == "self" and entity.name == "我" for entity in entities):
+        return entities
+    if not self_profile_name_query_anchor(sentence):
+        return entities
+    return (*entities, Entity("self", "我"))
+
+
+def query_with_topic_evidence(
+    sentence: str,
+    entities: tuple[Entity, ...],
+    pattern: CompiledQueryPattern,
+    query: Query,
+) -> Query | None:
+    if not any(entity.role == "topic" for entity in pattern.entities):
+        return query
+    if target_has_text_evidence(sentence, query.target):
+        return query
+    focus_topic = unique_runtime_topic(entities)
+    if focus_topic is None:
+        return None
+    return Query(
+        query.intent,
+        focus_topic,
+        query.qualifiers,
+        query.subqueries,
+    )
+
+
+def target_has_text_evidence(sentence: str, target: str) -> bool:
+    text = canonical_text(sentence)
+    target_text = canonical_text(target)
+    if not text or not target_text:
+        return False
+    if target_text in text:
+        return True
+    target_chars = set(target_text)
+    overlap = len(target_chars & set(text))
+    return overlap >= max(1, min(2, len(target_chars))) and overlap / len(target_chars) >= 0.5
+
+
+def unique_runtime_topic(entities: tuple[Entity, ...]) -> str | None:
+    topics = tuple(dict.fromkeys(entity.name for entity in entities if entity.role == "topic" and entity.name))
+    if len(topics) != 1:
+        return None
+    return topics[0]
+
+
+def self_profile_name_query_anchor(sentence: str) -> bool:
+    text = canonical_text(sentence)
+    if "我" not in text:
+        return False
+    return any(anchor in text for anchor in ("我是谁", "我叫啥", "我叫什么", "我的名字", "我叫甚"))
+
+
 def query_has_unresolved_slot(query: Query) -> bool:
     values = (query.target, *query.qualifiers)
     if any(value_contains_unresolved_slot(value) for value in values):
@@ -660,6 +740,8 @@ def materialize_query_from_pattern(
     entities: tuple[Entity, ...],
     pattern: CompiledQueryPattern,
 ) -> Query | None:
+    if pattern.query is None:
+        return None
     abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities))
     inferred_entities = infer_entities_from_abstract_pattern(pattern.abstract_question, abstract_sentence, entities)
     query = instantiate_query(

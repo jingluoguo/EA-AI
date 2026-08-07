@@ -80,6 +80,14 @@ def overwrite_current_state(states: list[State], state: State) -> bool:
         ]
         states.append(state)
         return True
+    if state.name in {"focus_topic", "focus_query_intent"}:
+        states[:] = [
+            existing
+            for existing in states
+            if not (existing.name == state.name and existing.left == state.left)
+        ]
+        states.append(state)
+        return True
     if state.name in {"likes", "dislikes"}:
         opposite = "dislikes" if state.name == "likes" else "likes"
         states[:] = [

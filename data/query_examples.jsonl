@@ -805,3 +805,32 @@
 {"question": "明天见", "entities": [], "query": {"intent": "dialog_act", "target": "farewell", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
 {"question": "保重", "entities": [], "query": {"intent": "dialog_act", "target": "farewell", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
 {"question": "下次聊", "entities": [], "query": {"intent": "dialog_act", "target": "farewell", "qualifiers": [], "subqueries": []}, "source": "human_feedback", "split": "train"}
+{"question": "我想了解铁生锈的原理", "entities": [{"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision", "split": "train"}
+{"question": "我想了解下铁生锈的原理", "entities": [{"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision", "split": "train"}
+{"question": "我想知道铁生锈的原理", "entities": [{"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision", "split": "train"}
+{"question": "铁生锈的原理是什么", "entities": [{"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision", "split": "test"}
+{"question": "我看到了铁生锈", "entities": [{"role": "self", "name": "我"}, {"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision_observation", "split": "train"}
+{"question": "我看到铁生锈了", "entities": [{"role": "self", "name": "我"}, {"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision_observation", "split": "train"}
+{"question": "我想了解下原理", "entities": [{"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision_context", "split": "train"}
+{"question": "我想知道下原理", "entities": [{"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision_context", "split": "train"}
+{"question": "原理呢", "entities": [{"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision_context", "split": "test"}
+{"question": "原因呢", "entities": [{"role": "topic", "name": "铁会生锈"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_supervision_context", "split": "test"}
+{"question": "你知道吗", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "你知道嘛", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "你了解吗", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "test"}
+{"question": "你知道的话", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "我想知道下", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "你", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "我想知道芯片被谁放进托盘了的", "entities": [{"role": "item", "name": "芯片"}, {"role": "container", "name": "托盘"}], "query": {"intent": "actor_for_event", "target": "put_in", "qualifiers": ["item=$item#1", "holder=$container#1"], "subqueries": []}, "source": "structural_supervision", "split": "train"}
+{"question": "我想问芯片被谁放进托盘了的", "entities": [{"role": "item", "name": "芯片"}, {"role": "container", "name": "托盘"}], "query": {"intent": "actor_for_event", "target": "put_in", "qualifiers": ["item=$item#1", "holder=$container#1"], "subqueries": []}, "source": "structural_supervision", "split": "train"}
+{"question": "请问我想知道芯片被谁放进托盘了的", "entities": [{"role": "item", "name": "芯片"}, {"role": "container", "name": "托盘"}], "query": {"intent": "actor_for_event", "target": "put_in", "qualifiers": ["item=$item#1", "holder=$container#1"], "subqueries": []}, "source": "structural_supervision", "split": "train"}
+{"question": "我是……", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "我是", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "test"}
+{"question": "你懂吧", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "你懂吗", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "test"}
+{"question": "我想了解", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "我想说", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "我想问", "entities": [], "query": null, "source": "structural_supervision_reject", "split": "test"}
+{"question": "我想了解", "entities": [{"role": "self", "name": "我"}], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "我想说", "entities": [{"role": "self", "name": "我"}], "query": null, "source": "structural_supervision_reject", "split": "train"}
+{"question": "我想问", "entities": [{"role": "self", "name": "我"}], "query": null, "source": "structural_supervision_reject", "split": "test"}

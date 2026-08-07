@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ..comprehension.intent import InMemoryIntentAnalyzer
 from ..kernel import default_capabilities
+from ..memory.working import capabilities_with_working_turn
 from ..motor.dialogue import LearnedDialogActAnswerer
 from .common import (
     apply_memory_args,
@@ -77,9 +78,17 @@ def ask_symbolic() -> None:
         return
 
     print("输入一句话，按回车推理；输入 exit 退出。")
+    session_capabilities = capabilities
     while True:
         text = input("> ").strip()
         if text.lower() in {"exit", "quit", "q"}:
             break
         if text:
-            print_prediction_with_learning(text, capabilities, args)
+            prediction = print_prediction_with_learning(text, session_capabilities, args)
+            if prediction is not None:
+                session_capabilities = capabilities_with_working_turn(
+                    session_capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                )

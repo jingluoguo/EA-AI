@@ -16,6 +16,13 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from struct_llm.capabilities import CognitiveCapabilities
+from struct_llm.comprehension.episode import (
+    EPISODE_DATA_PATH,
+    InMemoryPragmaticAnalyzer,
+    compile_episode_model_from_jsonl,
+    evaluate_pragmatic_analyzer,
+    load_episode_jsonl,
+)
 from struct_llm.comprehension.intent import InMemoryIntentAnalyzer
 from struct_llm.comprehension.intent import evaluate_intent_analyzer, load_intent_jsonl
 from struct_llm.comprehension.query import (
@@ -44,7 +51,7 @@ from struct_llm.neural.statement_classifier import (
     statement_neural_summary,
     train_statement_neural_model,
 )
-from struct_llm.structure import Entity, Event, Frame, Intention, Query, Relation, Role, State, Structure
+from struct_llm.structure import Entity, Event, Frame, Intention, PragmaticAct, Query, Relation, Role, State, Structure
 
 
 TRAINING_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
@@ -68,6 +75,8 @@ class LocalNeuralBoundaryModel:
             return self._parse_statement(payload)
         if task == "analyze_intent":
             return self._analyze_intent(payload)
+        if task == "analyze_pragmatics":
+            return self._analyze_pragmatics(payload)
         if task == "answer":
             return self._answer(payload)
         return None
@@ -116,6 +125,19 @@ class LocalNeuralBoundaryModel:
         return {
             "confidence": max(intention.confidence for intention in intentions),
             "intentions": [intention_to_dict(intention) for intention in intentions],
+        }
+
+    def _analyze_pragmatics(self, payload: Mapping[str, Any]) -> Mapping[str, Any] | None:
+        text = str(payload.get("text") or "").strip()
+        structure = structure_from_dict(payload.get("structure"))
+        if structure is None:
+            return None
+        acts = self._capabilities.analyze_pragmatics(text, structure)
+        if not acts:
+            return None
+        return {
+            "confidence": max(act.confidence for act in acts),
+            "pragmatic_acts": [pragmatic_act_to_dict(act) for act in acts],
         }
 
     def _answer(self, payload: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -193,6 +215,22 @@ def train_summary(model: LocalNeuralBoundaryModel) -> dict[str, Any]:
             "patterns": len(dialog_model.patterns),
         }
 
+    if EPISODE_DATA_PATH.exists():
+        episode_examples = load_episode_jsonl(EPISODE_DATA_PATH)
+        episode_model = compile_episode_model_from_jsonl(EPISODE_DATA_PATH)
+        pragmatic_analyzer = (
+            capabilities.pragmatic_analyzers[0]
+            if capabilities.pragmatic_analyzers
+            else InMemoryPragmaticAnalyzer()
+        )
+        pragmatic_result = evaluate_pragmatic_analyzer(pragmatic_analyzer, episode_examples)
+        summary["episode"] = {
+            "examples": episode_model.example_count,
+            "patterns": len(episode_model.patterns),
+            "matched": pragmatic_result.matched,
+            "accuracy": round(pragmatic_result.accuracy, 4),
+        }
+
     return summary
 
 
@@ -253,6 +291,26 @@ def intention_to_dict(intention: Intention) -> dict[str, Any]:
         "evidence": intention.evidence,
         "confidence": intention.confidence,
         "source": intention.source,
+    }
+
+
+def pragmatic_act_from_dict(record: dict[str, Any]) -> PragmaticAct:
+    return PragmaticAct(
+        act=str(record.get("act") or "").strip(),
+        target=str(record.get("target") or "").strip(),
+        qualifiers=tuple(str(value).strip() for value in record.get("qualifiers", ()) if str(value).strip()),
+        confidence=float(record.get("confidence") or 1.0),
+        source=str(record.get("source") or "neural").strip() or "neural",
+    )
+
+
+def pragmatic_act_to_dict(act: PragmaticAct) -> dict[str, Any]:
+    return {
+        "act": act.act,
+        "target": act.target,
+        "qualifiers": list(act.qualifiers),
+        "confidence": act.confidence,
+        "source": act.source,
     }
 
 
@@ -324,6 +382,7 @@ def structure_from_dict(record: Any) -> Structure | None:
             frames=tuple(frame_from_dict(value) for value in record.get("frames", ()) if isinstance(value, dict)),
             states=tuple(state_from_dict(value) for value in record.get("states", ()) if isinstance(value, dict)),
             intentions=tuple(intention_from_dict(value) for value in record.get("intentions", ()) if isinstance(value, dict)),
+            pragmatic_acts=tuple(pragmatic_act_from_dict(value) for value in record.get("pragmatic_acts", ()) if isinstance(value, dict)),
         )
     except (TypeError, ValueError):
         return None

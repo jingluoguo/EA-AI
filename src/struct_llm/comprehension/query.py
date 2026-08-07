@@ -10,7 +10,7 @@ from ..errors import ParseError
 from ..structure import Entity, Query
 from ..capabilities import QueryParser
 from ..perception.lexer import split_query_candidate
-from ..perception.normalizer import is_question_noise, normalize_question
+from ..perception.normalizer import normalize_question
 
 
 QUERY_DATA_PATH = Path(__file__).resolve().parents[3] / "data" / "query_examples.jsonl"
@@ -28,7 +28,7 @@ class EntityExample:
 class QueryTrainingExample:
     question: str
     entities: tuple[EntityExample, ...]
-    query: Query
+    query: Query | None
     abstract_question: str
     source: str = "training"
     split: str = "train"
@@ -38,7 +38,7 @@ class QueryTrainingExample:
 class CompiledQueryPattern:
     abstract_question: str
     entities: tuple[EntityExample, ...]
-    query: Query
+    query: Query | None
     feature_units: tuple[str, ...]
     support: int = 1
 
@@ -72,7 +72,7 @@ def compile_query_examples(
         key = (
             abstract,
             tuple((entity.role, entity.name) for entity in example.entities),
-            query_signature(example.query),
+            optional_query_signature(example.query),
         )
         previous = grouped.get(key)
         if previous is None:
@@ -103,21 +103,21 @@ def query_pattern_from_dict(record: Any) -> CompiledQueryPattern:
     if not isinstance(record, dict):
         raise ValueError("Query model pattern entries must be objects.")
     abstract = str(record.get("abstract_question") or "").strip()
-    if not abstract:
-        raise ValueError("Query model pattern requires abstract_question.")
     raw_entities = record.get("entities", ())
     if not isinstance(raw_entities, list):
         raise ValueError("Query model pattern entities must be a list.")
     raw_query = record.get("query")
-    if not isinstance(raw_query, dict):
-        raise ValueError("Query model pattern query must be an object.")
+    if raw_query is not None and not isinstance(raw_query, dict):
+        raise ValueError("Query model pattern query must be an object or null.")
+    if not abstract and raw_query is not None:
+        raise ValueError("Query model pattern requires abstract_question.")
     raw_units = record.get("feature_units", ())
     if not isinstance(raw_units, list):
         raise ValueError("Query model pattern feature_units must be a list.")
     return CompiledQueryPattern(
         abstract_question=abstract,
         entities=tuple(entity_example_from_dict(value, "Query model pattern") for value in raw_entities),
-        query=query_from_dict(raw_query, "Query model pattern"),
+        query=query_from_dict(raw_query, "Query model pattern") if raw_query is not None else None,
         feature_units=tuple(str(value) for value in raw_units if str(value)),
         support=int(record.get("support") or 1),
     )
@@ -127,7 +127,7 @@ def query_pattern_to_dict(pattern: CompiledQueryPattern) -> dict[str, Any]:
     return {
         "abstract_question": pattern.abstract_question,
         "entities": [entity_example_to_dict(entity) for entity in pattern.entities],
-        "query": query_to_dict(pattern.query),
+        "query": query_to_dict(pattern.query) if pattern.query is not None else None,
         "feature_units": list(pattern.feature_units),
         "support": pattern.support,
     }
@@ -144,8 +144,6 @@ def resolve_query_candidates(
 
     for candidate in candidates:
         full_query = resolve_query_candidate(candidate, entities, parsers)
-        if is_question_noise(candidate) and not noise_candidate_has_meaningful_query(full_query):
-            continue
         meaningful_candidates.append(candidate)
 
         fragments = split_query_candidate(candidate)
@@ -154,8 +152,6 @@ def resolve_query_candidates(
             continue
 
         for fragment in fragments:
-            if is_question_noise(fragment):
-                continue
             try:
                 query = resolve_query_candidate_or_raise(fragment, entities, parsers)
             except ParseError as error:
@@ -186,14 +182,6 @@ def resolve_query_candidates(
     if errors:
         raise errors[-1]
     return None
-
-
-def noise_candidate_has_meaningful_query(query: Query | None) -> bool:
-    if query is None:
-        return False
-    if query.intent != "dialog_act":
-        return True
-    return query.target not in {"greeting", "capabilities"}
 
 
 def resolve_query_candidate(
@@ -243,6 +231,8 @@ def query_candidate_is_learned_unit(
         best = best_match(sentence, entities)
         if best is None or best[0] < 0.96:
             continue
+        if best[1].query is None:
+            continue
         # A high-scoring template should not swallow a comma-separated
         # compound query unless the model is nearly exact on the whole input.
         if len(split_query_candidate(sentence)) > 1 and best[0] < 1.0:
@@ -264,7 +254,7 @@ def suggest_query_pattern(
             best = best_match(sentence, entities)
             if best is not None:
                 score, pattern = best
-                if score >= min_score:
+                if score >= min_score and pattern.query is not None:
                     suggestions.append((score, pattern))
     if not suggestions:
         return None
@@ -291,6 +281,10 @@ def evaluate_query_parser(
     for example in examples:
         runtime_entities = tuple(Entity(entity.role, entity.name) for entity in example.entities)
         query = parser(example.question, runtime_entities)
+        if example.query is None:
+            if query is None:
+                matched += 1
+            continue
         expected = instantiate_query(example.query, example.entities, example.question, runtime_entities)
         if query is not None and query.linearize() == expected.linearize():
             matched += 1
@@ -337,7 +331,7 @@ def query_example_to_record(example: QueryTrainingExample) -> dict[str, Any]:
     return {
         "question": example.question,
         "entities": [entity_example_to_dict(entity) for entity in example.entities],
-        "query": query_to_dict(example.query),
+        "query": query_to_dict(example.query) if example.query is not None else None,
         "source": example.source,
         "split": example.split,
     }
@@ -354,10 +348,12 @@ def query_example_from_dict(record: dict[str, Any], *, line_number: int | None =
         raise ValueError(f"{prefix} entities must be a list.")
     entities = tuple(entity_example_from_dict(value, prefix) for value in raw_entities)
 
+    if "query" not in record:
+        raise ValueError(f"{prefix} requires a query field.")
     raw_query = record.get("query")
-    if not isinstance(raw_query, dict):
-        raise ValueError(f"{prefix} query must be an object.")
-    query = query_from_dict(raw_query, prefix)
+    if raw_query is not None and not isinstance(raw_query, dict):
+        raise ValueError(f"{prefix} query must be an object or null.")
+    query = query_from_dict(raw_query, prefix) if raw_query is not None else None
     abstract = str(record.get("abstract_question") or "").strip() or abstract_question(question, entities)
     return QueryTrainingExample(
         question=question,
@@ -422,6 +418,10 @@ def query_signature(query: Query) -> tuple[Any, ...]:
         query.qualifiers,
         tuple(query_signature(subquery) for subquery in query.subqueries),
     )
+
+
+def optional_query_signature(query: Query | None) -> tuple[Any, ...] | None:
+    return query_signature(query) if query is not None else None
 
 
 def instantiate_query(

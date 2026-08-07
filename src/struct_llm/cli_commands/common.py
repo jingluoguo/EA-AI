@@ -37,6 +37,7 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
     try:
         prediction = print_prediction(question, capabilities)
         maybe_save_chat_memory(question, prediction.structure, args)
+        return prediction
     except ParseError:
         try:
             structure = parse_text(question, capabilities)
@@ -44,19 +45,19 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
             structure = None
         if structure is not None and structure.query is not None:
             print_unanswered_structure(question, structure)
-            return
+            return None
         if not getattr(args, "learn_on_fail", False):
             raise
         learned = prompt_learning_feedback(question, args)
         if learned == "queued":
-            return
+            return None
         if not learned:
             print("已跳过，不写入训练集。")
-            return
+            return None
         refreshed = capabilities_after_training(args)
         print("我已经记下并重新整理模型了。现在重试一次：")
         try:
-            print_prediction(question, refreshed)
+            return print_prediction(question, refreshed)
         except ParseError:
             try:
                 structure = parse_text(question, refreshed)
@@ -66,6 +67,7 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
                 print_unanswered_structure(question, structure)
             else:
                 print("样本已经保存，不过当前还不能完整理解。后续补充训练样本后再试。")
+            return None
 
 
 def prompt_learning_feedback(text: str, args) -> str | bool:

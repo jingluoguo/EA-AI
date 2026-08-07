@@ -55,38 +55,6 @@ TAKE_OUT_VERBS = ("取出来", "拿出来", "取出", "拿出", "取走", "拿�
 CONTAINER_SUFFIXES = ("里面", "里边", "里头", "内部", "里", "内", "中")
 CONTAINER_SURFACE_SUFFIXES = ("里面", "里边", "里头", "内部")
 DEMONSTRATIVE_PREFIXES = ("这个", "这件", "那个", "那件")
-QUESTION_NOISE_PHRASES = (
-    "请问",
-    "告诉我",
-    "帮我看看",
-    "给我说一下",
-    "想知道",
-    "想了解",
-    "想问",
-)
-CHAT_EXPRESSION_HINTS = (
-    "你好",
-    "您好",
-    "嗨",
-    "哈喽",
-    "谢谢",
-    "感谢",
-    "再见",
-    "拜拜",
-    "你是谁",
-    "你叫什么",
-    "你能做什么",
-    "你会什么",
-    "你可以做什么",
-    "总结",
-    "概括",
-    "回顾",
-    "刚才说了什么",
-    "我叫什么",
-    "我是谁",
-    "我喜欢什么",
-    "我讨厌什么",
-)
 
 
 def normalize_question(sentence: str) -> str:
@@ -185,54 +153,3 @@ def normalize_take_out_expression(sentence: str) -> str:
         normalized = normalized.replace(verb, "取出")
     return normalized
 
-
-def is_question_noise(sentence: str) -> bool:
-    normalized = normalize_question(sentence).strip()
-    if not normalized:
-        return True
-    if any(hint in normalized for hint in CHAT_EXPRESSION_HINTS):
-        return False
-    if normalized in QUESTION_NOISE_PHRASES or normalized in {
-        "知道",
-        "知道吗",
-        "知道嘛",
-        "知道的话",
-        "了解",
-        "了解吗",
-        "了解嘛",
-        "了解的话",
-        "明白",
-        "明白吗",
-        "明白嘛",
-        "明白的话",
-        "你知道",
-        "你知道吗",
-        "你知道嘛",
-        "你知道的话",
-        "你了解",
-        "你了解吗",
-        "你了解嘛",
-        "你了解的话",
-        "你明白",
-        "你明白吗",
-        "你明白嘛",
-        "你明白的话",
-        "您知道",
-        "您知道吗",
-        "您知道嘛",
-        "您知道的话",
-        "您了解",
-        "您了解吗",
-        "您了解嘛",
-        "您了解的话",
-        "您明白",
-        "您明白吗",
-        "您明白嘛",
-        "您明白的话",
-    }:
-        return True
-    if len(normalized) <= 3 and not any(
-        word in normalized for word in ("谁", "什么", "哪里", "哪儿", "哪", "有", "在", "是", "几", "多", "最", "前", "后", "能", "会")
-    ):
-        return True
-    return False

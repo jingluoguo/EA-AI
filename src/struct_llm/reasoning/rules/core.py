@@ -17,6 +17,7 @@ __all__ = (
     "infer_actions_by_actors",
     "infer_compound_query",
     "infer_dialog_act",
+    "infer_pragmatic_response_policy",
     "infer_profile_lookup",
     "infer_initial_location",
     "infer_location_before_actor_action",

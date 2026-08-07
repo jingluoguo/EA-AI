@@ -148,6 +148,10 @@ def evaluate_statement_parser(
     matched = 0
     for example in examples:
         parsed = parser(example.sentence)
+        if not example.frames:
+            if parsed is None:
+                matched += 1
+            continue
         expected = instantiate_statement(example, slots_from_example(example))
         if parsed is not None and linearize_statement_result(parsed) == linearize_statement_result(expected):
             matched += 1
@@ -213,8 +217,6 @@ def statement_example_from_dict(record: dict[str, Any], *, line_number: int | No
     if not isinstance(raw_frames, list):
         raise ValueError(f"{prefix} frames must be a list.")
     frames = tuple(frame_template_from_dict(value, prefix) for value in raw_frames)
-    if not frames:
-        raise ValueError(f"{prefix} requires at least one frame.")
 
     return StatementTrainingExample(
         sentence=sentence,

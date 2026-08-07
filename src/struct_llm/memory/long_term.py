@@ -257,6 +257,12 @@ def memory_entities_from_states(states: tuple[State, ...]) -> tuple[Entity, ...]
 
 
 def entities_for_state(state: State) -> tuple[Entity, ...]:
+    if state.name == "last_user_utterance":
+        return ()
+    if state.name == "focus_topic":
+        return (Entity("topic", state.right),)
+    if state.name == "focus_query_intent":
+        return ()
     if state.name == "at":
         return (Entity("thing", state.left), Entity("place", state.right))
     if state.name == "in":

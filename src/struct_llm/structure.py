@@ -74,6 +74,23 @@ class Intention:
 
 
 @dataclass(frozen=True)
+class PragmaticAct:
+    act: str
+    target: str = ""
+    qualifiers: tuple[str, ...] = ()
+    confidence: float = 1.0
+    source: str = "learned"
+
+    def linearize(self) -> str:
+        target = self.target or "_"
+        if self.qualifiers:
+            head = f"PRAGMATIC_ACT {self.act}({target},{','.join(self.qualifiers)})"
+        else:
+            head = f"PRAGMATIC_ACT {self.act}({target})"
+        return f"{head} confidence={self.confidence:.2f} source={self.source}"
+
+
+@dataclass(frozen=True)
 class Role:
     frame_id: str
     name: str
@@ -206,6 +223,7 @@ class Structure:
     frames: tuple[Frame, ...] = ()
     states: tuple[State, ...] = ()
     intentions: tuple[Intention, ...] = ()
+    pragmatic_acts: tuple[PragmaticAct, ...] = ()
 
     def linearize(self) -> str:
         lines = [entity.linearize() for entity in self.entities]
@@ -216,6 +234,7 @@ class Structure:
         lines.extend(relation.linearize() for relation in relations)
         lines.extend(event.linearize() for event in events)
         lines.extend(intention.linearize() for intention in self.intentions)
+        lines.extend(act.linearize() for act in self.pragmatic_acts)
         lines.extend(frame.linearize() for frame in frames)
         lines.extend(f"RULE {rule}" for rule in self.rules)
         query = self.query

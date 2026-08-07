@@ -103,6 +103,227 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("SUBQUERY profile(我,attribute=likes)", structure)
         self.assertEqual(prediction.answer, "你叫小王；你喜欢咖啡。")
 
+    def test_activity_preference_statement_is_queryable_chat_state(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        name_turn = predict("我叫郭士君", capabilities)
+        capabilities = capabilities_with_working_turn(capabilities, "我叫郭士君", name_turn.structure.states)
+
+        first = predict("我喜欢徒步", capabilities)
+        first_structure = first.structure.linearize()
+        self.assertIn("REL name(我,郭士君)", first_structure)
+        self.assertIn("REL likes(我,徒步)", first_structure)
+        self.assertIn("FRAME f1 type=profile_like time=1", first_structure)
+        self.assertEqual(first.answer, "我知道了，你喜欢徒步。")
+
+        capabilities = capabilities_with_working_turn(capabilities, "我喜欢徒步", first.structure.states)
+        second = predict("我喜欢什么", capabilities)
+
+        structure = second.structure.linearize()
+        self.assertIn("REL likes(我,徒步)", structure)
+        self.assertIn("QUERY profile(我,attribute=likes)", structure)
+        self.assertEqual(second.answer, "你喜欢徒步。")
+
+    def test_self_profile_queries_use_discourse_participant_context(self) -> None:
+        examples = ("我是谁", "我叫啥", "我叫什么")
+
+        for text in examples:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn("ENTITY self=我", structure)
+                self.assertIn("QUERY profile(我,attribute=name)", structure)
+                self.assertIn("RULE profile_name_unknown", structure)
+                self.assertEqual(prediction.answer, "我还不知道你叫什么。")
+
+    def test_real_chinese_profile_name_statements_are_queryable(self) -> None:
+        examples = ("我叫郭士君。我是谁？", "我是郭士君。我叫啥？")
+
+        for text in examples:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn("REL name(我,郭士君)", structure)
+                self.assertIn("FRAME f1 type=profile_name time=1", structure)
+                self.assertIn("QUERY profile(我,attribute=name)", structure)
+                self.assertEqual(prediction.answer, "你叫郭士君。")
+
+    def test_episode_pragmatic_supervision_handles_incomplete_and_ambiguous_inputs(self) -> None:
+        cases = (
+            (
+                "我是……",
+                "PRAGMATIC_ACT incomplete_utterance(profile_name,missing=profile_value,response_policy=wait_for_completion)",
+                "RULE pragmatic_response_wait_for_completion",
+                "我先等你把话说完整。",
+            ),
+            (
+                "那个呢？",
+                "PRAGMATIC_ACT ambiguous_reference(那个,missing=referent,depends_on=focus,response_policy=ask_clarification)",
+                "RULE pragmatic_response_ask_clarification",
+                "这句话还缺少可计算的对象或上下文，你想让我具体处理什么？",
+            ),
+            (
+                "帮我弄一下",
+                "PRAGMATIC_ACT underspecified_action_request(task,missing=object,missing=operation,response_policy=ask_clarification)",
+                "RULE pragmatic_response_ask_clarification",
+                "这句话还缺少可计算的对象或上下文，你想让我具体处理什么？",
+            ),
+            (
+                "你懂吧？",
+                "PRAGMATIC_ACT confirm_understanding(shared_ground,not_capability_query=true,response_policy=confirm)",
+                "RULE pragmatic_response_confirm",
+                "我理解你是在确认我是否跟上了。",
+            ),
+            (
+                "你",
+                "PRAGMATIC_ACT incomplete_utterance(addressee,missing=predicate,response_policy=wait_for_completion)",
+                "RULE pragmatic_response_wait_for_completion",
+                "我先等你把话说完整。",
+            ),
+            (
+                "我想说",
+                "PRAGMATIC_ACT incomplete_utterance(user_intention,intent=say,missing=content,response_policy=wait_for_completion)",
+                "RULE pragmatic_response_wait_for_completion",
+                "我先等你把话说完整。",
+            ),
+            (
+                "我想了解",
+                "PRAGMATIC_ACT incomplete_utterance(user_intention,intent=learn,missing=topic,response_policy=wait_for_completion)",
+                "RULE pragmatic_response_wait_for_completion",
+                "我先等你把话说完整。",
+            ),
+        )
+
+        for text, pragmatic_line, rule, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(pragmatic_line, structure)
+                self.assertIn(rule, structure)
+                self.assertEqual(prediction.answer, answer)
+
+    def test_incomplete_inputs_do_not_ack_stale_profile_memory(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        name_turn = predict("我叫郭士君", capabilities)
+        capabilities = capabilities_with_working_turn(capabilities, "我叫郭士君", name_turn.structure.states)
+        like_turn = predict("我喜欢徒步", capabilities)
+        capabilities = capabilities_with_working_turn(capabilities, "我喜欢徒步", like_turn.structure.states)
+
+        for text in ("你", "我想说", "我想了解"):
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                structure = prediction.structure.linearize()
+                self.assertIn("REL name(我,郭士君)", structure)
+                self.assertIn("REL likes(我,徒步)", structure)
+                self.assertIn("RULE pragmatic_response_wait_for_completion", structure)
+                self.assertEqual(prediction.answer, "我先等你把话说完整。")
+
+    def test_episode_pragmatic_supervision_coexists_with_query_structure(self) -> None:
+        prediction = predict("你会想我吗")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("QUERY dialog_act(affection)", structure)
+        self.assertIn("PRAGMATIC_ACT relationship_probe(affection,not_capability_query=true,response_policy=answer)", structure)
+        self.assertEqual(
+            prediction.answer,
+            "我不会像人一样想念你，但我会记得当前对话里的上下文；你回来找我时，我会认真接住你的话。",
+        )
+
+    def test_working_memory_answers_previous_user_turn_query(self) -> None:
+        capabilities = capabilities_with_last_user_utterance(
+            default_capabilities(use_environment=False, use_memory=False),
+            "你是谁",
+        )
+
+        prediction = predict("我刚刚说的啥", capabilities)
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL last_user_utterance(user,你是谁)", structure)
+        self.assertIn("PRAGMATIC_ACT recall_previous_turn(user,turn=previous,response_policy=answer)", structure)
+        self.assertIn("RULE pragmatic_recall_previous_turn_found", structure)
+        self.assertEqual(prediction.answer, "你刚刚说的是：你是谁")
+
+    def test_working_memory_carries_profile_state_between_turns(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        first = predict("我叫郭士君", capabilities)
+        capabilities = capabilities_with_working_turn(capabilities, "我叫郭士君", first.structure.states)
+
+        second = predict("我是谁", capabilities)
+
+        structure = second.structure.linearize()
+        self.assertIn("REL name(我,郭士君)", structure)
+        self.assertIn("REL last_user_utterance(user,我叫郭士君)", structure)
+        self.assertIn("QUERY profile(我,attribute=name)", structure)
+        self.assertEqual(second.answer, "你叫郭士君。")
+
+    def test_follow_up_principle_question_reuses_previous_query_focus(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False).with_answerers(
+            default_learned_memory_knowledge_answerer("data/memory_knowledge_model.json")
+        )
+        first = predict("我看到了铁生锈", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "我看到了铁生锈",
+            first.structure.states,
+            first.structure.query,
+        )
+
+        second = predict("我想了解下原理", capabilities)
+
+        structure = second.structure.linearize()
+        self.assertIn("QUERY why(铁会生锈,type=why)", structure)
+        self.assertNotIn("PRAGMATIC_ACT incomplete_utterance", structure)
+        self.assertEqual(second.answer, "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。")
+
+    def test_observation_query_can_replace_stale_profile_focus(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False).with_answerers(
+            default_learned_memory_knowledge_answerer("data/memory_knowledge_model.json")
+        )
+        name_turn = predict("我叫郭士君", capabilities)
+        capabilities = capabilities_with_working_turn(capabilities, "我叫郭士君", name_turn.structure.states, name_turn.structure.query)
+        like_turn = predict("我喜欢徒步", capabilities)
+        capabilities = capabilities_with_working_turn(capabilities, "我喜欢徒步", like_turn.structure.states, like_turn.structure.query)
+        profile_query = predict("我喜欢什么", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "我喜欢什么",
+            profile_query.structure.states,
+            profile_query.structure.query,
+        )
+
+        observation = predict("我看到了铁生锈", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "我看到了铁生锈",
+            observation.structure.states,
+            observation.structure.query,
+        )
+        followup = predict("我想了解下原理", capabilities)
+
+        self.assertIn("QUERY why(铁会生锈,type=why)", observation.structure.linearize())
+        self.assertEqual(observation.answer, "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。")
+        self.assertIn("QUERY why(铁会生锈,type=why)", followup.structure.linearize())
+        self.assertEqual(followup.answer, "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。")
+
+    def test_principle_request_without_focus_waits_for_completion(self) -> None:
+        prediction = predict("我想了解下原理", default_capabilities(use_environment=False, use_memory=False))
+
+        structure = prediction.structure.linearize()
+        self.assertIn("PRAGMATIC_ACT incomplete_utterance(user_intention,intent=learn,missing=topic,response_policy=wait_for_completion)", structure)
+        self.assertIn("RULE pragmatic_response_wait_for_completion", structure)
+        self.assertEqual(prediction.answer, "我先等你把话说完整。")
+
+    def test_pragmatic_acts_are_deduped_across_local_neural_provider_layers(self) -> None:
+        capabilities = with_neural_boundary(
+            default_capabilities(use_environment=False, use_memory=False),
+            make_model(),
+        )
+
+        prediction = predict("那个呢", capabilities)
+
+        structure = prediction.structure.linearize()
+        self.assertEqual(structure.count("PRAGMATIC_ACT ambiguous_reference"), 1)
+        self.assertEqual(prediction.answer, "这句话还缺少可计算的对象或上下文，你想让我具体处理什么？")
+
     def test_profile_name_statement_without_task_query_is_acknowledged(self) -> None:
         examples = (
             "我是小郭",

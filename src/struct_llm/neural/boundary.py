@@ -9,7 +9,7 @@ from typing import Any, Callable, Mapping, Optional, Protocol
 from ..capabilities import CognitiveCapabilities, StatementParseResult
 from ..comprehension.query import query_from_dict
 from ..perception.normalizer import normalize_slot_value
-from ..structure import Entity, Frame, Intention, Query, Relation, Role, State, Structure
+from ..structure import Entity, Frame, Intention, PragmaticAct, Query, Relation, Role, State, Structure
 
 
 NeuralPayload = Mapping[str, Any]
@@ -114,6 +114,33 @@ class NeuralIntentAnalyzer:
 
 
 @dataclass(frozen=True)
+class NeuralPragmaticAnalyzer:
+    model: NeuralBoundaryModel
+    min_confidence: float = 0.55
+
+    def __call__(self, text: str, structure: Structure) -> tuple[PragmaticAct, ...]:
+        result = self.model.predict(
+            "analyze_pragmatics",
+            {
+                "text": text,
+                "structure": structure_to_dict(structure),
+            },
+        )
+        if not confident_enough(result, self.min_confidence):
+            return ()
+        raw_acts = result.get("pragmatic_acts") if result is not None else None
+        if not isinstance(raw_acts, list):
+            return ()
+        acts = tuple(
+            act
+            for value in raw_acts
+            for act in (pragmatic_act_from_dict(value),)
+            if act is not None and act.confidence >= self.min_confidence
+        )
+        return acts[:3]
+
+
+@dataclass(frozen=True)
 class NeuralAnswerer:
     model: NeuralBoundaryModel
     min_confidence: float = 0.65
@@ -137,11 +164,13 @@ def with_neural_boundary(
     query_min_confidence: float = 0.75,
     statement_min_confidence: float = 0.75,
     intent_min_confidence: float = 0.55,
+    pragmatic_min_confidence: float = 0.55,
     answer_min_confidence: float = 0.65,
 ) -> CognitiveCapabilities:
     query_parser = NeuralQueryParser(model, min_confidence=query_min_confidence)
     statement_parser = NeuralStatementParser(model, min_confidence=statement_min_confidence)
     intent_analyzer = NeuralIntentAnalyzer(model, min_confidence=intent_min_confidence)
+    pragmatic_analyzer = NeuralPragmaticAnalyzer(model, min_confidence=pragmatic_min_confidence)
     answerer = NeuralAnswerer(model, min_confidence=answer_min_confidence)
 
     statement_priority = normalize_priority(statement_priority, after_alias="after_existing")
@@ -178,6 +207,11 @@ def with_neural_boundary(
         if input_first
         else (*capabilities.intent_analyzers, intent_analyzer)
     )
+    pragmatic_analyzers = (
+        (pragmatic_analyzer, *capabilities.pragmatic_analyzers)
+        if input_first
+        else (*capabilities.pragmatic_analyzers, pragmatic_analyzer)
+    )
     return CognitiveCapabilities(
         statement_parsers=statement_parsers,
         state_projectors=capabilities.state_projectors,
@@ -186,6 +220,7 @@ def with_neural_boundary(
         rule_inferers=capabilities.rule_inferers,
         answerers=answerers,
         intent_analyzers=intent_analyzers,
+        pragmatic_analyzers=pragmatic_analyzers,
         memory_states=capabilities.memory_states,
     )
 
@@ -298,6 +333,32 @@ def intention_from_dict(record: Any) -> Intention | None:
     )
 
 
+def pragmatic_act_from_dict(record: Any) -> PragmaticAct | None:
+    if not isinstance(record, dict):
+        return None
+    act = str(record.get("act") or "").strip()
+    if not act:
+        return None
+    try:
+        confidence = float(record.get("confidence", 1.0))
+    except (TypeError, ValueError):
+        return None
+    if confidence < 0 or confidence > 1:
+        return None
+    raw_qualifiers = record.get("qualifiers", ())
+    if raw_qualifiers is None:
+        raw_qualifiers = ()
+    if not isinstance(raw_qualifiers, list):
+        return None
+    return PragmaticAct(
+        act=act,
+        target=str(record.get("target") or "").strip(),
+        qualifiers=tuple(str(value).strip() for value in raw_qualifiers if str(value).strip()),
+        confidence=confidence,
+        source=str(record.get("source") or "neural").strip() or "neural",
+    )
+
+
 def structure_to_dict(structure: Structure) -> dict[str, Any]:
     return {
         "entities": [entity_to_dict(entity) for entity in structure.entities],
@@ -308,6 +369,7 @@ def structure_to_dict(structure: Structure) -> dict[str, Any]:
         "frames": [frame_to_dict(frame) for frame in structure.frames],
         "states": [state_to_dict(state) for state in structure.states],
         "intentions": [intention_to_dict(intention) for intention in structure.intentions],
+        "pragmatic_acts": [pragmatic_act_to_dict(act) for act in structure.pragmatic_acts],
         "linearized": structure.linearize(),
     }
 
@@ -363,4 +425,14 @@ def intention_to_dict(intention: Intention) -> dict[str, Any]:
         "evidence": intention.evidence,
         "confidence": intention.confidence,
         "source": intention.source,
+    }
+
+
+def pragmatic_act_to_dict(act: PragmaticAct) -> dict[str, Any]:
+    return {
+        "act": act.act,
+        "target": act.target,
+        "qualifiers": list(act.qualifiers),
+        "confidence": act.confidence,
+        "source": act.source,
     }

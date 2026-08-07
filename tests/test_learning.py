@@ -98,6 +98,34 @@ class LearningTest(unittest.TestCase):
         self.assertIn("REL at(芯片,库房)", structure)
         self.assertEqual(prediction.answer, "芯片在库房。")
 
+    def test_neural_boundary_can_replace_pragmatic_learning_signal(self) -> None:
+        model = InMemoryNeuralBoundaryModel(
+            {
+                "analyze_pragmatics": lambda payload: {
+                    "confidence": 0.96,
+                    "pragmatic_acts": [
+                        {
+                            "act": "incomplete_utterance",
+                            "target": "task",
+                            "qualifiers": ["missing=object", "response_policy=wait_for_completion"],
+                            "confidence": 0.96,
+                            "source": "neural",
+                        }
+                    ],
+                },
+            }
+        )
+        capabilities = with_neural_boundary(
+            default_capabilities(use_environment=False, use_memory=False),
+            model,
+        )
+
+        prediction = predict("这句还没说完", capabilities)
+
+        self.assertIsInstance(capabilities.pragmatic_analyzers[0], NeuralPragmaticAnalyzer)
+        self.assertIn("PRAGMATIC_ACT incomplete_utterance(task,missing=object,response_policy=wait_for_completion)", prediction.structure.linearize())
+        self.assertEqual(prediction.answer, "我先等你把话说完整。")
+
     def test_neural_answerer_runs_after_verified_dialog_answers_by_default(self) -> None:
         def parse_query(payload):
             return {
@@ -175,6 +203,46 @@ class LearningTest(unittest.TestCase):
                 assert query is not None
                 self.assertEqual(query.linearize(), "QUERY why(铁会生锈,type=why)")
 
+    def test_default_neural_query_parser_reuses_focus_topic_for_principle_followups(self) -> None:
+        parser = default_neural_query_parser()
+        entities = (Entity("topic", "铁会生锈"),)
+
+        for text in ("我想了解下原理", "我想知道下原理", "原理呢", "原因呢"):
+            with self.subTest(text=text):
+                query = parser(text, entities)
+                self.assertIsNotNone(query)
+                assert query is not None
+                self.assertEqual(query.linearize(), "QUERY why(铁会生锈,type=why)")
+
+        for text in ("我想了解铁生锈的原理", "我想知道铁生锈的原理"):
+            with self.subTest(text=text):
+                query = parser(text, ())
+                self.assertIsNotNone(query)
+                assert query is not None
+                self.assertEqual(query.linearize(), "QUERY why(铁会生锈,type=why)")
+
+        self.assertIsNone(parser("我想了解下原理", ()))
+
+    def test_neural_query_parser_learns_non_query_rejection(self) -> None:
+        parser = default_neural_query_parser()
+
+        for text in ("你知道吗", "你知道嘛", "你了解吗", "你知道的话", "我想知道下"):
+            with self.subTest(text=text):
+                self.assertIsNone(parser(text, ()))
+
+    def test_query_dataset_accepts_explicit_empty_structure_supervision(self) -> None:
+        example = query_example_from_dict(
+            {
+                "question": "你知道吗",
+                "entities": [],
+                "query": None,
+                "source": "structural_supervision_reject",
+                "split": "train",
+            }
+        )
+
+        self.assertIsNone(example.query)
+
     def test_neural_training_summary_uses_current_datasets(self) -> None:
         model = make_model()
         summary = train_summary(model)
@@ -208,6 +276,61 @@ class LearningTest(unittest.TestCase):
                     {role.name: role.value for role in move_frames[0].roles},
                     {"actor": "阿明", "theme": "芯片", "goal": "库房"},
                 )
+
+    def test_neural_statement_parser_learns_real_profile_name_boundaries(self) -> None:
+        parser = default_neural_statement_parser()
+        examples = (
+            ("我叫郭士君", "郭士君"),
+            ("我是郭士君", "郭士君"),
+            ("我叫张三丰", "张三丰"),
+            ("我是李小龙", "李小龙"),
+        )
+
+        for text, name in examples:
+            with self.subTest(text=text):
+                parsed = parser(text)
+                self.assertIsNotNone(parsed)
+                assert parsed is not None
+                entities, frames = parsed
+                self.assertIn(("self", "我"), {(entity.role, entity.name) for entity in entities})
+                self.assertIn(("profile_value", name), {(entity.role, entity.name) for entity in entities})
+                profile_frames = [frame for frame in frames if frame.frame_type == "profile_name"]
+                self.assertTrue(profile_frames)
+                self.assertEqual(
+                    {role.name: role.value for role in profile_frames[0].roles},
+                    {"subject": "我", "value": name},
+                )
+
+    def test_neural_statement_parser_learns_activity_preference_boundaries(self) -> None:
+        parser = default_neural_statement_parser()
+        examples = (
+            ("我喜欢徒步", "徒步"),
+            ("我喜欢露营", "露营"),
+            ("我爱徒步", "徒步"),
+            ("我的爱好是徒步", "徒步"),
+        )
+
+        for text, value in examples:
+            with self.subTest(text=text):
+                parsed = parser(text)
+                self.assertIsNotNone(parsed)
+                assert parsed is not None
+                entities, frames = parsed
+                self.assertIn(("self", "我"), {(entity.role, entity.name) for entity in entities})
+                self.assertIn(("profile_value", value), {(entity.role, entity.name) for entity in entities})
+                like_frames = [frame for frame in frames if frame.frame_type == "profile_like"]
+                self.assertTrue(like_frames)
+                self.assertEqual(
+                    {role.name: role.value for role in like_frames[0].roles},
+                    {"subject": "我", "value": value},
+                )
+
+    def test_neural_statement_parser_rejects_query_intent_profile_overreach(self) -> None:
+        parser = default_neural_statement_parser()
+
+        for text in ("我想了解下原理", "我想知道下原理", "我想了解铁生锈的原理"):
+            with self.subTest(text=text):
+                self.assertIsNone(parser(text))
 
     def test_statement_examples_evaluate_and_train_neural_parser(self) -> None:
         examples = load_statement_jsonl("data/statement_examples.jsonl")
@@ -635,6 +758,100 @@ class LearningTest(unittest.TestCase):
                         "goal": "找到眼镜",
                         "confidence": 1.5,
                     },
+                }
+            )
+
+    def test_episode_examples_preserve_context_policy_and_feedback_diagnosis(self) -> None:
+        record = {
+            "schema": "struct_llm.episode_example.v1",
+            "episode_id": "repair-001",
+            "dialogue_turn": 15,
+            "speaker": "user",
+            "scene": "feedback",
+            "text": "不是，小李放进去的，不是小王",
+            "known_world_state": [{"name": "in", "left": "芯片", "right": "托盘"}],
+            "belief_state": [{"name": "believes", "left": "assistant", "right": "put_in(actor=小王)"}],
+            "relationship_state": [{"name": "communication_style", "left": "user", "right": "direct"}],
+            "focus": ["put_in", "actor", "芯片", "托盘"],
+            "expected_response_policy": "repair",
+            "expected_frames": [
+                {"frame_type": "put_in", "roles": {"actor": "小李", "theme": "芯片", "goal": "托盘"}}
+            ],
+            "expected_pragmatic_acts": [
+                {
+                    "act": "repair_previous_understanding",
+                    "target": "role_binding",
+                    "qualifiers": ["error_type=role_binding", "response_policy=repair"],
+                    "confidence": 1.0,
+                }
+            ],
+            "feedback_diagnosis": {
+                "error_type": "role_binding",
+                "user_feedback": "不是，小李放进去的，不是小王",
+                "previous_answer": "小王把芯片放进托盘。",
+                "original_understanding": "FRAME put_in actor=小王 theme=芯片 goal=托盘",
+                "correct_structure": "FRAME put_in actor=小李 theme=芯片 goal=托盘",
+                "generalization_target": "put_in_actor_correction",
+            },
+        }
+
+        example = episode_example_from_dict(record)
+
+        self.assertEqual(example.expected_response_policy, "repair")
+        self.assertEqual(example.known_world_state[0], State("in", "芯片", "托盘"))
+        self.assertEqual(example.relationship_state[0], State("communication_style", "user", "direct"))
+        self.assertEqual(example.focus, ("put_in", "actor", "芯片", "托盘"))
+        self.assertEqual(example.expected_frames[0].role("actor"), "小李")
+        self.assertIsNotNone(example.feedback_diagnosis)
+        assert example.feedback_diagnosis is not None
+        self.assertEqual(example.feedback_diagnosis.error_type, "role_binding")
+
+    def test_episode_dataset_evaluates_pragmatic_analyzer(self) -> None:
+        examples = load_episode_jsonl("data/episode_examples.jsonl")
+        analyzer = InMemoryPragmaticAnalyzer(examples)
+        result = evaluate_pragmatic_analyzer(analyzer, examples)
+        model = compile_episode_model_from_jsonl("data/episode_examples.jsonl")
+
+        self.assertGreaterEqual(len(examples), 6)
+        self.assertEqual(result.total, len(examples))
+        self.assertEqual(result.matched, len(examples))
+        self.assertEqual(model.schema, "struct_llm.episode_model.v1")
+        self.assertGreaterEqual(len(model.patterns), 1)
+
+    def test_episode_feedback_appends_structural_supervision(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            paths = LearningPaths(episode_data=Path(directory) / "episode_examples.jsonl")
+            result = save_manual_episode_feedback(
+                "帮我弄一下",
+                "ask_clarification",
+                paths,
+                pragmatic_acts=(
+                    PragmaticAct(
+                        "underspecified_action_request",
+                        "task",
+                        ("missing=object", "response_policy=ask_clarification"),
+                    ),
+                ),
+                previous_turns=(DialogueTurn("user", "我想处理那个文件", 1),),
+                relationship_state=(State("communication_style", "user", "direct"),),
+                focus=("task",),
+                source="human_feedback",
+            )
+            loaded = load_episode_jsonl(paths.episode_data)
+
+        self.assertEqual(result.kind, "episode")
+        self.assertEqual(result.example_count, 1)
+        self.assertEqual(result.pattern_count, 1)
+        self.assertEqual(loaded[0].expected_pragmatic_acts[0].act, "underspecified_action_request")
+        self.assertEqual(loaded[0].previous_turns[0].text, "我想处理那个文件")
+
+    def test_episode_dataset_rejects_invalid_policy(self) -> None:
+        with self.assertRaisesRegex(ValueError, "expected_response_policy"):
+            episode_example_from_dict(
+                {
+                    "text": "帮我弄一下",
+                    "expected_response_policy": "guess_anyway",
+                    "expected_pragmatic_acts": [{"act": "underspecified_action_request"}],
                 }
             )
 

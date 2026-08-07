@@ -178,6 +178,8 @@ class LoadedNeuralStatementParser:
             predicted_tags = torch.argmax(tag_logits, dim=-1)[0].tolist()[: int(lengths[0].item())]
 
         pattern = self.patterns[int(label_index.item())]
+        if not pattern.entities and not pattern.frames:
+            return None
         entities = decode_entities(normalized, predicted_tags, self.tag_labels)
         entities = filter_expected_entities(entities, pattern.entities)
         if not expected_entities_present(entities, pattern.entities):
@@ -491,8 +493,6 @@ def statement_pattern_from_dict(record: Any) -> NeuralStatementPattern:
         for value in raw_frames
         if isinstance(value, dict)
     )
-    if not entities and not frames:
-        raise ValueError("Neural statement pattern cannot be empty.")
     return NeuralStatementPattern(entities, frames, int(record.get("support") or 1))
 
 

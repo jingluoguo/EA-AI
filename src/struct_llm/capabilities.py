@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Callable, Iterable, Optional, TypeVar
 
-from .structure import Entity, Frame, Intention, Query, State, Structure
+from .structure import Entity, Frame, Intention, PragmaticAct, Query, State, Structure
 
 
 StatementParseResult = tuple[list[Entity], list[Frame]]
@@ -14,6 +14,7 @@ QueryParser = Callable[[str, tuple[Entity, ...]], Optional[Query]]
 RuleInferer = Callable[[Structure], Optional[str]]
 Answerer = Callable[[Structure], Optional[str]]
 IntentAnalyzer = Callable[[str, Structure], tuple[Intention, ...]]
+PragmaticAnalyzer = Callable[[str, Structure], tuple[PragmaticAct, ...]]
 T = TypeVar("T")
 
 
@@ -26,6 +27,7 @@ class CognitiveCapabilities:
     rule_inferers: tuple[RuleInferer, ...]
     answerers: tuple[Answerer, ...]
     intent_analyzers: tuple[IntentAnalyzer, ...] = ()
+    pragmatic_analyzers: tuple[PragmaticAnalyzer, ...] = ()
     memory_states: tuple[State, ...] = ()
 
     def parse_statement(self, sentence: str) -> StatementParseResult | None:
@@ -58,6 +60,18 @@ class CognitiveCapabilities:
         for analyzer in self.intent_analyzers:
             intentions.extend(analyzer(text, structure))
         return tuple(intentions)
+
+    def analyze_pragmatics(self, text: str, structure: Structure) -> tuple[PragmaticAct, ...]:
+        acts: list[PragmaticAct] = []
+        seen: set[tuple[str, str, tuple[str, ...]]] = set()
+        for analyzer in self.pragmatic_analyzers:
+            for act in analyzer(text, structure):
+                signature = (act.act, act.target, act.qualifiers)
+                if signature in seen:
+                    continue
+                seen.add(signature)
+                acts.append(act)
+        return tuple(acts)
 
     def answer(self, structure: Structure) -> str | None:
         return self._first_non_none(answerer(structure) for answerer in self.answerers)
@@ -95,6 +109,9 @@ class CognitiveCapabilities:
 
     def with_intent_analyzers(self, *analyzers: IntentAnalyzer) -> CognitiveCapabilities:
         return self._with_tuple("intent_analyzers", *analyzers)
+
+    def with_pragmatic_analyzers(self, *analyzers: PragmaticAnalyzer) -> CognitiveCapabilities:
+        return self._with_tuple("pragmatic_analyzers", *analyzers)
 
     def with_memory_states(self, *states: State) -> CognitiveCapabilities:
         return self._with_tuple("memory_states", *states)
