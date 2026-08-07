@@ -1,0 +1,2296 @@
+{
+  "schema": "struct_llm.statement_neural_model.v1",
+  "source_sha256": "0c039e34d139892484e0248e7a77f749e1afab1710408800bd00a4f1ed395cd7",
+  "vocab": {
+    "<pad>": 0,
+    "<unk>": 1,
+    "一": 2,
+    "上": 3,
+    "不": 4,
+    "丢": 5,
+    "个": 6,
+    "中": 7,
+    "为": 8,
+    "之": 9,
+    "书": 10,
+    "了": 11,
+    "于": 12,
+    "些": 13,
+    "交": 14,
+    "产": 15,
+    "从": 16,
+    "仓": 17,
+    "他": 18,
+    "付": 19,
+    "以": 20,
+    "件": 21,
+    "份": 22,
+    "会": 23,
+    "伞": 24,
+    "作": 25,
+    "信": 26,
+    "假": 27,
+    "充": 28,
+    "入": 29,
+    "公": 30,
+    "关": 31,
+    "冰": 32,
+    "出": 33,
+    "刚": 34,
+    "创": 35,
+    "到": 36,
+    "制": 37,
+    "刷": 38,
+    "前": 39,
+    "办": 40,
+    "动": 41,
+    "包": 42,
+    "匙": 43,
+    "医": 44,
+    "卧": 45,
+    "即": 46,
+    "厂": 47,
+    "厌": 48,
+    "厨": 49,
+    "又": 50,
+    "友": 51,
+    "取": 52,
+    "变": 53,
+    "口": 54,
+    "只": 55,
+    "叫": 56,
+    "台": 57,
+    "吃": 58,
+    "合": 59,
+    "同": 60,
+    "名": 61,
+    "后": 62,
+    "吧": 63,
+    "启": 64,
+    "告": 65,
+    "员": 66,
+    "呢": 67,
+    "咖": 68,
+    "啊": 69,
+    "啡": 70,
+    "喜": 71,
+    "喝": 72,
+    "器": 73,
+    "因": 74,
+    "图": 75,
+    "在": 76,
+    "地": 77,
+    "塞": 78,
+    "墙": 79,
+    "壁": 80,
+    "士": 81,
+    "声": 82,
+    "壶": 83,
+    "大": 84,
+    "夹": 85,
+    "奶": 86,
+    "好": 87,
+    "如": 88,
+    "妈": 89,
+    "子": 90,
+    "字": 91,
+    "存": 92,
+    "学": 93,
+    "它": 94,
+    "实": 95,
+    "客": 96,
+    "室": 97,
+    "将": 98,
+    "小": 99,
+    "就": 100,
+    "屉": 101,
+    "工": 102,
+    "已": 103,
+    "师": 104,
+    "帐": 105,
+    "带": 106,
+    "库": 107,
+    "开": 108,
+    "张": 109,
+    "往": 110,
+    "得": 111,
+    "想": 112,
+    "成": 113,
+    "我": 114,
+    "户": 115,
+    "房": 116,
+    "所": 117,
+    "手": 118,
+    "才": 119,
+    "打": 120,
+    "扔": 121,
+    "托": 122,
+    "找": 123,
+    "把": 124,
+    "投": 125,
+    "护": 126,
+    "抽": 127,
+    "挪": 128,
+    "据": 129,
+    "掀": 130,
+    "掏": 131,
+    "接": 132,
+    "推": 133,
+    "提": 134,
+    "搁": 135,
+    "搬": 136,
+    "放": 137,
+    "教": 138,
+    "文": 139,
+    "料": 140,
+    "既": 141,
+    "明": 142,
+    "是": 143,
+    "有": 144,
+    "朋": 145,
+    "服": 146,
+    "本": 147,
+    "机": 148,
+    "李": 149,
+    "来": 150,
+    "果": 151,
+    "染": 152,
+    "柜": 153,
+    "栽": 154,
+    "桌": 155,
+    "橡": 156,
+    "欢": 157,
+    "正": 158,
+    "步": 159,
+    "毁": 160,
+    "水": 161,
+    "没": 162,
+    "测": 163,
+    "涂": 164,
+    "漆": 165,
+    "烤": 166,
+    "然": 167,
+    "煲": 168,
+    "爱": 169,
+    "爸": 170,
+    "片": 171,
+    "牛": 172,
+    "猜": 173,
+    "王": 174,
+    "理": 175,
+    "瓶": 176,
+    "生": 177,
+    "由": 178,
+    "电": 179,
+    "白": 180,
+    "的": 181,
+    "皮": 182,
+    "盆": 183,
+    "盒": 184,
+    "盖": 185,
+    "盘": 186,
+    "相": 187,
+    "看": 188,
+    "眼": 189,
+    "着": 190,
+    "研": 191,
+    "碗": 192,
+    "示": 193,
+    "票": 194,
+    "称": 195,
+    "移": 196,
+    "程": 197,
+    "究": 198,
+    "窗": 199,
+    "笔": 200,
+    "箱": 201,
+    "篷": 202,
+    "米": 203,
+    "粉": 204,
+    "糕": 205,
+    "紧": 206,
+    "红": 207,
+    "经": 208,
+    "给": 209,
+    "绿": 210,
+    "置": 211,
+    "翻": 212,
+    "老": 213,
+    "而": 214,
+    "背": 215,
+    "脑": 216,
+    "色": 217,
+    "芯": 218,
+    "茶": 219,
+    "药": 220,
+    "菜": 221,
+    "营": 222,
+    "蓝": 223,
+    "蛋": 224,
+    "衣": 225,
+    "表": 226,
+    "袋": 227,
+    "被": 228,
+    "装": 229,
+    "要": 230,
+    "觉": 231,
+    "认": 232,
+    "讨": 233,
+    "议": 234,
+    "记": 235,
+    "诉": 236,
+    "说": 237,
+    "课": 238,
+    "跑": 239,
+    "车": 240,
+    "运": 241,
+    "还": 242,
+    "这": 243,
+    "进": 244,
+    "送": 245,
+    "递": 246,
+    "造": 247,
+    "道": 248,
+    "那": 249,
+    "郭": 250,
+    "里": 251,
+    "钥": 252,
+    "销": 253,
+    "锅": 254,
+    "镜": 255,
+    "闭": 256,
+    "间": 257,
+    "阳": 258,
+    "阿": 259,
+    "随": 260,
+    "零": 261,
+    "饭": 262,
+    "验": 263,
+    "黄": 264,
+    "黑": 265,
+    "，": 266
+  },
+  "tag_labels": [
+    "O",
+    "B:color",
+    "I:color",
+    "B:container",
+    "I:container",
+    "B:giver",
+    "I:giver",
+    "B:item",
+    "I:item",
+    "B:person",
+    "I:person",
+    "B:place",
+    "I:place",
+    "B:profile_value",
+    "I:profile_value",
+    "B:receiver",
+    "I:receiver",
+    "B:self",
+    "I:self",
+    "B:thing",
+    "I:thing"
+  ],
+  "label_keys": [
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"小王打开盒子\", \"consequent\": \"盒子就是打开的\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"小王把盒子带到办公室\", \"consequent\": \"盒子就在办公室\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"小王把箱子搬出仓库\", \"consequent\": \"箱子就不在仓库里\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"小王把芯片放进托盘\", \"consequent\": \"芯片就在托盘里\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"小王把芯片放进盒子\", \"consequent\": \"芯片就在盒子里\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"小郭打开抽屉\", \"consequent\": \"抽屉就是打开的\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"小郭把笔记本涂成红色\", \"consequent\": \"笔记本就变成红色了\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"小郭把箱子搬到仓库\", \"consequent\": \"箱子就在仓库里\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"小郭把芯片放进托盘\", \"consequent\": \"小王就把托盘带到实验室\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"老师把文件交给学生\", \"consequent\": \"学生就有文件了\"}}]}",
+    "{\"entities\": [], \"frames\": [{\"frame_type\": \"if_then\", \"roles\": {\"antecedent\": \"老师把文件交给学生\", \"consequent\": \"文件就在学生手里\"}}]}",
+    "{\"entities\": [{\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$item#1\", \"role\": \"item\"}], \"frames\": [{\"frame_type\": \"be_in\", \"roles\": {\"goal\": \"$container#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$item#1\", \"role\": \"item\"}], \"frames\": [{\"frame_type\": \"not_in\", \"roles\": {\"source\": \"$container#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$place#1\", \"role\": \"place\"}], \"frames\": [{\"frame_type\": \"move\", \"roles\": {\"actor\": \"$person#1\", \"goal\": \"$place#1\", \"theme\": \"$container#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$container#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"close\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"关闭\", \"theme\": \"$container#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$container#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"open\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"打开\", \"theme\": \"$container#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$container#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$place#1\", \"role\": \"place\"}, {\"name\": \"$item#1\", \"role\": \"item\"}], \"frames\": [{\"frame_type\": \"because\", \"roles\": {\"cause\": \"小王把$container#1带到$place#1\", \"effect\": \"$item#1在$place#1的$container#1里\"}}, {\"frame_type\": \"move\", \"roles\": {\"goal\": \"$place#1\", \"theme\": \"$container#1\"}}, {\"frame_type\": \"be_in\", \"roles\": {\"goal\": \"$container#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$place#1\", \"role\": \"place\"}], \"frames\": [{\"frame_type\": \"move\", \"roles\": {\"actor\": \"\", \"goal\": \"$place#1\", \"theme\": \"$container#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$giver#1\", \"role\": \"giver\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$receiver#1\", \"role\": \"receiver\"}], \"frames\": [{\"frame_type\": \"because\", \"roles\": {\"cause\": \"$giver#1把$item#1交给$receiver#1\", \"effect\": \"$item#1在$receiver#1手里\"}}, {\"frame_type\": \"give\", \"roles\": {\"actor\": \"$giver#1\", \"recipient\": \"$receiver#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$giver#1\", \"role\": \"giver\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$receiver#1\", \"role\": \"receiver\"}], \"frames\": [{\"frame_type\": \"because\", \"roles\": {\"cause\": \"$giver#1把$item#1交给了$receiver#1\", \"effect\": \"$receiver#1有$item#1\"}}, {\"frame_type\": \"give\", \"roles\": {\"actor\": \"$giver#1\", \"recipient\": \"$receiver#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$giver#1\", \"role\": \"giver\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$receiver#1\", \"role\": \"receiver\"}], \"frames\": [{\"frame_type\": \"give\", \"roles\": {\"actor\": \"$giver#1\", \"recipient\": \"$receiver#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$giver#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$container#2\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"not_in\", \"roles\": {\"source\": \"$container#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"be_in\", \"roles\": {\"goal\": \"$container#2\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"be_in\", \"roles\": {\"goal\": \"$container#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"not_in\", \"roles\": {\"source\": \"$container#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"take_out\", \"roles\": {\"source\": \"$container#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$giver#1\", \"role\": \"giver\"}, {\"name\": \"$receiver#1\", \"role\": \"receiver\"}], \"frames\": [{\"frame_type\": \"give\", \"roles\": {\"actor\": \"$giver#1\", \"recipient\": \"$receiver#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$giver#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$color#1\", \"role\": \"color\"}], \"frames\": [{\"frame_type\": \"paint\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"$color#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"put_in\", \"roles\": {\"actor\": \"$person#1\", \"goal\": \"$container#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"take_out\", \"roles\": {\"actor\": \"$person#1\", \"source\": \"$container#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$place#1\", \"role\": \"place\"}], \"frames\": [{\"frame_type\": \"move\", \"roles\": {\"actor\": \"$person#1\", \"goal\": \"$place#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$item#1\", \"role\": \"item\"}], \"frames\": [{\"frame_type\": \"take_out\", \"roles\": {\"actor\": \"$person#1\", \"source\": \"$container#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$place#1\", \"role\": \"place\"}], \"frames\": [{\"frame_type\": \"because\", \"roles\": {\"cause\": \"$person#1把$container#1带到$place#1\", \"effect\": \"$container#1在$place#1\"}}, {\"frame_type\": \"move\", \"roles\": {\"actor\": \"$person#1\", \"goal\": \"$place#1\", \"theme\": \"$container#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$container#1\", \"role\": \"container\"}, {\"name\": \"$place#1\", \"role\": \"place\"}], \"frames\": [{\"frame_type\": \"move\", \"roles\": {\"actor\": \"$person#1\", \"goal\": \"$place#1\", \"theme\": \"$container#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$container#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"because\", \"roles\": {\"cause\": \"$person#1关上$container#1\", \"effect\": \"$container#1是关闭的\"}}, {\"frame_type\": \"close\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"关闭\", \"theme\": \"$container#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"close\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"关闭\", \"theme\": \"$container#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$container#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"open\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"打开\", \"theme\": \"$container#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$container#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$color#1\", \"role\": \"color\"}], \"frames\": [{\"frame_type\": \"because\", \"roles\": {\"cause\": \"$person#1把$item#1涂成$color#1\", \"effect\": \"$item#1变成$color#1了\"}}, {\"frame_type\": \"paint\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"$color#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$color#1\", \"role\": \"color\"}], \"frames\": [{\"frame_type\": \"paint\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"$color#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"because\", \"roles\": {\"cause\": \"$person#1把$item#1从$container#1里取出\", \"effect\": \"$item#1不在$container#1里\"}}, {\"frame_type\": \"take_out\", \"roles\": {\"actor\": \"$person#1\", \"source\": \"$container#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"not_in\", \"roles\": {\"source\": \"$container#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"because\", \"roles\": {\"cause\": \"$person#1把$item#1从$container#1里拿出来\", \"effect\": \"$item#1不在$container#1里\"}}, {\"frame_type\": \"take_out\", \"roles\": {\"actor\": \"$person#1\", \"source\": \"$container#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"not_in\", \"roles\": {\"source\": \"$container#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"because\", \"roles\": {\"cause\": \"$person#1把$item#1放进$container#1\", \"effect\": \"$item#1在$container#1里\"}}, {\"frame_type\": \"put_in\", \"roles\": {\"actor\": \"$person#1\", \"goal\": \"$container#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"be_in\", \"roles\": {\"goal\": \"$container#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"$item#1在$container#1里\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"put_in\", \"roles\": {\"actor\": \"$person#1\", \"goal\": \"$container#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$container#1\", \"role\": \"container\"}], \"frames\": [{\"frame_type\": \"take_out\", \"roles\": {\"actor\": \"$person#1\", \"source\": \"$container#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}, {\"name\": \"$place#1\", \"role\": \"place\"}], \"frames\": [{\"frame_type\": \"move\", \"roles\": {\"actor\": \"$person#1\", \"goal\": \"$place#1\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}], \"frames\": [{\"frame_type\": \"close\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"关闭\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$item#1\", \"role\": \"item\"}], \"frames\": [{\"frame_type\": \"open\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"打开\", \"theme\": \"$item#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$item#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$thing#1\", \"role\": \"thing\"}], \"frames\": [{\"frame_type\": \"create\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"存在\", \"theme\": \"$thing#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$thing#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}, {\"name\": \"$thing#1\", \"role\": \"thing\"}], \"frames\": [{\"frame_type\": \"destroy\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"不存在\", \"theme\": \"$thing#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$thing#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"学生把文件交了\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"文件被交给了老师\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"盒子被带到了实验室\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"笔记本不在包里\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"芯片不在托盘里\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"芯片在托盘里\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"芯片被放进托盘了\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"芯片被放进盒子了\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"钥匙不在盒子里\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"believe\", \"roles\": {\"person\": \"$person#1\", \"proposition\": \"钥匙在抽屉里\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"学生把笔记本交了\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"文件不在文件夹里\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"盒子被带到办公室了\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"盒子被带到实验室了\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"芯片不存在\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"芯片在托盘里\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"芯片在盒子里\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"芯片存在\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"芯片被放进托盘了\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"钥匙不在抽屉里\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"钥匙在盒子里\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"say\", \"roles\": {\"proposition\": \"钥匙被交给了学生\", \"speaker\": \"$person#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$self#1\", \"role\": \"self\"}, {\"name\": \"$profile_value#1\", \"role\": \"profile_value\"}], \"frames\": [{\"frame_type\": \"profile_dislike\", \"roles\": {\"subject\": \"$self#1\", \"value\": \"$profile_value#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$self#1\", \"role\": \"self\"}, {\"name\": \"$profile_value#1\", \"role\": \"profile_value\"}], \"frames\": [{\"frame_type\": \"profile_like\", \"roles\": {\"subject\": \"$self#1\", \"value\": \"$profile_value#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$self#1\", \"role\": \"self\"}, {\"name\": \"$profile_value#1\", \"role\": \"profile_value\"}], \"frames\": [{\"frame_type\": \"profile_name\", \"roles\": {\"subject\": \"$self#1\", \"value\": \"$profile_value#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$thing#1\", \"role\": \"thing\"}, {\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"create\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"存在\", \"theme\": \"$thing#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$thing#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$thing#1\", \"role\": \"thing\"}, {\"name\": \"$person#1\", \"role\": \"person\"}], \"frames\": [{\"frame_type\": \"destroy\", \"roles\": {\"actor\": \"$person#1\", \"result\": \"不存在\", \"theme\": \"$thing#1\"}}, {\"frame_type\": \"handle\", \"roles\": {\"actor\": \"$person#1\", \"theme\": \"$thing#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$thing#1\", \"role\": \"thing\"}, {\"name\": \"$place#1\", \"role\": \"place\"}], \"frames\": [{\"frame_type\": \"move\", \"roles\": {\"actor\": \"\", \"goal\": \"$place#1\", \"theme\": \"$thing#1\"}}]}",
+    "{\"entities\": [{\"name\": \"$thing#1\", \"role\": \"thing\"}, {\"name\": \"$place#1\", \"role\": \"place\"}], \"frames\": [{\"frame_type\": \"move\", \"roles\": {\"goal\": \"$place#1\", \"theme\": \"$thing#1\"}}]}"
+  ],
+  "patterns": [
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小王打开盒子",
+            "consequent": "盒子就是打开的"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小王把盒子带到办公室",
+            "consequent": "盒子就在办公室"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小王把箱子搬出仓库",
+            "consequent": "箱子就不在仓库里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小王把芯片放进托盘",
+            "consequent": "芯片就在托盘里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小王把芯片放进盒子",
+            "consequent": "芯片就在盒子里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小郭打开抽屉",
+            "consequent": "抽屉就是打开的"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小郭把笔记本涂成红色",
+            "consequent": "笔记本就变成红色了"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小郭把箱子搬到仓库",
+            "consequent": "箱子就在仓库里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "小郭把芯片放进托盘",
+            "consequent": "小王就把托盘带到实验室"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "老师把文件交给学生",
+            "consequent": "学生就有文件了"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [],
+      "frames": [
+        {
+          "frame_type": "if_then",
+          "roles": {
+            "antecedent": "老师把文件交给学生",
+            "consequent": "文件就在学生手里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "be_in",
+          "roles": {
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 4
+    },
+    {
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "not_in",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 5
+    },
+    {
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$place#1",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "support": 12
+    },
+    {
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "close",
+          "roles": {
+            "actor": "$person#1",
+            "result": "关闭",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "support": 8
+    },
+    {
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "open",
+          "roles": {
+            "actor": "$person#1",
+            "result": "打开",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "support": 7
+    },
+    {
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "小王把$container#1带到$place#1",
+            "effect": "$item#1在$place#1的$container#1里"
+          }
+        },
+        {
+          "frame_type": "move",
+          "roles": {
+            "goal": "$place#1",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "be_in",
+          "roles": {
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "",
+            "goal": "$place#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "support": 6
+    },
+    {
+      "entities": [
+        {
+          "role": "giver",
+          "name": "$giver#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "receiver",
+          "name": "$receiver#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "$giver#1把$item#1交给$receiver#1",
+            "effect": "$item#1在$receiver#1手里"
+          }
+        },
+        {
+          "frame_type": "give",
+          "roles": {
+            "actor": "$giver#1",
+            "recipient": "$receiver#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "giver",
+          "name": "$giver#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "receiver",
+          "name": "$receiver#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "$giver#1把$item#1交给了$receiver#1",
+            "effect": "$receiver#1有$item#1"
+          }
+        },
+        {
+          "frame_type": "give",
+          "roles": {
+            "actor": "$giver#1",
+            "recipient": "$receiver#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "giver",
+          "name": "$giver#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "receiver",
+          "name": "$receiver#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "give",
+          "roles": {
+            "actor": "$giver#1",
+            "recipient": "$receiver#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$giver#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 46
+    },
+    {
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#2"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "not_in",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "be_in",
+          "roles": {
+            "goal": "$container#2",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 2
+    },
+    {
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "be_in",
+          "roles": {
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 12
+    },
+    {
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "not_in",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 11
+    },
+    {
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "giver",
+          "name": "$giver#1"
+        },
+        {
+          "role": "receiver",
+          "name": "$receiver#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "give",
+          "roles": {
+            "actor": "$giver#1",
+            "recipient": "$receiver#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$giver#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 13
+    },
+    {
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "color",
+          "name": "$color#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "paint",
+          "roles": {
+            "actor": "$person#1",
+            "result": "$color#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 3
+    },
+    {
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "put_in",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 20
+    },
+    {
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "actor": "$person#1",
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 10
+    },
+    {
+      "entities": [
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$place#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "actor": "$person#1",
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 6
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "$person#1把$container#1带到$place#1",
+            "effect": "$container#1在$place#1"
+          }
+        },
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$place#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$place#1",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "support": 34
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "$person#1关上$container#1",
+            "effect": "$container#1是关闭的"
+          }
+        },
+        {
+          "frame_type": "close",
+          "roles": {
+            "actor": "$person#1",
+            "result": "关闭",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "close",
+          "roles": {
+            "actor": "$person#1",
+            "result": "关闭",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "support": 22
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "open",
+          "roles": {
+            "actor": "$person#1",
+            "result": "打开",
+            "theme": "$container#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$container#1"
+          }
+        }
+      ],
+      "support": 26
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "color",
+          "name": "$color#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "$person#1把$item#1涂成$color#1",
+            "effect": "$item#1变成$color#1了"
+          }
+        },
+        {
+          "frame_type": "paint",
+          "roles": {
+            "actor": "$person#1",
+            "result": "$color#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "color",
+          "name": "$color#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "paint",
+          "roles": {
+            "actor": "$person#1",
+            "result": "$color#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 32
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "$person#1把$item#1从$container#1里取出",
+            "effect": "$item#1不在$container#1里"
+          }
+        },
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "actor": "$person#1",
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "not_in",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "$person#1把$item#1从$container#1里拿出来",
+            "effect": "$item#1不在$container#1里"
+          }
+        },
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "actor": "$person#1",
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "not_in",
+          "roles": {
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 2
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "because",
+          "roles": {
+            "cause": "$person#1把$item#1放进$container#1",
+            "effect": "$item#1在$container#1里"
+          }
+        },
+        {
+          "frame_type": "put_in",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "be_in",
+          "roles": {
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 2
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "$item#1在$container#1里"
+          }
+        }
+      ],
+      "support": 7
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "put_in",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 79
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "container",
+          "name": "$container#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "take_out",
+          "roles": {
+            "actor": "$person#1",
+            "source": "$container#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 31
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "$person#1",
+            "goal": "$place#1",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 2
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "close",
+          "roles": {
+            "actor": "$person#1",
+            "result": "关闭",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "item",
+          "name": "$item#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "open",
+          "roles": {
+            "actor": "$person#1",
+            "result": "打开",
+            "theme": "$item#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$item#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "create",
+          "roles": {
+            "actor": "$person#1",
+            "result": "存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "support": 14
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        },
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "destroy",
+          "roles": {
+            "actor": "$person#1",
+            "result": "不存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "support": 12
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "学生把文件交了"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "文件被交给了老师"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "盒子被带到了实验室"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "笔记本不在包里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片不在托盘里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片在托盘里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片被放进托盘了"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "芯片被放进盒子了"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "钥匙不在盒子里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "believe",
+          "roles": {
+            "person": "$person#1",
+            "proposition": "钥匙在抽屉里"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "学生把笔记本交了",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "文件不在文件夹里",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "盒子被带到办公室了",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "盒子被带到实验室了",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片不存在",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片在托盘里",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 2
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片在盒子里",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 2
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片存在",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "芯片被放进托盘了",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 2
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "钥匙不在抽屉里",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "钥匙在盒子里",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "say",
+          "roles": {
+            "proposition": "钥匙被交给了学生",
+            "speaker": "$person#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "self",
+          "name": "$self#1"
+        },
+        {
+          "role": "profile_value",
+          "name": "$profile_value#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "profile_dislike",
+          "roles": {
+            "subject": "$self#1",
+            "value": "$profile_value#1"
+          }
+        }
+      ],
+      "support": 3
+    },
+    {
+      "entities": [
+        {
+          "role": "self",
+          "name": "$self#1"
+        },
+        {
+          "role": "profile_value",
+          "name": "$profile_value#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "profile_like",
+          "roles": {
+            "subject": "$self#1",
+            "value": "$profile_value#1"
+          }
+        }
+      ],
+      "support": 4
+    },
+    {
+      "entities": [
+        {
+          "role": "self",
+          "name": "$self#1"
+        },
+        {
+          "role": "profile_value",
+          "name": "$profile_value#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "profile_name",
+          "roles": {
+            "subject": "$self#1",
+            "value": "$profile_value#1"
+          }
+        }
+      ],
+      "support": 5
+    },
+    {
+      "entities": [
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "create",
+          "roles": {
+            "actor": "$person#1",
+            "result": "存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "support": 3
+    },
+    {
+      "entities": [
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        },
+        {
+          "role": "person",
+          "name": "$person#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "destroy",
+          "roles": {
+            "actor": "$person#1",
+            "result": "不存在",
+            "theme": "$thing#1"
+          }
+        },
+        {
+          "frame_type": "handle",
+          "roles": {
+            "actor": "$person#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "support": 2
+    },
+    {
+      "entities": [
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "actor": "",
+            "goal": "$place#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "support": 1
+    },
+    {
+      "entities": [
+        {
+          "role": "thing",
+          "name": "$thing#1"
+        },
+        {
+          "role": "place",
+          "name": "$place#1"
+        }
+      ],
+      "frames": [
+        {
+          "frame_type": "move",
+          "roles": {
+            "goal": "$place#1",
+            "theme": "$thing#1"
+          }
+        }
+      ],
+      "support": 1
+    }
+  ],
+  "embed_dim": 128,
+  "hidden_dim": 128,
+  "dropout": 0.2,
+  "min_confidence": 0.6,
+  "example_count": 494
+}

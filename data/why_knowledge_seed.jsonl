@@ -8,3 +8,4 @@
 {"question":"植物为什么需要阳光？","answer":"植物要用光进行光合作用，把水和二氧化碳转成养分，维持生长。","source":"curated","split":"train"}
 {"question":"为什么人会打哈欠？","answer":"打哈欠和疲劳、缺少刺激、状态切换有关，具体机制还没有完全统一的答案。","source":"curated","split":"train"}
 {"question":"为什么会打雷？","answer":"云层里电荷分离后会放电，空气被瞬间加热膨胀，就形成了雷声。","source":"curated","split":"train"}
+{"question":"我家的铁怎么生锈了？","answer":"铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。","source":"curated","split":"train"}

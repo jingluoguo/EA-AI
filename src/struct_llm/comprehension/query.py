@@ -15,7 +15,6 @@ from ..perception.normalizer import is_question_noise, normalize_question
 
 
 QUERY_DATA_PATH = Path(__file__).resolve().parents[3] / "data" / "query_examples.jsonl"
-QUERY_MODEL_PATH = Path(__file__).resolve().parents[3] / "data" / "query_model.json"
 QUERY_MODEL_SCHEMA = "struct_llm.query_model.v1"
 QUERY_DIRECT_CONFIDENCE = DIRECT_CONFIDENCE_THRESHOLD
 UNRESOLVED_REFERENCE_WORDS = ("前者", "后者", "前一个", "后一个", "它", "他", "她", "这个", "那个")
@@ -88,10 +87,6 @@ class LearnedQueryParser:
     ) -> LearnedQueryParser:
         return cls((), min_score=min_score, patterns=compile_query_examples(examples).patterns)
 
-    @classmethod
-    def from_model(cls, path: str | Path, min_score: float = QUERY_DIRECT_CONFIDENCE) -> LearnedQueryParser:
-        return cls((), min_score=min_score, patterns=load_query_model(path).patterns)
-
     def __call__(self, sentence: str, entities: tuple[Entity, ...]) -> Query | None:
         best = self.best_match(sentence, entities)
         if best is None:
@@ -115,19 +110,6 @@ class LearnedQueryParser:
         if score < self.min_score:
             return None
         return score, example
-
-
-def default_learned_query_parser() -> LearnedQueryParser:
-    if QUERY_MODEL_PATH.exists():
-        return LearnedQueryParser.from_model(QUERY_MODEL_PATH)
-    return LearnedQueryParser.from_jsonl(QUERY_DATA_PATH)
-
-
-def compile_query_model_from_jsonl(path: str | Path) -> CompiledQueryModel:
-    data_path = Path(path)
-    return compile_query_examples(load_query_jsonl(data_path), source_sha256=file_sha256(data_path))
-
-
 def compile_query_examples(
     examples: tuple[QueryTrainingExample, ...],
     source_sha256: str = "",
@@ -164,49 +146,6 @@ def compile_query_examples(
         example_count=len(examples),
         patterns=tuple(sorted(grouped.values(), key=lambda pattern: (-pattern.support, pattern.abstract_question))),
     )
-
-
-def load_query_model(path: str | Path) -> CompiledQueryModel:
-    with Path(path).open("r", encoding="utf-8") as file:
-        raw_model = json.load(file)
-    if not isinstance(raw_model, dict):
-        raise ValueError("Query model must be a JSON object.")
-    return query_model_from_dict(raw_model)
-
-
-def save_query_model(model: CompiledQueryModel, path: str | Path) -> None:
-    model_path = Path(path)
-    model_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = model_path.with_name(f"{model_path.name}.tmp")
-    with temporary_path.open("w", encoding="utf-8") as file:
-        json.dump(query_model_to_dict(model), file, ensure_ascii=False, indent=2)
-        file.write("\n")
-    temporary_path.replace(model_path)
-
-
-def query_model_from_dict(record: dict[str, Any]) -> CompiledQueryModel:
-    schema = str(record.get("schema") or "").strip()
-    if schema != QUERY_MODEL_SCHEMA:
-        raise ValueError(f"Unsupported query model schema: {schema}")
-    raw_patterns = record.get("patterns")
-    if not isinstance(raw_patterns, list):
-        raise ValueError("Query model patterns must be a list.")
-    return CompiledQueryModel(
-        schema=schema,
-        source_sha256=str(record.get("source_sha256") or ""),
-        example_count=int(record.get("example_count") or 0),
-        patterns=tuple(query_pattern_from_dict(value) for value in raw_patterns),
-    )
-
-
-def query_model_to_dict(model: CompiledQueryModel) -> dict[str, Any]:
-    return {
-        "schema": model.schema,
-        "source_sha256": model.source_sha256,
-        "example_count": model.example_count,
-        "pattern_count": len(model.patterns),
-        "patterns": [query_pattern_to_dict(pattern) for pattern in model.patterns],
-    }
 
 
 def query_pattern_from_dict(record: Any) -> CompiledQueryPattern:
@@ -252,16 +191,18 @@ def resolve_query_candidates(
     errors: list[ParseError] = []
 
     for candidate in candidates:
+        if is_question_noise(candidate):
+            continue
+
         full_query = resolve_query_candidate(candidate, entities, parsers)
         fragments = split_query_candidate(candidate)
         if full_query is not None and (len(fragments) == 1 or query_candidate_is_learned_unit(candidate, entities, parsers)):
             parsed_queries.append(full_query)
             continue
 
-        if is_question_noise(candidate):
-            continue
-
         for fragment in fragments:
+            if is_question_noise(fragment):
+                continue
             try:
                 query = resolve_query_candidate_or_raise(fragment, entities, parsers)
             except ParseError as error:
@@ -300,9 +241,10 @@ def resolve_query_candidate(
 ) -> Query | None:
     normalized = normalize_question(sentence)
     for parser in parsers:
-        query = parser(normalized, entities)
-        if query is not None:
-            return query
+        for candidate in dict.fromkeys((sentence, normalized)):
+            query = parser(candidate, entities)
+            if query is not None:
+                return query
     return None
 
 
@@ -323,12 +265,21 @@ def query_candidate_is_learned_unit(
     parsers: tuple[QueryParser, ...],
 ) -> bool:
     for parser in parsers:
+        structural_unit = getattr(parser, "candidate_is_structural_unit", None)
+        if structural_unit is not None and structural_unit(sentence, entities):
+            return True
+
         best_match = getattr(parser, "best_match", None)
         if best_match is None:
             continue
         best = best_match(sentence, entities)
-        if best is not None and best[0] >= 0.96:
-            return True
+        if best is None or best[0] < 0.96:
+            continue
+        # A high-scoring template should not swallow a comma-separated
+        # compound query unless the model is nearly exact on the whole input.
+        if len(split_query_candidate(sentence)) > 1 and best[0] < 1.0:
+            continue
+        return True
     return False
 
 
@@ -341,6 +292,14 @@ def suggest_query_pattern(
     abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities))
     suggestions: list[tuple[float, CompiledQueryPattern]] = []
     for parser in parsers:
+        best_match = getattr(parser, "best_match", None)
+        if best_match is not None:
+            best = best_match(sentence, entities)
+            if best is not None:
+                score, pattern = best
+                if score >= min_score:
+                    suggestions.append((score, pattern))
+                    continue
         patterns = getattr(parser, "patterns", ())
         for pattern in patterns:
             score = query_pattern_score(pattern, abstract_sentence)
@@ -510,12 +469,26 @@ def instantiate_query(
     example_entities: tuple[EntityExample, ...],
     sentence: str,
     runtime_entities: tuple[Entity, ...],
+    *,
+    allow_example_fallback: bool = True,
 ) -> Query:
     return Query(
         template.intent,
-        instantiate_value(template.target, example_entities, sentence, runtime_entities),
-        tuple(instantiate_qualifier(value, example_entities, sentence, runtime_entities) for value in template.qualifiers),
-        tuple(instantiate_query(subquery, example_entities, sentence, runtime_entities) for subquery in template.subqueries),
+        instantiate_value(template.target, example_entities, sentence, runtime_entities, allow_example_fallback=allow_example_fallback),
+        tuple(
+            instantiate_qualifier(value, example_entities, sentence, runtime_entities, allow_example_fallback=allow_example_fallback)
+            for value in template.qualifiers
+        ),
+        tuple(
+            instantiate_query(
+                subquery,
+                example_entities,
+                sentence,
+                runtime_entities,
+                allow_example_fallback=allow_example_fallback,
+            )
+            for subquery in template.subqueries
+        ),
     )
 
 
@@ -524,11 +497,13 @@ def instantiate_qualifier(
     example_entities: tuple[EntityExample, ...],
     sentence: str,
     runtime_entities: tuple[Entity, ...],
+    *,
+    allow_example_fallback: bool = True,
 ) -> str:
     if "=" not in qualifier:
-        return instantiate_value(qualifier, example_entities, sentence, runtime_entities)
+        return instantiate_value(qualifier, example_entities, sentence, runtime_entities, allow_example_fallback=allow_example_fallback)
     key, value = qualifier.split("=", 1)
-    return f"{key}={instantiate_value(value, example_entities, sentence, runtime_entities)}"
+    return f"{key}={instantiate_value(value, example_entities, sentence, runtime_entities, allow_example_fallback=allow_example_fallback)}"
 
 
 def instantiate_value(
@@ -536,6 +511,8 @@ def instantiate_value(
     example_entities: tuple[EntityExample, ...],
     sentence: str,
     runtime_entities: tuple[Entity, ...],
+    *,
+    allow_example_fallback: bool = True,
 ) -> str:
     if "$" not in value:
         return value
@@ -551,6 +528,11 @@ def instantiate_value(
         if runtime_entity is not None:
             resolved = resolved.replace(example_entity.name, runtime_entity.name, 1)
             continue
+        if not allow_example_fallback:
+            unique_runtime_entity = unique_runtime_entity_for(example_entity, entity_examples_from_runtime(runtime_entities))
+            if unique_runtime_entity is not None:
+                resolved = resolved.replace(example_entity.name, unique_runtime_entity.name, 1)
+            continue
         original = original_entity_for_placeholder(example_entity, placeholders, example_entities)
         if original is not None:
             resolved = resolved.replace(example_entity.name, original.name, 1)
@@ -565,6 +547,16 @@ def runtime_entity_for(example_entity: EntityExample, runtime_matches: tuple[Ent
     if occurrence < len(role_matches):
         return role_matches[occurrence]
     return role_matches[-1]
+
+
+def unique_runtime_entity_for(
+    example_entity: EntityExample,
+    runtime_entities: tuple[EntityExample, ...],
+) -> EntityExample | None:
+    role_matches = [entity for entity in runtime_entities if roles_compatible(example_entity.role, entity.role)]
+    if len(role_matches) != 1:
+        return None
+    return role_matches[0]
 
 
 def placeholder_occurrence(entity: EntityExample) -> int:
@@ -607,8 +599,11 @@ def query_pattern_score(pattern: CompiledQueryPattern, sentence: str) -> float:
         return 1.0
     if not pattern.abstract_question or not sentence:
         return 0.0
-    if extract_role_token_slots(pattern.abstract_question, sentence) is not None:
-        return 0.95
+    extracted_slots = extract_role_token_slots(pattern.abstract_question, sentence)
+    if extracted_slots is not None:
+        # Prefer the pattern that explains more structural slots when several
+        # templates share the same question tail, such as belief vs. location.
+        return min(0.99, 0.95 + 0.01 * len(extracted_slots))
     sentence_units = character_bigrams(sentence)
     feature_units = set(pattern.feature_units)
     bigram_score = 0.0 if not sentence_units or not feature_units else len(feature_units & sentence_units) / len(feature_units | sentence_units)

@@ -60,6 +60,12 @@ class NeuralQueryParser:
         except ValueError:
             return None
 
+    def best_match(self, sentence: str, entities: tuple[Entity, ...]):
+        matcher = getattr(self.model, "best_query_match", None)
+        if not callable(matcher):
+            return None
+        return matcher(sentence, entities)
+
 
 @dataclass(frozen=True)
 class NeuralStatementParser:
@@ -124,6 +130,8 @@ def with_neural_boundary(
     model: NeuralBoundaryModel,
     *,
     input_first: bool = True,
+    statement_priority: str = "first",
+    query_priority: str = "first",
     answer_priority: str = "fallback",
     query_min_confidence: float = 0.75,
     statement_min_confidence: float = 0.75,
@@ -135,16 +143,24 @@ def with_neural_boundary(
     intent_analyzer = NeuralIntentAnalyzer(model, min_confidence=intent_min_confidence)
     answerer = NeuralAnswerer(model, min_confidence=answer_min_confidence)
 
-    statement_parsers = (
-        (statement_parser, *capabilities.statement_parsers)
-        if input_first
-        else (*capabilities.statement_parsers, statement_parser)
-    )
-    query_parsers = (
-        (query_parser, *capabilities.query_parsers)
-        if input_first
-        else (*capabilities.query_parsers, query_parser)
-    )
+    if statement_priority not in {"replace", "first", "fallback"}:
+        raise ValueError("statement_priority must be 'replace', 'first', or 'fallback'.")
+    if statement_priority == "replace":
+        statement_parsers = (statement_parser,)
+    elif statement_priority == "first":
+        statement_parsers = (statement_parser, *capabilities.statement_parsers)
+    else:
+        statement_parsers = (*capabilities.statement_parsers, statement_parser)
+    if query_priority not in {"replace", "first", "fallback"}:
+        raise ValueError("query_priority must be 'replace', 'first', or 'fallback'.")
+    # Replacement mode keeps the active input path entirely neural. The
+    # default "first" mode keeps generic boundary adapters backward-compatible.
+    if query_priority == "replace":
+        query_parsers = (query_parser,)
+    elif query_priority == "first":
+        query_parsers = (query_parser, *capabilities.query_parsers)
+    else:
+        query_parsers = (*capabilities.query_parsers, query_parser)
     if answer_priority not in {"fallback", "first"}:
         raise ValueError("answer_priority must be 'fallback' or 'first'.")
     answerers = (
@@ -238,7 +254,7 @@ def frame_from_dict(record: Any) -> Frame | None:
     for name, value in raw_roles.items():
         role_name = str(name).strip()
         role_value = normalize_slot_value(str(value or ""))
-        if not role_name or not role_value:
+        if not role_name:
             return None
         roles.append(Role(frame_id, role_name, role_value))
     return Frame(frame_id, frame_type, 0, tuple(roles))

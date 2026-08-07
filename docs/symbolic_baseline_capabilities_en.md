@@ -53,4 +53,4 @@ It groups supported types by task family instead of keeping the catalog inside t
 - Statement training set: `data/statement_examples.jsonl`
 - Query training set: `data/query_examples.jsonl`
 - Intent training / feedback set: `data/intent_examples.jsonl`
-- Runtime artifacts: `data/statement_model.json`, `data/query_model.json`, `data/dialog_answer_model.json`
+- Runtime artifacts: `data/statement_neural_model.pt/json`, `data/query_neural_model.pt/json`, `data/dialog_answer_model.json`

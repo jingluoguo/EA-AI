@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-"""Local neural boundary example.
+"""Local neural boundary model.
 
 This module is a small adapter you can import with:
 
     uv run struct-ask --neural-provider my_neural:make_model "你是谁？"
 
-It does not host a real neural model yet. Instead, it wraps the existing
-structural capabilities so the runtime path is executable end-to-end and can
-later be swapped with a real model call without changing the CLI contract.
+It loads trained PyTorch Query and Statement models and exposes them through the
+same boundary contract as an external neural backend.
 """
 
 import json
@@ -21,22 +20,29 @@ from struct_llm.comprehension.intent import InMemoryIntentAnalyzer
 from struct_llm.comprehension.intent import evaluate_intent_analyzer, load_intent_jsonl
 from struct_llm.comprehension.query import (
     QUERY_DATA_PATH,
-    LearnedQueryParser,
-    evaluate_query_parser,
-    load_query_jsonl,
     query_from_dict,
+    query_to_dict,
 )
 from struct_llm.comprehension.statement import (
     STATEMENT_DATA_PATH,
-    LearnedStatementParser,
     evaluate_statement_parser,
     load_statement_jsonl,
 )
 from struct_llm.kernel import default_capabilities
 from struct_llm.motor.dialogue import (
     DIALOG_ANSWER_DATA_PATH,
-    LearnedDialogActAnswerer,
+    default_learned_dialog_answerer,
     compile_dialog_answer_model_from_jsonl,
+)
+from struct_llm.neural.query_classifier import (
+    default_neural_query_parser,
+    query_neural_summary,
+    train_query_neural_model,
+)
+from struct_llm.neural.statement_classifier import (
+    default_neural_statement_parser,
+    statement_neural_summary,
+    train_statement_neural_model,
 )
 from struct_llm.structure import Entity, Event, Frame, Intention, Query, Relation, Role, State, Structure
 
@@ -46,13 +52,13 @@ TRAINING_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 @dataclass(frozen=True)
 class LocalNeuralBoundaryModel:
-    """Template model that bridges the neural interface to existing capabilities."""
+    """Data-backed boundary model that bridges the neural interface to capabilities."""
 
     _capabilities: CognitiveCapabilities = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        # Train once from the repo's current JSONL data so this provider follows the
-        # same examples the rest of the project already uses.
+        # Load neural artifacts derived from the current datasets. Structural
+        # reasoning still consumes the resulting Entity/Frame/Query objects.
         object.__setattr__(self, "_capabilities", build_trained_capabilities())
 
     def predict(self, task: str, payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -65,6 +71,19 @@ class LocalNeuralBoundaryModel:
         if task == "answer":
             return self._answer(payload)
         return None
+
+    def best_query_match(self, sentence: str, entities: tuple[Entity, ...]):
+        """Expose neural Query confidence for feedback suggestions.
+
+        The feedback layer uses this to ask for confirmation without reviving
+        a legacy Query artifact.
+        """
+        if not self._capabilities.query_parsers:
+            return None
+        best_match = getattr(self._capabilities.query_parsers[0], "best_match", None)
+        if best_match is None:
+            return None
+        return best_match(sentence, entities)
 
     def _parse_query(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         sentence = str(payload.get("sentence") or "").strip()
@@ -115,35 +134,26 @@ def make_model() -> LocalNeuralBoundaryModel:
 
 
 def train() -> None:
-    # Rebuild the provider from the current repo datasets and report what the
-    # model learned from them. This keeps the "training" path explicit instead
-    # of hiding it behind import side effects.
+    # Rebuild both input classifiers from the current datasets, then report the
+    # complete boundary summary.
+    train_query_neural_model()
+    train_statement_neural_model()
     model = make_model()
     summary = train_summary(model)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 def build_trained_capabilities() -> CognitiveCapabilities:
-    # Start from the structural kernel, then replace the learnable pieces with
-    # versions trained directly from the current data files.
+    # Start from the structural kernel, then install the neural input models.
     capabilities = default_capabilities(use_environment=False, use_memory=False)
-    if STATEMENT_DATA_PATH.exists():
-        capabilities = capabilities.replace_statement_parsers(
-            LearnedStatementParser.from_jsonl(STATEMENT_DATA_PATH)
-        )
-    if QUERY_DATA_PATH.exists():
-        capabilities = capabilities.replace_query_parsers(
-            LearnedQueryParser.from_jsonl(QUERY_DATA_PATH)
-        )
+    capabilities = capabilities.replace_statement_parsers(default_neural_statement_parser())
+    capabilities = capabilities.replace_query_parsers(default_neural_query_parser())
     intent_data_path = TRAINING_DATA_DIR / "intent_examples.jsonl"
     if intent_data_path.exists():
         capabilities = capabilities.with_intent_analyzers(
             InMemoryIntentAnalyzer.from_jsonl(intent_data_path)
         )
-    if DIALOG_ANSWER_DATA_PATH.exists():
-        capabilities = capabilities.with_answerers(
-            LearnedDialogActAnswerer.from_jsonl(DIALOG_ANSWER_DATA_PATH)
-        )
+    capabilities = capabilities.with_answerers(default_learned_dialog_answerer())
     return capabilities
 
 
@@ -152,14 +162,7 @@ def train_summary(model: LocalNeuralBoundaryModel) -> dict[str, Any]:
     summary: dict[str, Any] = {}
 
     if QUERY_DATA_PATH.exists():
-        query_examples = load_query_jsonl(QUERY_DATA_PATH)
-        query_parser = capabilities.query_parsers[0]
-        query_result = evaluate_query_parser(query_parser, query_examples)
-        summary["query"] = {
-            "examples": query_result.total,
-            "matched": query_result.matched,
-            "accuracy": round(query_result.accuracy, 4),
-        }
+        summary["query_neural"] = query_neural_summary(QUERY_DATA_PATH)
 
     if STATEMENT_DATA_PATH.exists():
         statement_examples = load_statement_jsonl(STATEMENT_DATA_PATH)
@@ -170,6 +173,7 @@ def train_summary(model: LocalNeuralBoundaryModel) -> dict[str, Any]:
             "matched": statement_result.matched,
             "accuracy": round(statement_result.accuracy, 4),
         }
+        summary["statement_neural"] = statement_neural_summary(STATEMENT_DATA_PATH)
 
     intent_data_path = TRAINING_DATA_DIR / "intent_examples.jsonl"
     if intent_data_path.exists():

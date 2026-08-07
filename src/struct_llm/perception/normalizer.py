@@ -230,7 +230,7 @@ def is_question_noise(sentence: str) -> bool:
     }:
         return True
     if len(normalized) <= 3 and not any(
-        word in normalized for word in ("谁", "什么", "哪里", "哪儿", "哪", "有", "在", "是", "几", "多", "最", "前", "后")
+        word in normalized for word in ("谁", "什么", "哪里", "哪儿", "哪", "有", "在", "是", "几", "多", "最", "前", "后", "能", "会")
     ):
         return True
     return False

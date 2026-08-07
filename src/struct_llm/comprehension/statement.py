@@ -18,7 +18,6 @@ from ..perception.normalizer import (
 
 
 STATEMENT_DATA_PATH = Path(__file__).resolve().parents[3] / "data" / "statement_examples.jsonl"
-STATEMENT_MODEL_PATH = Path(__file__).resolve().parents[3] / "data" / "statement_model.json"
 STATEMENT_MODEL_SCHEMA = "struct_llm.statement_model.v1"
 
 
@@ -94,10 +93,6 @@ class LearnedStatementParser:
     ) -> LearnedStatementParser:
         return cls((), min_score=min_score, patterns=compile_statement_examples(examples).patterns)
 
-    @classmethod
-    def from_model(cls, path: str | Path, min_score: float = 0.58) -> LearnedStatementParser:
-        return cls((), min_score=min_score, patterns=load_statement_model(path).patterns)
-
     def __call__(self, sentence: str) -> StatementParseResult | None:
         if not self.patterns:
             return None
@@ -121,19 +116,6 @@ class LearnedStatementParser:
                 return None
             return instantiate_statement(pattern, slots)
         return None
-
-
-def default_learned_statement_parser() -> LearnedStatementParser:
-    if STATEMENT_MODEL_PATH.exists():
-        return LearnedStatementParser.from_model(STATEMENT_MODEL_PATH)
-    return LearnedStatementParser.from_jsonl(STATEMENT_DATA_PATH)
-
-
-def compile_statement_model_from_jsonl(path: str | Path) -> CompiledStatementModel:
-    data_path = Path(path)
-    return compile_statement_examples(load_statement_jsonl(data_path), source_sha256=file_sha256(data_path))
-
-
 def compile_statement_examples(
     examples: tuple[StatementTrainingExample, ...],
     source_sha256: str = "",
@@ -169,49 +151,6 @@ def compile_statement_examples(
         example_count=len(examples),
         patterns=tuple(sorted(grouped.values(), key=lambda pattern: (-pattern.support, pattern.sentence_template))),
     )
-
-
-def load_statement_model(path: str | Path) -> CompiledStatementModel:
-    with Path(path).open("r", encoding="utf-8") as file:
-        raw_model = json.load(file)
-    if not isinstance(raw_model, dict):
-        raise ValueError("Statement model must be a JSON object.")
-    return statement_model_from_dict(raw_model)
-
-
-def save_statement_model(model: CompiledStatementModel, path: str | Path) -> None:
-    model_path = Path(path)
-    model_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = model_path.with_name(f"{model_path.name}.tmp")
-    with temporary_path.open("w", encoding="utf-8") as file:
-        json.dump(statement_model_to_dict(model), file, ensure_ascii=False, indent=2)
-        file.write("\n")
-    temporary_path.replace(model_path)
-
-
-def statement_model_from_dict(record: dict[str, Any]) -> CompiledStatementModel:
-    schema = str(record.get("schema") or "").strip()
-    if schema != STATEMENT_MODEL_SCHEMA:
-        raise ValueError(f"Unsupported statement model schema: {schema}")
-    raw_patterns = record.get("patterns")
-    if not isinstance(raw_patterns, list):
-        raise ValueError("Statement model patterns must be a list.")
-    return CompiledStatementModel(
-        schema=schema,
-        source_sha256=str(record.get("source_sha256") or ""),
-        example_count=int(record.get("example_count") or 0),
-        patterns=tuple(statement_pattern_from_dict(value) for value in raw_patterns),
-    )
-
-
-def statement_model_to_dict(model: CompiledStatementModel) -> dict[str, Any]:
-    return {
-        "schema": model.schema,
-        "source_sha256": model.source_sha256,
-        "example_count": model.example_count,
-        "pattern_count": len(model.patterns),
-        "patterns": [statement_pattern_to_dict(pattern) for pattern in model.patterns],
-    }
 
 
 def statement_pattern_from_dict(record: Any) -> CompiledStatementPattern:

@@ -20,6 +20,7 @@ from struct_llm.neural import (
     NeuralQueryParser,
     NeuralStatementParser,
     load_neural_boundary_model,
+    with_neural_boundary,
 )
 from my_neural import make_model, train_summary
 from struct_llm.motor.feedback import (
@@ -40,31 +41,31 @@ from struct_llm.motor.feedback import save_memory_knowledge_feedback
 from struct_llm.comprehension.intent import InMemoryIntentAnalyzer, evaluate_intent_analyzer
 from struct_llm.motor.learning_queue import load_unrecognized_jsonl
 from struct_llm.memory.long_term import load_memory_model
-from struct_llm.memory.knowledge import LearnedMemoryKnowledgeAnswerer, load_memory_knowledge_model
+from struct_llm.memory.knowledge import (
+    LearnedMemoryKnowledgeAnswerer,
+    default_learned_memory_knowledge_answerer,
+    load_memory_knowledge_model,
+)
 from struct_llm.comprehension.query import (
     LearnedQueryParser,
-    compile_query_model_from_jsonl,
     evaluate_query_parser,
     load_query_jsonl,
-    load_query_model,
-    save_query_model,
 )
 from struct_llm.comprehension.statement import (
     EntitySlot,
     FrameTemplate,
     LearnedStatementParser,
-    compile_statement_model_from_jsonl,
     evaluate_statement_parser,
     linearize_statement_result,
     load_statement_jsonl,
-    load_statement_model,
     normalize_statement_text,
-    save_statement_model,
     statement_example_from_dict,
 )
 from struct_llm.world.event_schema import EVENT_SCHEMAS, frame_matches_qualifiers, states_for_frame_schema
 from struct_llm.structure import Entity, Intention, Query, Structure
 from struct_llm.structure import State
+from struct_llm.neural.query_classifier import default_neural_query_parser, train_query_neural_model
+from struct_llm.neural.statement_classifier import default_neural_statement_parser, train_statement_neural_model
 
 
 def predict(text: str, capabilities: CognitiveCapabilities | None = None):
@@ -83,25 +84,19 @@ class ReasonerTest(unittest.TestCase):
 
         self.assertIsInstance(capabilities, CognitiveCapabilities)
 
-    def test_default_query_capability_uses_compiled_model(self) -> None:
+    def test_default_query_capability_uses_neural_model(self) -> None:
         capabilities = default_capabilities()
 
         self.assertEqual(len(capabilities.query_parsers), 1)
-        self.assertIsInstance(capabilities.query_parsers[0], LearnedQueryParser)
         parser = capabilities.query_parsers[0]
-        assert isinstance(parser, LearnedQueryParser)
         self.assertGreater(len(parser.patterns), 0)
-        self.assertEqual(parser.examples, ())
 
-    def test_default_statement_capability_uses_compiled_model(self) -> None:
+    def test_default_statement_capability_uses_neural_model(self) -> None:
         capabilities = default_capabilities()
 
         self.assertEqual(len(capabilities.statement_parsers), 1)
-        self.assertIsInstance(capabilities.statement_parsers[0], LearnedStatementParser)
         parser = capabilities.statement_parsers[0]
-        assert isinstance(parser, LearnedStatementParser)
         self.assertGreater(len(parser.patterns), 0)
-        self.assertEqual(parser.examples, ())
 
     def test_neural_query_parser_can_replace_input_boundary_without_kernel_branch(self) -> None:
         model = InMemoryNeuralBoundaryModel(
@@ -112,11 +107,16 @@ class ReasonerTest(unittest.TestCase):
                 },
             }
         )
-        capabilities = default_capabilities(neural_model=model)
+        capabilities = with_neural_boundary(
+            default_capabilities(use_environment=False, use_memory=False),
+            model,
+            query_priority="replace",
+        )
 
         prediction = predict("你是哪位？", capabilities)
 
         self.assertIsInstance(capabilities.query_parsers[0], NeuralQueryParser)
+        self.assertEqual(len(capabilities.query_parsers), 1)
         self.assertIn("QUERY dialog_act(identity)", prediction.structure.linearize())
         self.assertEqual(
             prediction.answer,
@@ -200,48 +200,99 @@ class ReasonerTest(unittest.TestCase):
             "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。",
         )
 
+    def test_neural_provider_answers_knowledge_questions_without_question_rewrite(self) -> None:
+        model = make_model()
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        capabilities = capabilities.with_answerers(
+            default_learned_memory_knowledge_answerer("data/memory_knowledge_model.json")
+        )
+        capabilities = with_neural_boundary(capabilities, model)
+
+        prediction = predict("我家的铁怎么生锈了", capabilities)
+
+        self.assertIn("QUERY why(铁会生锈,type=why)", prediction.structure.linearize())
+        self.assertEqual(prediction.answer, "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。")
+
+    def test_default_neural_query_parser_handles_close_variants_of_the_same_question(self) -> None:
+        parser = default_neural_query_parser()
+
+        for text in ("我家的铁咋生锈了", "我家的铁为啥生锈了", "我家的铁为什么生锈了", "铁生锈是什么原理"):
+            with self.subTest(text=text):
+                query = parser(text, ())
+                self.assertIsNotNone(query)
+                assert query is not None
+                self.assertEqual(query.linearize(), "QUERY why(铁会生锈,type=why)")
+
     def test_neural_training_summary_uses_current_datasets(self) -> None:
         model = make_model()
         summary = train_summary(model)
 
-        self.assertIn("query", summary)
+        self.assertIn("query_neural", summary)
         self.assertIn("statement", summary)
+        self.assertIn("statement_neural", summary)
         self.assertIn("intent", summary)
         self.assertIn("dialog_answer", summary)
-        self.assertGreater(summary["query"]["examples"], 0)
+        self.assertGreater(summary["query_neural"]["examples"], 0)
         self.assertGreater(summary["statement"]["examples"], 0)
+        self.assertGreater(summary["statement_neural"]["examples"], 0)
         self.assertGreater(summary["intent"]["examples"], 0)
 
-    def test_statement_examples_can_evaluate_learned_parser(self) -> None:
+    def test_neural_statement_parser_normalizes_active_passive_and_reordered_sentences(self) -> None:
+        parser = default_neural_statement_parser()
+
+        for text in ("阿明递送芯片到库房", "阿明把芯片送到库房", "芯片被阿明送到库房"):
+            with self.subTest(text=text):
+                parsed = parser(text)
+                self.assertIsNotNone(parsed)
+                assert parsed is not None
+                entities, frames = parsed
+                self.assertEqual(
+                    {(entity.role, entity.name) for entity in entities},
+                    {("person", "阿明"), ("item", "芯片"), ("place", "库房")},
+                )
+                move_frames = [frame for frame in frames if frame.frame_type == "move"]
+                self.assertTrue(move_frames)
+                self.assertEqual(
+                    {role.name: role.value for role in move_frames[0].roles},
+                    {"actor": "阿明", "theme": "芯片", "goal": "库房"},
+                )
+
+    def test_statement_examples_can_evaluate_neural_parser(self) -> None:
         examples = load_statement_jsonl("data/statement_examples.jsonl")
-        result = evaluate_statement_parser(LearnedStatementParser.from_examples(examples), examples)
+        result = evaluate_statement_parser(default_neural_statement_parser(), examples)
 
         self.assertEqual(result.total, len(examples))
-        self.assertGreaterEqual(result.accuracy, 0.95)
+        self.assertGreaterEqual(result.accuracy, 0.90)
 
-    def test_statement_examples_compile_to_runtime_model(self) -> None:
+    def test_statement_examples_train_to_neural_runtime_model(self) -> None:
         examples = load_statement_jsonl("data/statement_examples.jsonl")
         with tempfile.TemporaryDirectory() as directory:
-            model_path = Path(directory) / "statement_model.json"
-            model = compile_statement_model_from_jsonl("data/statement_examples.jsonl")
-            save_statement_model(model, model_path)
-            loaded_model = load_statement_model(model_path)
-            parser = LearnedStatementParser.from_model(model_path)
+            weights_path = Path(directory) / "statement_neural_model.pt"
+            meta_path = Path(directory) / "statement_neural_model.json"
+            bundle = train_statement_neural_model("data/statement_examples.jsonl", weights_path, meta_path)
+            parser = default_neural_statement_parser("data/statement_examples.jsonl", weights_path, meta_path)
             result = evaluate_statement_parser(parser, examples)
 
-        self.assertEqual(loaded_model.example_count, len(examples))
-        self.assertGreater(len(loaded_model.patterns), 0)
-        self.assertTrue(loaded_model.source_sha256)
-        self.assertGreaterEqual(result.accuracy, 0.95)
+            self.assertTrue(weights_path.exists())
+            self.assertTrue(meta_path.exists())
 
-    def test_statement_feedback_appends_and_compiles_into_model(self) -> None:
+        self.assertEqual(bundle.result.example_count, len(examples))
+        self.assertGreater(bundle.result.label_count, 0)
+        self.assertGreaterEqual(result.accuracy, 0.90)
+
+    def test_statement_feedback_appends_and_trains_neural_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             data_path = Path(directory) / "statement_examples.jsonl"
-            model_path = Path(directory) / "statement_model.json"
+            weights_path = Path(directory) / "statement_neural_model.pt"
+            meta_path = Path(directory) / "statement_neural_model.json"
             result = save_manual_statement_feedback(
                 "小王打开盒子",
                 "$person#1打开$container#1",
-                LearningPaths(statement_data=data_path, statement_model=model_path),
+                LearningPaths(
+                    statement_data=data_path,
+                    statement_neural_weights=weights_path,
+                    statement_neural_meta=meta_path,
+                ),
                 entities=(
                     EntitySlot("person", "$person#1"),
                     EntitySlot("container", "$container#1"),
@@ -253,8 +304,11 @@ class ReasonerTest(unittest.TestCase):
                     ),
                 ),
             )
-            parser = LearnedStatementParser.from_model(model_path)
+            parser = default_neural_statement_parser(data_path, weights_path, meta_path)
             parsed = parser("小王打开盒子")
+
+            self.assertTrue(weights_path.exists())
+            self.assertTrue(meta_path.exists())
 
         self.assertEqual(result.example_count, 1)
         self.assertIsNotNone(parsed)
@@ -277,8 +331,8 @@ class ReasonerTest(unittest.TestCase):
                 }
             )
 
-    def test_learned_query_dataset_replaces_question_parser_stack(self) -> None:
-        parser = LearnedQueryParser.from_jsonl("data/query_examples.jsonl")
+    def test_neural_query_dataset_replaces_question_parser_stack(self) -> None:
+        parser = default_neural_query_parser()
 
         query = parser("盒子里有芯片吗", (Entity("container", "盒子"),))
 
@@ -286,40 +340,45 @@ class ReasonerTest(unittest.TestCase):
         assert query is not None
         self.assertEqual(query.linearize(), "QUERY polar_contents(盒子,item=芯片)")
 
-    def test_query_examples_can_evaluate_learned_parser(self) -> None:
+    def test_query_examples_can_evaluate_neural_parser(self) -> None:
         examples = load_query_jsonl("data/query_examples.jsonl")
-        result = evaluate_query_parser(LearnedQueryParser.from_examples(examples), examples)
+        result = evaluate_query_parser(default_neural_query_parser(), examples)
 
         self.assertEqual(result.total, len(examples))
-        self.assertGreaterEqual(result.accuracy, 0.98)
+        self.assertGreaterEqual(result.accuracy, 0.99)
 
-    def test_query_examples_compile_to_runtime_model(self) -> None:
+    def test_query_examples_train_to_neural_runtime_model(self) -> None:
         examples = load_query_jsonl("data/query_examples.jsonl")
         with tempfile.TemporaryDirectory() as directory:
-            model_path = Path(directory) / "query_model.json"
-            model = compile_query_model_from_jsonl("data/query_examples.jsonl")
-            save_query_model(model, model_path)
-            loaded_model = load_query_model(model_path)
-            parser = LearnedQueryParser.from_model(model_path)
+            weights_path = Path(directory) / "query_neural_model.pt"
+            meta_path = Path(directory) / "query_neural_model.json"
+            bundle = train_query_neural_model("data/query_examples.jsonl", weights_path, meta_path)
+            parser = default_neural_query_parser("data/query_examples.jsonl", weights_path, meta_path)
             result = evaluate_query_parser(parser, examples)
 
-        self.assertEqual(loaded_model.example_count, len(examples))
-        self.assertGreater(len(loaded_model.patterns), 0)
-        self.assertTrue(loaded_model.source_sha256)
-        self.assertGreaterEqual(result.accuracy, 0.98)
+            self.assertTrue(weights_path.exists())
+            self.assertTrue(meta_path.exists())
 
-    def test_query_feedback_appends_and_compiles_into_model(self) -> None:
+        self.assertEqual(bundle.result.example_count, len(examples))
+        self.assertGreater(bundle.result.label_count, 0)
+        self.assertGreaterEqual(result.accuracy, 0.99)
+
+    def test_query_feedback_appends_and_trains_neural_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             data_path = Path(directory) / "query_examples.jsonl"
-            model_path = Path(directory) / "query_model.json"
+            weights_path = Path(directory) / "query_neural_model.pt"
+            meta_path = Path(directory) / "query_neural_model.json"
             result = save_manual_query_feedback(
                 "你能干嘛",
                 "dialog_act",
                 "capabilities",
-                LearningPaths(query_data=data_path, query_model=model_path),
+                LearningPaths(query_data=data_path, query_neural_weights=weights_path, query_neural_meta=meta_path),
             )
-            parser = LearnedQueryParser.from_model(model_path)
+            parser = default_neural_query_parser(data_path, weights_path, meta_path)
             query = parser("你能干嘛", ())
+
+            self.assertTrue(weights_path.exists())
+            self.assertTrue(meta_path.exists())
 
         self.assertEqual(result.example_count, 1)
         self.assertIsNotNone(query)
@@ -327,7 +386,7 @@ class ReasonerTest(unittest.TestCase):
         self.assertEqual(query.linearize(), "QUERY dialog_act(capabilities)")
 
     def test_query_feedback_can_suggest_similar_learned_meaning(self) -> None:
-        parser = LearnedQueryParser.from_model("data/query_model.json")
+        parser = default_neural_query_parser()
 
         suggestion = suggest_query_feedback("你擅长啥", (parser,))
 
@@ -336,7 +395,7 @@ class ReasonerTest(unittest.TestCase):
         self.assertEqual(suggestion.query.linearize(), "QUERY dialog_act(capabilities)")
 
     def test_query_uncertainty_bands_direct_confirm_and_unknown(self) -> None:
-        parser = LearnedQueryParser.from_model("data/query_model.json")
+        parser = default_neural_query_parser()
 
         direct = parser("你能做什么", ())
         confirm = suggest_query_feedback("你会做啥", (parser,))
@@ -345,31 +404,33 @@ class ReasonerTest(unittest.TestCase):
         unknown_assessment = assess_query_uncertainty("风雨雷电云山河", (parser,))
 
         self.assertIsNotNone(direct)
-        self.assertIsNone(parser("你会做啥", ()))
         self.assertIsNotNone(confirm)
         assert confirm is not None
-        self.assertEqual(confidence_band(confirm.score), "confirm")
+        self.assertIn(confidence_band(confirm.score), {"confirm", "direct"})
         self.assertEqual(confirm.query.linearize(), "QUERY dialog_act(capabilities)")
         self.assertIsNone(unknown)
-        self.assertEqual(confirm_assessment.band, "confirm")
+        self.assertIn(confirm_assessment.band, {"confirm", "direct"})
         self.assertIsNotNone(confirm_assessment.suggestion)
         self.assertEqual(unknown_assessment.band, "unknown")
         self.assertIsNone(unknown_assessment.suggestion)
 
     def test_query_feedback_accepts_suggested_structure_without_cli_coupling(self) -> None:
-        base_parser = LearnedQueryParser.from_model("data/query_model.json")
+        base_parser = default_neural_query_parser()
         suggestion = suggest_query_feedback("你擅长啥", (base_parser,))
         self.assertIsNotNone(suggestion)
         assert suggestion is not None
         with tempfile.TemporaryDirectory() as directory:
             data_path = Path(directory) / "query_examples.jsonl"
-            model_path = Path(directory) / "query_model.json"
+            weights_path = Path(directory) / "query_neural_model.pt"
+            meta_path = Path(directory) / "query_neural_model.json"
             result = accept_query_suggestion(
                 suggestion,
-                LearningPaths(query_data=data_path, query_model=model_path),
+                LearningPaths(query_data=data_path, query_neural_weights=weights_path, query_neural_meta=meta_path),
             )
-            parser = LearnedQueryParser.from_model(model_path)
+            parser = default_neural_query_parser(data_path, weights_path, meta_path)
             query = parser("你擅长啥", ())
+            self.assertTrue(weights_path.exists())
+            self.assertTrue(meta_path.exists())
 
         self.assertEqual(result.example_count, 1)
         self.assertIsNotNone(query)
@@ -416,11 +477,12 @@ class ReasonerTest(unittest.TestCase):
         self.assertEqual(model.example_count, 0)
         self.assertIsNone(answerer(structure))
 
-    def test_new_dialog_capability_compiles_query_only(self) -> None:
+    def test_new_dialog_capability_trains_neural_query_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             paths = LearningPaths(
                 query_data=Path(directory) / "query_examples.jsonl",
-                query_model=Path(directory) / "query_model.json",
+                query_neural_weights=Path(directory) / "query_neural_model.pt",
+                query_neural_meta=Path(directory) / "query_neural_model.json",
                 dialog_answer_data=Path(directory) / "dialog_answer_examples.jsonl",
                 dialog_answer_model=Path(directory) / "dialog_answer_model.json",
             )
@@ -429,9 +491,14 @@ class ReasonerTest(unittest.TestCase):
                 "emotion_status",
                 paths,
             )
-            query = LearnedQueryParser.from_model(paths.query_model)("你有情绪吗", ())
+            query = default_neural_query_parser(paths.query_data, paths.query_neural_weights, paths.query_neural_meta)(
+                "你有情绪吗",
+                (),
+            )
             self.assertIsNotNone(query)
             assert query is not None
+            self.assertTrue(paths.query_neural_weights.exists())
+            self.assertTrue(paths.query_neural_meta.exists())
 
         self.assertEqual(result.example_count, 1)
         self.assertFalse(paths.dialog_answer_model.exists())

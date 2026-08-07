@@ -26,24 +26,8 @@ from .motor.dialogue import (
     compile_dialog_answer_model_from_jsonl,
     save_dialog_answer_model,
 )
-from .comprehension.query import (
-    EntityExample,
-    LearnedQueryParser,
-    QUERY_DIRECT_CONFIDENCE,
-    compile_query_model_from_jsonl,
-    evaluate_query_parser,
-    load_query_jsonl,
-    save_query_model,
-)
-from .comprehension.statement import (
-    EntitySlot,
-    FrameTemplate,
-    LearnedStatementParser,
-    compile_statement_model_from_jsonl,
-    evaluate_statement_parser,
-    load_statement_jsonl,
-    save_statement_model,
-)
+from .comprehension.query import EntityExample
+from .comprehension.statement import EntitySlot, FrameTemplate
 from .memory.long_term import (
     extract_chat_memory_entries,
     load_memory_model,
@@ -55,6 +39,8 @@ from .memory.knowledge import (
     save_memory_knowledge_model,
 )
 from .structure import State
+from .neural.query_classifier import train_query_neural_model
+from .neural.statement_classifier import train_statement_neural_model
 
 
 QUESTIONS = (
@@ -75,19 +61,13 @@ def ask_symbolic() -> None:
     parser.add_argument("text", nargs="?", help="Question text. Omit it to enter interactive mode.")
     parser.add_argument("--intent-data", help="JSONL file with learned intent examples.")
     parser.add_argument("--intent-min-score", type=float, default=0.6)
-    parser.add_argument("--query-data", help="JSONL file with learned query examples.")
-    parser.add_argument("--query-model", help="Compiled query model artifact.")
-    parser.add_argument("--query-min-score", type=float, default=QUERY_DIRECT_CONFIDENCE)
-    parser.add_argument("--statement-data", help="JSONL file with learned statement examples.")
-    parser.add_argument("--statement-model", help="Compiled statement model artifact.")
-    parser.add_argument("--statement-min-score", type=float, default=0.58)
     parser.add_argument("--dialog-answer-data", help="JSONL file with learned dialog answer examples.")
-    parser.add_argument("--dialog-answer-model", help="Compiled dialog answer model artifact.")
+    parser.add_argument("--dialog-answer-model", help="Verified dialog answer artifact.")
     parser.add_argument("--memory-direct-data", help="JSONL file with direct memory entries.")
     parser.add_argument("--memory-chat-data", help="JSONL file with chat-sedimented memory entries.")
-    parser.add_argument("--memory-model", help="Compiled memory model artifact.")
+    parser.add_argument("--memory-model", help="Long-term memory state artifact.")
     parser.add_argument("--memory-knowledge-data", help="JSONL file with long-term knowledge entries.")
-    parser.add_argument("--memory-knowledge-model", help="Compiled long-term knowledge artifact.")
+    parser.add_argument("--memory-knowledge-model", help="Verified long-term knowledge artifact.")
     parser.add_argument("--remember-chat", action="store_true", help="Ask before storing stable facts from successful chat turns.")
     parser.add_argument(
         "--neural-provider",
@@ -107,22 +87,6 @@ def ask_symbolic() -> None:
         use_environment=False,
         use_memory=False,
     )
-    if args.statement_model and Path(args.statement_model).exists():
-        capabilities = capabilities.replace_statement_parsers(
-            LearnedStatementParser.from_model(Path(args.statement_model), min_score=args.statement_min_score)
-        )
-    elif args.statement_data and Path(args.statement_data).exists():
-        capabilities = capabilities.replace_statement_parsers(
-            LearnedStatementParser.from_jsonl(Path(args.statement_data), min_score=args.statement_min_score)
-        )
-    if args.query_model and Path(args.query_model).exists():
-        capabilities = capabilities.replace_query_parsers(
-            LearnedQueryParser.from_model(Path(args.query_model), min_score=args.query_min_score)
-        )
-    elif args.query_data and Path(args.query_data).exists():
-        capabilities = capabilities.replace_query_parsers(
-            LearnedQueryParser.from_jsonl(Path(args.query_data), min_score=args.query_min_score)
-        )
     if args.intent_data:
         analyzer = InMemoryIntentAnalyzer.from_jsonl(Path(args.intent_data), min_score=args.intent_min_score)
         capabilities = capabilities.with_intent_analyzers(analyzer)
@@ -202,59 +166,27 @@ def eval_intent_examples() -> None:
 
 
 def eval_query_examples() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate the learned query parser against JSONL examples.")
+    parser = argparse.ArgumentParser(description="Evaluate the neural query parser against JSONL examples.")
     parser.add_argument("--query-data", default="data/query_examples.jsonl")
-    parser.add_argument("--query-model", default="")
-    parser.add_argument("--query-min-score", type=float, default=QUERY_DIRECT_CONFIDENCE)
     args = parser.parse_args()
 
-    examples = load_query_jsonl(Path(args.query_data))
-    query_parser = (
-        LearnedQueryParser.from_model(Path(args.query_model), min_score=args.query_min_score)
-        if args.query_model
-        else LearnedQueryParser.from_examples(examples, min_score=args.query_min_score)
+    bundle = train_query_neural_model(Path(args.query_data))
+    print(
+        f"问题样本={bundle.result.example_count} 标签={bundle.result.label_count} "
+        f"训练准确率={bundle.result.train_accuracy:.2f}"
     )
-    result = evaluate_query_parser(query_parser, examples)
-    print(f"问题样本={result.total} 命中={result.matched} 准确率={result.accuracy:.2f}")
 
 
 def eval_statement_examples() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate the learned statement parser against JSONL examples.")
+    parser = argparse.ArgumentParser(description="Evaluate the neural statement parser against JSONL examples.")
     parser.add_argument("--statement-data", default="data/statement_examples.jsonl")
-    parser.add_argument("--statement-model", default="")
-    parser.add_argument("--statement-min-score", type=float, default=0.58)
     args = parser.parse_args()
 
-    examples = load_statement_jsonl(Path(args.statement_data))
-    statement_parser = (
-        LearnedStatementParser.from_model(Path(args.statement_model), min_score=args.statement_min_score)
-        if args.statement_model
-        else LearnedStatementParser.from_examples(examples, min_score=args.statement_min_score)
+    bundle = train_statement_neural_model(Path(args.statement_data))
+    print(
+        f"陈述样本={bundle.result.example_count} 标签={bundle.result.label_count} "
+        f"训练准确率={bundle.result.train_accuracy:.2f}"
     )
-    result = evaluate_statement_parser(statement_parser, examples)
-    print(f"陈述样本={result.total} 命中={result.matched} 准确率={result.accuracy:.2f}")
-
-
-def compile_query_model() -> None:
-    parser = argparse.ArgumentParser(description="Compile Query JSONL examples into a runtime model artifact.")
-    parser.add_argument("--query-data", default="data/query_examples.jsonl")
-    parser.add_argument("--output", default="data/query_model.json")
-    args = parser.parse_args()
-
-    model = compile_query_model_from_jsonl(Path(args.query_data))
-    save_query_model(model, Path(args.output))
-    print(f"已生成问题模型：样本={model.example_count} 模式={len(model.patterns)} 输出={args.output}")
-
-
-def compile_statement_model() -> None:
-    parser = argparse.ArgumentParser(description="Compile statement JSONL examples into a runtime model artifact.")
-    parser.add_argument("--statement-data", default="data/statement_examples.jsonl")
-    parser.add_argument("--output", default="data/statement_model.json")
-    args = parser.parse_args()
-
-    model = compile_statement_model_from_jsonl(Path(args.statement_data))
-    save_statement_model(model, Path(args.output))
-    print(f"已生成陈述模型：样本={model.example_count} 模式={len(model.patterns)} 输出={args.output}")
 
 
 def compile_dialog_answer_model() -> None:
@@ -310,7 +242,7 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
         if not learned:
             print("已跳过，不写入训练集。")
             return
-        refreshed = capabilities_after_recompile(args)
+        refreshed = capabilities_after_training(args)
         print("我已经记下并重新整理模型了。现在重试一次：")
         try:
             print_prediction(question, refreshed)
@@ -326,7 +258,7 @@ def print_prediction_with_learning(question: str, capabilities, args) -> None:
 
 
 def prompt_learning_feedback(text: str, args) -> str | bool:
-    capabilities = capabilities_after_recompile(args)
+    capabilities = capabilities_after_training(args)
     assessment = assess_query_uncertainty(text, capabilities.query_parsers)
     if assessment.band == "unknown":
         save_unrecognized_feedback(
@@ -351,7 +283,7 @@ def prompt_learning_feedback(text: str, args) -> str | bool:
 
 def prompt_similar_query_feedback(text: str, args, assessment=None) -> bool | None:
     if assessment is None:
-        capabilities = capabilities_after_recompile(args)
+        capabilities = capabilities_after_training(args)
         assessment = assess_query_uncertainty(text, capabilities.query_parsers)
     suggestion = assessment.suggestion
     if suggestion is None:
@@ -403,7 +335,7 @@ def prompt_query_feedback(text: str, args) -> bool:
         entities=entities,
         qualifiers=qualifiers,
     )
-    print(f"已保存问题样本并重新编译，问题样本现在有 {result.example_count} 条。")
+    print(f"已保存问题样本并重新训练神经模型，问题样本现在有 {result.example_count} 条。")
     return True
 
 
@@ -457,7 +389,7 @@ def prompt_statement_feedback(text: str, args) -> bool:
         entities=entities,
         frames=frames,
     )
-    print(f"已保存陈述样本并重新编译，陈述样本现在有 {result.example_count} 条。")
+    print(f"已保存陈述样本并重新训练神经模型，陈述样本现在有 {result.example_count} 条。")
     return True
 
 
@@ -484,9 +416,11 @@ def prompt_intent_feedback(text: str, args) -> bool:
 def learning_paths_from_args(args) -> LearningPaths:
     return LearningPaths(
         query_data=Path(getattr(args, "query_data", None) or "data/query_examples.jsonl"),
-        query_model=Path(getattr(args, "query_model", None) or "data/query_model.json"),
+        query_neural_weights=Path(getattr(args, "query_neural_weights", None) or "data/query_neural_model.pt"),
+        query_neural_meta=Path(getattr(args, "query_neural_meta", None) or "data/query_neural_model.json"),
         statement_data=Path(getattr(args, "statement_data", None) or "data/statement_examples.jsonl"),
-        statement_model=Path(getattr(args, "statement_model", None) or "data/statement_model.json"),
+        statement_neural_weights=Path(getattr(args, "statement_neural_weights", None) or "data/statement_neural_model.pt"),
+        statement_neural_meta=Path(getattr(args, "statement_neural_meta", None) or "data/statement_neural_model.json"),
         dialog_answer_data=Path(getattr(args, "dialog_answer_data", None) or "data/dialog_answer_examples.jsonl"),
         dialog_answer_model=Path(getattr(args, "dialog_answer_model", None) or "data/dialog_answer_model.json"),
         unrecognized_data=Path(
@@ -558,19 +492,13 @@ def input_required(label: str) -> str:
             return value
 
 
-def capabilities_after_recompile(args):
+def capabilities_after_training(args):
     capabilities = default_capabilities(
         neural_answer_priority=getattr(args, "neural_answer_priority", "first"),
         use_environment=False,
         use_memory=False,
     )
-    query_model = getattr(args, "query_model", None)
-    statement_model = getattr(args, "statement_model", None)
     dialog_answer_model = getattr(args, "dialog_answer_model", None)
-    if statement_model and Path(statement_model).exists():
-        capabilities = capabilities.replace_statement_parsers(LearnedStatementParser.from_model(Path(statement_model)))
-    if query_model and Path(query_model).exists():
-        capabilities = capabilities.replace_query_parsers(LearnedQueryParser.from_model(Path(query_model)))
     if dialog_answer_model and Path(dialog_answer_model).exists():
         capabilities = capabilities.with_answerers(LearnedDialogActAnswerer.from_model(Path(dialog_answer_model)))
     capabilities = apply_memory_args(capabilities, args)
@@ -591,6 +519,8 @@ def apply_neural_provider_args(capabilities, args):
     return with_neural_boundary(
         capabilities,
         model,
+        statement_priority="replace",
+        query_priority="replace",
         answer_priority=getattr(args, "neural_answer_priority", "fallback"),
     )
 
@@ -650,8 +580,6 @@ def add_memory_entry() -> None:
     parser.add_argument("--memory-direct-data", default="data/memory_direct_examples.jsonl")
     parser.add_argument("--memory-chat-data", default="data/memory_chat_examples.jsonl")
     parser.add_argument("--memory-model", default="data/memory_model.json")
-    parser.add_argument("--statement-model", default="data/statement_model.json")
-    parser.add_argument("--query-model", default="data/query_model.json")
     parser.add_argument("--neural-provider")
     args = parser.parse_args()
 
@@ -672,10 +600,6 @@ def add_memory_entry() -> None:
     if not args.text:
         raise SystemExit("需要提供 TEXT 或 --state。")
     capabilities = default_capabilities(use_environment=False, use_memory=False)
-    if args.statement_model and Path(args.statement_model).exists():
-        capabilities = capabilities.replace_statement_parsers(LearnedStatementParser.from_model(Path(args.statement_model)))
-    if args.query_model and Path(args.query_model).exists():
-        capabilities = capabilities.replace_query_parsers(LearnedQueryParser.from_model(Path(args.query_model)))
     capabilities = apply_neural_provider_args(capabilities, args)
     structure = parse_text(args.text, capabilities)
     result = save_direct_memory_structure_feedback(args.text, structure, paths, confidence=args.confidence)
@@ -690,8 +614,6 @@ def add_memory_knowledge_entry() -> None:
     parser.add_argument("--source", default="human_feedback")
     parser.add_argument("--memory-knowledge-data", default="data/memory_knowledge_examples.jsonl")
     parser.add_argument("--memory-knowledge-model", default="data/memory_knowledge_model.json")
-    parser.add_argument("--query-model", default="data/query_model.json")
-    parser.add_argument("--statement-model", default="data/statement_model.json")
     parser.add_argument("--neural-provider")
     args = parser.parse_args()
 
@@ -703,10 +625,6 @@ def add_memory_knowledge_entry() -> None:
         raise SystemExit("单条写入需要提供 --answer。")
     paths = learning_paths_from_args(args)
     capabilities = default_capabilities(use_environment=False, use_memory=False)
-    if args.statement_model and Path(args.statement_model).exists():
-        capabilities = capabilities.replace_statement_parsers(LearnedStatementParser.from_model(Path(args.statement_model)))
-    if args.query_model and Path(args.query_model).exists():
-        capabilities = capabilities.replace_query_parsers(LearnedQueryParser.from_model(Path(args.query_model)))
     capabilities = apply_neural_provider_args(capabilities, args)
     records = (
         load_memory_knowledge_source_records(Path(args.file), fallback_source=args.source)
@@ -718,7 +636,7 @@ def add_memory_knowledge_entry() -> None:
     for question, answer, source in records:
         structure = parse_text(question, capabilities)
         if structure.query is None:
-            raise SystemExit(f"当前解析结果没有生成可编译的 Query：{question}")
+            raise SystemExit(f"当前解析结果没有生成可入库的 Query：{question}")
         result = save_memory_knowledge_feedback(
             question,
             structure.query,

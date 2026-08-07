@@ -1,9 +1,21 @@
 {
   "schema": "struct_llm.memory_knowledge_model.v1",
-  "source_sha256": "6444f28860b742ba8c70ade4327a2d5b636954d6d7228bc2ca8c62cb643a19d1",
-  "example_count": 10,
+  "source_sha256": "35ee5f990dbd024e4859f366d696cfcbb679af8e3e16bb7e151cf20ab1e50171",
+  "example_count": 21,
   "pattern_count": 10,
   "patterns": [
+    {
+      "query": {
+        "intent": "why",
+        "target": "铁会生锈",
+        "qualifiers": [
+          "type=why"
+        ],
+        "subqueries": []
+      },
+      "answer": "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。",
+      "support": 3
+    },
     {
       "query": {
         "intent": "why",
@@ -14,7 +26,7 @@
         "subqueries": []
       },
       "answer": "云层里电荷分离后会放电，空气被瞬间加热膨胀，就形成了雷声。",
-      "support": 1
+      "support": 2
     },
     {
       "query": {
@@ -26,7 +38,7 @@
         "subqueries": []
       },
       "answer": "冬天空气温度更低，水汽更容易在高空凝结成冰晶，落下来就形成雪。",
-      "support": 1
+      "support": 2
     },
     {
       "query": {
@@ -38,7 +50,7 @@
         "subqueries": []
       },
       "answer": "因为河流把岩石中的矿物质带进海洋，长期积累后，海水里就含有很多盐类。",
-      "support": 1
+      "support": 2
     },
     {
       "query": {
@@ -50,7 +62,7 @@
         "subqueries": []
       },
       "answer": "因为阳光进入大气后会被空气分子散射，短波长的蓝光更容易散开，所以天空看起来偏蓝。",
-      "support": 1
+      "support": 2
     },
     {
       "query": {
@@ -62,7 +74,7 @@
         "subqueries": []
       },
       "answer": "太阳内部持续发生核聚变，把质量转成能量，再以光和热的形式释放出来。",
-      "support": 1
+      "support": 2
     },
     {
       "query": {
@@ -74,7 +86,7 @@
         "subqueries": []
       },
       "answer": "打哈欠和疲劳、缺少刺激、状态切换有关，具体机制还没有完全统一的答案。",
-      "support": 1
+      "support": 2
     },
     {
       "query": {
@@ -86,7 +98,7 @@
         "subqueries": []
       },
       "answer": "月亮本身并不变形，是太阳照亮的那一半随着月球绕地球运行而呈现出不同可见面积。",
-      "support": 1
+      "support": 2
     },
     {
       "query": {
@@ -98,19 +110,7 @@
         "subqueries": []
       },
       "answer": "植物要用光进行光合作用，把水和二氧化碳转成养分，维持生长。",
-      "support": 1
-    },
-    {
-      "query": {
-        "intent": "why",
-        "target": "铁会生锈",
-        "qualifiers": [
-          "type=why"
-        ],
-        "subqueries": []
-      },
-      "answer": "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。",
-      "support": 1
+      "support": 2
     },
     {
       "query": {
@@ -122,7 +122,7 @@
         "subqueries": []
       },
       "answer": "阳光穿过雨滴时会发生折射和色散，不同波长的光分开后，就形成了多种颜色。",
-      "support": 1
+      "support": 2
     }
   ]
 }

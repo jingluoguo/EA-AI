@@ -6,7 +6,7 @@
 
 > 模型能否从句子里抽取实体、关系、事件和规则，再基于这些结构推理出答案？
 
-当前主路径是标准库即可运行的显式结构推理 baseline。
+当前日常主路径是“显式结构推理 + PyTorch 神经 Query 边界模型”。
 
 ## 设计思想
 
@@ -45,9 +45,9 @@
 原始文本
   -> perception/lexer.py 切句和查询候选保留
   -> perception/normalizer.py 表层剥离和槽位归一
-  -> comprehension/statement.py 加载 statement_model.json，实例化 Entity + FRAME/ROLE
+  -> my_neural.py 加载 statement_neural_model.pt/json，用神经模型解析 Entity + FRAME/ROLE
   -> world/state.py FRAME 投影为当前 STATE
-  -> comprehension/query.py 加载 query_model.json，把查询候选抽象为 QUERY
+  -> my_neural.py 加载 query_neural_model.pt/json，用神经模型把查询候选解析为 QUERY
   -> memory/long_term.py 加载 memory_model.json，把已确认的长期 STATE 注入当前结构
   -> intent_analyzers 从完整结构和训练样本推断 INTENT
   -> reasoning/pipeline.py 门面转发到 reasoning/core.py 根据 QUERY + FRAME/STATE 推导 RULE
@@ -59,14 +59,14 @@
 
 ### 完整实现流程
 
-项目现在按“训练数据沉淀能力，运行时加载能力产物”的方式工作：
+项目现在按“训练数据沉淀能力，运行时加载神经能力产物”的方式工作：
 
 | 阶段 | 做什么 | 用到的方法 / 技术 | 主要代码 / 产物 |
 | --- | --- | --- | --- |
 | 1. 收集样本 | 保存用户输入、失败案例、人工反馈和已确认记忆 | JSONL 追加式数据集；训练样本 schema；人工确认反馈 | `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl`、`data/dialog_answer_examples.jsonl`、`data/memory_direct_examples.jsonl`、`data/memory_chat_examples.jsonl` |
 | 2. 样本校验 | 确认样本字段完整、结构合法 | 结构化 schema 校验；`dataclass` 样本对象；槽位字段检查 | `comprehension/query.py`、`comprehension/statement.py`、`comprehension/intent_dataset.py` |
-| 3. 编译模型产物 | 把训练样本和记忆条目沉淀成运行时能力文件 | 结构模板聚合；抽象问题模式；回答结构聚合；记忆状态合并；源数据 `sha256` 指纹；原子写入 JSON | `data/query_model.json`、`data/statement_model.json`、`data/dialog_answer_model.json`、`data/memory_model.json` |
-| 4. 运行时加载 | 启动时加载编译后的能力和已确认记忆，而不是扫描原始文件 | 模型 artifact 加载；能力函数注册；可替换 learner 接口；长期状态注入 | `kernel.default_capabilities()`、`LearnedQueryParser`、`LearnedStatementParser`、`LearnedDialogActAnswerer`、`memory_states` |
+| 3. 训练神经能力产物 | 从训练样本训练神经输入模型，并把回答和记忆沉淀为可信库产物 | 字符级双向 GRU；实体角色序列标注；Query/Statement 结构标签；回答聚合；记忆状态合并；源数据 `sha256` 指纹；原子写入 JSON/权重 | `data/query_neural_model.pt`、`data/query_neural_model.json`、`data/statement_neural_model.pt`、`data/statement_neural_model.json`、`data/dialog_answer_model.json`、`data/memory_model.json` |
+| 4. 运行时加载 | 启动时加载神经输入模型、可验证回答和已确认记忆，而不是扫描原始文件 | PyTorch 权重加载；能力函数注册；可替换 learner 接口；长期状态注入 | `my_neural.make_model()`、`NeuralQueryParser`、`NeuralStatementParser`、`LearnedDialogActAnswerer`、`memory_states` |
 | 5. 文本切分 | 把输入拆成陈述片段和查询候选 | 标点切句；逗号/分号候选拆分；聊天片段保留；尾句保留 | `perception/lexer.py` |
 | 6. 表层归一化 | 剥离不影响语义的表层差异 | 语气词清理；提问外壳清理；同义动作归一；容器后缀归一；`啥 -> 什么` | `perception/normalizer.py` |
 | 7. 陈述理解 | 把陈述句变成实体和历史事件 | 句子模板槽位抽取；实体角色实例化；`FRAME/ROLE` 结构模板实例化 | `comprehension/statement.py`、`ENTITY`、`FRAME`、`ROLE` |
@@ -74,29 +74,31 @@
 | 9. 状态投影 | 从历史事件得到当前世界状态 | 事件 schema；状态 projector；状态 reducer；后发生事件覆盖旧状态 | `world/state.py`、`world/event_schema.py`、`STATE` |
 | 10. 结构推理 | 根据结构推导规则和答案 | frame 角色匹配；状态查询；关系闭包；事件约束；反事实重放；答案生成器 | `reasoning/core.py`、`reasoning/pipeline.py`、`reasoning/rules/`、`reasoning/answers/`、`RULE`、answerer |
 | 11. 不确定性决策 | 按置信度决定回答、确认或学习 | 置信度分段；`>=0.90` 直接回答；`0.50-0.90` 询问确认；`<0.50` 引导学习 | `metacognition/confidence.py`、`motor/feedback.py` |
-| 12. 自学习反馈 | 未命中时确认相似含义或记录待整理样本 | 中置信相似结构召回；低置信写入待整理队列；回答只加载可信来源；重新编译；立即重试 | `motor/feedback.py`、`motor/learning_queue.py`、`motor/dialogue.py`、`struct-ask --learn-on-fail` |
+| 12. 自学习反馈 | 未命中时确认相似含义或记录待整理样本 | 中置信相似结构召回；低置信写入待整理队列；回答只加载可信来源；重新训练神经模型；立即重试 | `motor/feedback.py`、`motor/learning_queue.py`、`motor/dialogue.py`、`struct-ask --learn-on-fail` |
 | 13. 实验验证 | 验证训练集、模型产物和端到端行为 | 数据集评估；unittest 回归；结构线性化断言；端到端答案断言 | `make check`、`uv run python -m unittest discover -q -b` |
 
-这里的“模型产物”目前不是神经网络权重，而是由训练样本编译出的结构能力文件。它保存抽象后的问题模式、句子模板、槽位角色、结构模板、特征单元、样本数量和数据指纹。后续如果替换成分类器、向量检索、生成模型或真正的神经模型，只需要替换 `comprehension/query.py`、`comprehension/statement.py` 里的学习能力实现，不需要把逻辑堆回 `kernel.py`。
+现在 Query 和 Statement 两条用户输入理解线都已经是神经网络权重：`data/query_neural_model.pt/json` 和 `data/statement_neural_model.pt/json` 保存 PyTorch 参数、词表、标签和数据指纹。旧的 Query/Statement 编译产物已经移除。
 
 ### 用到的技术
 
-当前实现刻意保持轻量，核心路径只依赖 Python 标准库：
+当前实现把结构推理保持轻量，但 Query 输入理解已经接入 PyTorch：
 
-- Python `dataclass`：定义 `Entity`、`Frame`、`Role`、`State`、`Query`、`Intention`、训练样本和编译模型结构。
+- Python `dataclass`：定义 `Entity`、`Frame`、`Role`、`State`、`Query`、`Intention`、训练样本和神经元数据结构。
+- PyTorch：训练字符级双向 GRU Query 分类器，把问句映射到结构化标签。
 - JSONL 数据集：用 `data/query_examples.jsonl`、`data/statement_examples.jsonl`、`data/intent_examples.jsonl`、`data/dialog_answer_examples.jsonl`、`data/memory_direct_examples.jsonl`、`data/memory_chat_examples.jsonl` 保存可增量追加的训练/反馈样本和已确认记忆。
-- 编译 JSON 模型：用 `data/query_model.json`、`data/statement_model.json`、`data/dialog_answer_model.json`、`data/memory_model.json` 保存从训练集和记忆库中沉淀出的运行时能力。
+- 神经输入模型：用 `data/query_neural_model.pt/json` 和 `data/statement_neural_model.pt/json` 保存从 Query/Statement 样本训练出的输入理解能力。
 - 结构槽位：用 `$item#1`、`$container#1`、`$person#1` 这类槽位表达实体角色和出现顺序。
 - 表层归一化：在 `perception/normalizer.py` 中统一语气词、同义动作、容器后缀、提问外壳和“啥/什么”等表层差异。
-- 抽象特征匹配：Query 编译后使用抽象问题和字符 bigram 特征寻找相似结构；未命中时也用同一套相似度给用户推荐可能含义。
+- 神经 Query 分类器：`my_neural.py` 训练并加载一个字符级双向 GRU 分类器，把输入句子映射到 Query 标签，再还原成结构化 `QUERY`。
+- 神经 Query 元数据：保留结构标签、代表性抽象问题和字符特征，供反馈整理、离线评估和相似含义建议使用，不作为运行时旧编译模型兜底。
 - 不确定性策略：`metacognition/confidence.py` 统一管理置信度阈值，避免在 CLI 或推理层写散落判断。
-- 模板实例化：Statement 编译后使用句子模板抽取槽位，再实例化为 `ENTITY + FRAME/ROLE`。
+- 神经 Statement 标注：用序列标注抽取实体边界，再按神经预测的结构标签实例化为 `ENTITY + FRAME/ROLE`。
 - 状态投影：`world/state.py` 把历史 `FRAME` 转成当前 `STATE`，并处理后发生事件覆盖旧状态。
 - 结构推理：`reasoning/core.py` 基于 frame 角色匹配、状态查询、关系闭包、事件约束和反事实重放生成 `RULE` 和答案，`reasoning/pipeline.py` 只保留稳定入口。
 - 能力注册：`CognitiveCapabilities` 把陈述学习、Query 学习、状态投影、状态覆盖、规则推导和答案生成组合为可替换能力。
-- 反馈学习服务：`motor/feedback.py` 和 `motor/dialogue.py` 封装相似建议、新聊天能力、可信回答样本加载和模型重编译；CLI 只负责交互展示。
-- CLI 与 Makefile：`struct-ask`、`struct-compile-*`、`struct-eval-*`、`struct-add-memory` 提供命令入口；`make model`、`make check`、`make ask`、`make remember` 是日常使用入口。
-- unittest 回归：`tests/test_reasoner.py` 覆盖数据 loader、反馈写入、模型编译、运行时加载、结构推理和端到端回答。
+- 反馈学习服务：`motor/feedback.py` 和 `motor/dialogue.py` 封装相似建议、新聊天能力、可信回答样本加载和神经模型重训；CLI 只负责交互展示。
+- CLI 与 Makefile：`struct-ask`、`struct-train-neural`、`struct-eval-*`、`struct-add-memory` 提供命令入口；`make train-neural`、`make check`、`make ask`、`make remember` 是日常使用入口。
+- unittest 回归：`tests/test_reasoner.py` 覆盖数据 loader、反馈写入、神经训练、运行时加载、结构推理和端到端回答。
 
 ### 能力组合
 
@@ -129,51 +131,39 @@ prediction = predict(text, capabilities)
 4. 训练或替换能力：优先更新数据集或对应 analyzer/learner/projector/inferer。
 5. 回归验证：补 loader、schema、评估和端到端测试，确认能力来自数据闭环，而不是单句特殊分支。
 
-### Query 训练与编译
+### Query 神经训练
 
-Query 的流程很简单：
+Query 的流程只有神经主路径：
 
 1. 把样本写进 `data/query_examples.jsonl`。
-2. 运行编译命令，生成 `data/query_model.json`。
-3. `struct-ask` 默认读这个模型文件，不直接扫训练集。
+2. 运行 `make train-neural` 或 `uv run struct-train-neural`，生成 `data/query_neural_model.pt` 和 `data/query_neural_model.json`。
+3. `struct-ask --neural-provider "my_neural:make_model"` 默认读取神经 Query 模型，不直接扫训练集。
 
 ```json
 {"question":"芯片在哪里","entities":[{"role":"item","name":"芯片"}],"query":{"intent":"location","target":"$item#1","qualifiers":[]},"source":"training","split":"train"}
 ```
 
-样本里的 `$item#1`、`$container#1`、`$place#1` 是结构槽位，不是正则。编译时会把多条样本压成一个可加载的 `QUERY` 模型产物。
+样本里的 `$item#1`、`$container#1`、`$place#1` 是结构槽位，不是正则。神经训练会把这些结构模式学成分类标签，再在运行时还原成 `QUERY`。
 
 ```bash
-uv run struct-compile-query \
-  --query-data data/query_examples.jsonl \
-  --output data/query_model.json
+make train-neural
 ```
 
-需要检查效果时，跑这条：
+也可以直接跑神经评估入口，它会按当前数据重新训练并输出训练准确率：
 
 ```bash
-uv run struct-eval-query \
-  --query-data data/query_examples.jsonl \
-  --query-model data/query_model.json
+uv run struct-eval-query --query-data data/query_examples.jsonl
 ```
 
-`struct-ask` 默认使用 `data/query_model.json`。调试时可以显式指定模型：
+一句话：Query 样本进入 JSONL，运行 `make train-neural` 后生成神经模型；不再生成旧编译模型。
 
-```bash
-uv run struct-ask \
-  --query-model data/query_model.json \
-  "研究员把芯片放进托盘。托盘被带到实验室。芯片在哪里？"
-```
+### 陈述神经训练
 
-一句话：先喂样本，再编译成模型，运行时只加载模型。
-
-### 陈述训练与编译
-
-陈述句也是同样的三步：
+陈述句现在和 Query 一样，运行时走神经模型：
 
 1. 把样本写进 `data/statement_examples.jsonl`。
-2. 运行编译命令，生成 `data/statement_model.json`。
-3. `struct-ask` 默认读这个模型文件，不直接扫训练集。
+2. 运行 `make train-neural`，训练字符级双向 GRU，并生成 `data/statement_neural_model.pt` 和 `data/statement_neural_model.json`。
+3. `struct-ask --neural-provider "my_neural:make_model"` 加载神经模型，把输入解析为 `ENTITY + FRAME/ROLE`，再交给既有状态投影和结构推理。
 
 ```json
 {"sentence":"小张认为芯片在托盘里","sentence_template":"$person#1认为芯片在托盘里","entities":[{"role":"person","name":"$person#1"}],"frames":[{"frame_type":"believe","roles":{"person":"$person#1","proposition":"芯片在托盘里"}}],"source":"human_feedback","split":"train"}
@@ -181,34 +171,25 @@ uv run struct-ask \
 
 主动句、被动句、换序和“里面/里边/里头”等表层差异先在 normalization 层归一，再压成同一类 `FRAME/ROLE` 模型。
 
+训练并检查神经陈述模型：
+
 ```bash
-uv run struct-compile-statement \
-  --statement-data data/statement_examples.jsonl \
-  --output data/statement_model.json
+make train-neural
+uv run struct-eval-statement --statement-data data/statement_examples.jsonl
 ```
 
-需要检查效果时，跑这条：
+日常运行直接使用神经主路径：
 
 ```bash
-uv run struct-eval-statement \
-  --statement-data data/statement_examples.jsonl \
-  --statement-model data/statement_model.json
+make ask TEXT="阿明递送芯片到库房。芯片在哪里？"
 ```
 
-`struct-ask` 默认使用 `data/statement_model.json`。调试时也可以显式指定模型：
+一句话：先补 JSONL 样本，再运行 `make train-neural`；运行时只走神经陈述和 Query 模型。
+
+改完训练集后直接用：
 
 ```bash
-uv run struct-ask \
-  --statement-model data/statement_model.json \
-  "小王把芯片从托盘里面拿出来。芯片在哪里？"
-```
-
-一句话：先喂样本，再编译成模型，运行时只加载模型。
-
-也可以直接用：
-
-```bash
-make model
+make train-neural
 make check
 ```
 
@@ -225,12 +206,12 @@ make ask TEXT="你擅长什么"
 | 置信度 | 行为 |
 | --- | --- |
 | `>= 0.90` | 认为结构足够确定，直接回答。 |
-| `0.50 - 0.90` | 不直接猜答案，先问用户“是不是这个意思”。确认后写回 JSONL、重新编译模型，再重试回答。 |
+| `0.50 - 0.90` | 不直接猜答案，先问用户“是不是这个意思”。确认后写回 JSONL、重新训练神经模型，再重试回答。 |
 | `< 0.50` | 不再追问用户，写入 `data/unrecognized_examples.jsonl`，对用户只说“暂时无法识别。” |
 
-所以如果一句话没有直接命中现有模型，它会先拿模型产物找相似含义，例如问你“它是不是在询问我能做什么”。你确认后，它会把原句按相同结构写入 Query 或 Statement 的 JSONL，并重新编译模型；如果置信度低，或你否认了这个相似含义，系统只把原句记录到 `data/unrecognized_examples.jsonl`，留给后续离线整理。
+所以如果一句话没有直接命中现有模型，它会先用神经 Query 模型的结构标签置信度寻找相似含义，例如问你“它是不是在询问我能做什么”。你确认后，它会把原句按相同结构写入 Query 或 Statement 的 JSONL，并重新训练神经模型；如果置信度低，或你否认了这个相似含义，系统只把原句记录到 `data/unrecognized_examples.jsonl`，留给后续离线整理。
 
-如果待整理样本后来被你补成新的聊天能力，需要先把它迁移成 `data/query_examples.jsonl` 里的 Query 样本，再运行 `make model`。回答不会从运行时交互里直接生成；只有 `training`、`teacher`、`self_model`、`knowledge`、`curated`、`human_verified` 这些可信来源的回答样本会编译进 `data/dialog_answer_model.json`。没有可信回答时，系统会承认“已经理解问题，但还没有经过验证的相关回答”。
+如果待整理样本后来被你补成新的聊天能力，需要先把它迁移成 `data/query_examples.jsonl` 里的 Query 样本，再运行 `make train-neural`。回答不会从运行时交互里直接生成；只有 `training`、`teacher`、`self_model`、`knowledge`、`curated`、`human_verified` 这些可信来源的回答样本会进入 `data/dialog_answer_model.json`。没有可信回答时，系统会承认“已经理解问题，但还没有经过验证的相关回答”。
 
 长期记忆是另一条线，不会自动乱写。默认聊天只做当前轮推理，不会把内容直接塞进长期库；如果你要显式写入，可以用：
 
@@ -349,9 +330,11 @@ uv run struct-ask --intent-data data/intent_examples.jsonl "妈妈在找眼镜�
   uv.lock              # uv 锁文件
   data/
     query_examples.jsonl  # Query 解析训练样本
-    query_model.json      # Query 编译模型，默认运行时加载
+    query_neural_model.json  # Query 神经模型元数据
+    query_neural_model.pt    # Query 神经模型权重
     statement_examples.jsonl  # 陈述解析训练样本
-    statement_model.json      # 陈述编译模型，默认运行时加载
+    statement_neural_model.json  # 陈述神经模型元数据
+    statement_neural_model.pt    # 陈述神经模型权重
     intent_examples.jsonl # 可选：意图分析训练/反馈样本
     memory_direct_examples.jsonl  # 显式长期记忆样本
     memory_chat_examples.jsonl     # 聊天确认后的长期记忆样本
@@ -365,8 +348,8 @@ src/struct_llm/
     normalizer.py       # 语气词、外层话术、槽位边界归一化
     reference.py        # 指代和指示词消解
   comprehension/
-    statement.py        # 编译陈述样本并加载 statement_model.json
-    query.py            # 编译 Query 样本并加载 query_model.json
+    statement.py        # 陈述数据 schema、离线编译和评估
+    query.py            # Query 数据 schema、离线编译和评估
     intent_dataset.py   # 意图训练/反馈 JSONL schema、校验、追加写入
     intent.py           # 观察样本 -> INTENT，可替换为训练模型
     structure_helpers.py # 纯结构构造和实体去重工具
@@ -407,10 +390,9 @@ struct-add-intent-example = struct_llm.cli:add_intent_example
 struct-eval-intent = struct_llm.cli:eval_intent_examples
 struct-eval-query = struct_llm.cli:eval_query_examples
 struct-eval-statement = struct_llm.cli:eval_statement_examples
-struct-compile-query = struct_llm.cli:compile_query_model
-struct-compile-statement = struct_llm.cli:compile_statement_model
 struct-compile-dialog-answer = struct_llm.cli:compile_dialog_answer_model
 struct-compile-memory = struct_llm.cli:compile_memory_model
+struct-train-neural = my_neural:train
 struct-add-memory = struct_llm.cli:add_memory_entry
 ```
 
@@ -426,11 +408,11 @@ struct-add-memory = struct_llm.cli:add_memory_entry
 
 `perception/normalizer.py` 负责剥离表层因素。例如当前会把 `放到/放入/放进` 归一为同一类容器放入动作，并把 `盒子里面/盒子里` 归一为 `盒子`。
 
-`comprehension/statement.py` 负责默认陈述学习路径。它把 `data/statement_examples.jsonl` 编译为 `data/statement_model.json`，运行时从模型产物加载结构模板并通过实体槽位实例化 `FRAME/ROLE`；后续可以替换为分类器、生成模型或在线学习模型。
+`comprehension/statement.py` 负责陈述数据 schema 和样本评估；`neural/statement_classifier.py` 负责字符级双向 GRU 的训练、实体角色序列标注、权重保存和运行时加载。`my_neural.py` 默认加载 `statement_neural_model.pt/json`，把输入解析为 `ENTITY + FRAME/ROLE`。
 
 `world/state.py` 负责把历史事件投影成当前世界状态。新增事件如果会改变世界状态，应在这里新增 state projector 或 state reducer。
 
-`comprehension/query.py` 负责默认 Query 学习路径。它把 `data/query_examples.jsonl` 编译为 `data/query_model.json`，运行时从模型产物加载抽象问题模式和 `QUERY` 结构模板。后续可以替换为分类器、生成模型或在线学习模型。
+`comprehension/query.py` 负责 Query 数据集和结构标签；`neural/query_classifier.py` 负责字符级双向 GRU 的训练、权重保存和加载。`my_neural.py` 在运行时加载 `data/query_neural_model.pt`，让用户输入先经过神经 Query 解析，再交给结构推理。
 
 `reasoning/core.py` 负责规则推导和答案生成。`reasoning/pipeline.py` 现在只是稳定门面，`reasoning/rules/` 和 `reasoning/answers/` 暂时承接默认注册出口。
 
@@ -442,9 +424,9 @@ struct-add-memory = struct_llm.cli:add_memory_entry
 
 - 标点、尾句、寒暄问题没有被保留：改 `perception/lexer.py`。
 - 语气词、同义动作、槽位边界污染：改 `perception/normalizer.py`。
-- 陈述表达没有映射到已有 `FRAME/ROLE`：先追加 `data/statement_examples.jsonl`，再跑 `struct-compile-statement` 和 `struct-eval-statement --statement-model data/statement_model.json`。
+- 陈述表达没有映射到已有 `FRAME/ROLE`：先追加 `data/statement_examples.jsonl`，再跑 `make train-neural`，并用 `uv run struct-eval-statement --statement-data data/statement_examples.jsonl` 检查神经训练结果。
 - 新事件会改变当前世界，例如取出后不再在容器里：改 `world/state.py`。
-- 用户换了问法但语义相同：先追加 `data/query_examples.jsonl`，再跑 `struct-compile-query` 和 `struct-eval-query --query-model data/query_model.json`。
+- 用户换了问法但语义相同：先追加 `data/query_examples.jsonl`，再跑 `make train-neural`，并用 `uv run struct-eval-query --query-data data/query_examples.jsonl` 检查神经训练结果。
 - 已经有 `QUERY` 和 `FRAME/STATE`，但没有命中规则：改 `reasoning/core.py` 的 rule inferer。
 - 已经命中规则，但答案表达不对：改 `reasoning/core.py` 的 answerer。
 

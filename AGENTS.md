@@ -12,7 +12,7 @@
 
 - 观察现象：先收集失败输入、已有结构输出、期望答案，确认失败发生在陈述解析、问题解析、规则推导还是答案生成。
 - 训练优先：遇到新失败样例时，先补训练/反馈数据，记录 `observation`、上下文、已知世界状态、信念状态、期望 `INTENT/QUERY/STATE` 或答案，再用数据集评估现有能力；只有数据证明结构标签缺失或模型槽位不足时，才改 parser、state、query 或 inference。
-- 学习主路径：陈述和 Query 默认都必须走 `comprehension/statement.py`、`comprehension/query.py`。JSONL 数据集只作为训练/反馈/编译输入；默认运行时优先加载 `data/statement_model.json`、`data/query_model.json` 这类编译后的能力产物。新增失败样例先进入数据集、重新编译并评估，不新增问法分支。
+- 学习主路径：陈述和 Query 默认都必须走神经输入模型，样本 schema 和标签构造仍放在 `comprehension/statement.py`、`comprehension/query.py`。JSONL 数据集只作为训练/反馈输入；默认运行时优先加载 `data/statement_neural_model.pt/json`、`data/query_neural_model.pt/json` 这类神经能力产物。新增失败样例先进入数据集、重新训练并评估，不新增问法分支。
 - 剥离次要因素：把主动句、被动句、换序、语气词、时间副词等表层差异视为可归一化因素，不能直接把这些差异变成互不相关的答案规则。
 - 数据集边界：意图分析样本放入 `data/intent_examples.jsonl` 或同 schema 的 JSONL 文件；Query 样本放入 `data/query_examples.jsonl` 或同 schema 的 JSONL 文件；陈述样本放入 `data/statement_examples.jsonl` 或同 schema 的 JSONL 文件。数据读写、校验、编译和模型加载放在对应 dataset/learning 模块；样本消费、模型编译或模型预测放在 `comprehension/intent.py`、`comprehension/query.py`、`comprehension/statement.py`。后续新增学习型能力也应先有 dataset/schema，再接训练产物或推理实现。
 - 槽位规范化：从句子中抽出的实体、事件角色、查询目标必须先清理首尾语气词、时间副词和“我想知道”这类提问框架，再用已知实体表校正槽位边界，然后才进入结构匹配，避免把“你可以告诉我芯片”、“我想知道芯片”或“托盘的了”之类表层残留当成实体。

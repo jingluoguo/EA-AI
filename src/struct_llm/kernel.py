@@ -3,16 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .capabilities import CognitiveCapabilities
-from .comprehension.query import (
-    default_learned_query_parser,
-    query_candidate_is_learned_unit,
-    resolve_query_candidates,
-)
-from .comprehension.statement import default_learned_statement_parser
+from .comprehension.query import query_candidate_is_learned_unit, resolve_query_candidates
 from .comprehension.structure_helpers import dedupe_entities, with_time
 from .errors import ParseError
 from .motor.dialogue import default_learned_dialog_answerer
 from .neural import NeuralBoundaryModel, configured_neural_boundary_model, with_neural_boundary
+from .neural.query_classifier import default_neural_query_parser
+from .neural.statement_classifier import default_neural_statement_parser
 from .memory.long_term import default_memory_states, memory_entities_from_states
 from .perception.lexer import is_query_like_fragment, split_query_candidate, split_sentences
 from .perception.reference import resolve_references
@@ -45,10 +42,10 @@ def default_capabilities(
     use_memory: bool = True,
 ) -> CognitiveCapabilities:
     capabilities = CognitiveCapabilities(
-        statement_parsers=(default_learned_statement_parser(),),
+        statement_parsers=(default_neural_statement_parser(),),
         state_projectors=DEFAULT_STATE_PROJECTORS,
         state_reducers=DEFAULT_STATE_REDUCERS,
-        query_parsers=(default_learned_query_parser(),),
+        query_parsers=(default_neural_query_parser(),),
         rule_inferers=DEFAULT_RULE_INFERERS,
         answerers=(*DEFAULT_ANSWERERS, default_learned_dialog_answerer()),
     )

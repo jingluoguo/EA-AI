@@ -14,10 +14,8 @@ from ..comprehension.query import (
     EntityExample,
     append_query_record,
     build_query_record,
-    compile_query_model_from_jsonl,
     entity_example_to_dict,
     query_to_dict,
-    save_query_model,
     suggest_query_pattern,
 )
 from ..comprehension.statement import (
@@ -25,8 +23,6 @@ from ..comprehension.statement import (
     FrameTemplate,
     append_statement_record,
     build_statement_record,
-    compile_statement_model_from_jsonl,
-    save_statement_model,
 )
 from ..memory.long_term import (
     MEMORY_CHAT_DATA_PATH,
@@ -55,14 +51,26 @@ from ..metacognition.confidence import (
     DIRECT_CONFIDENCE_THRESHOLD,
     confidence_band,
 )
+from ..neural.query_classifier import (
+    QUERY_NEURAL_META_PATH,
+    QUERY_NEURAL_WEIGHTS_PATH,
+    train_query_neural_model,
+)
+from ..neural.statement_classifier import (
+    STATEMENT_NEURAL_META_PATH,
+    STATEMENT_NEURAL_WEIGHTS_PATH,
+    train_statement_neural_model,
+)
 
 
 @dataclass(frozen=True)
 class LearningPaths:
     query_data: Path = Path("data/query_examples.jsonl")
-    query_model: Path = Path("data/query_model.json")
+    query_neural_weights: Path = QUERY_NEURAL_WEIGHTS_PATH
+    query_neural_meta: Path = QUERY_NEURAL_META_PATH
     statement_data: Path = Path("data/statement_examples.jsonl")
-    statement_model: Path = Path("data/statement_model.json")
+    statement_neural_weights: Path = STATEMENT_NEURAL_WEIGHTS_PATH
+    statement_neural_meta: Path = STATEMENT_NEURAL_META_PATH
     dialog_answer_data: Path = Path("data/dialog_answer_examples.jsonl")
     dialog_answer_model: Path = Path("data/dialog_answer_model.json")
     unrecognized_data: Path = Path("data/unrecognized_examples.jsonl")
@@ -220,14 +228,13 @@ def accept_query_suggestion(
             "split": "train",
         },
     )
-    model = compile_query_model_from_jsonl(paths.query_data)
-    save_query_model(model, paths.query_model)
+    bundle = train_query_neural_model(paths.query_data, paths.query_neural_weights, paths.query_neural_meta)
     return LearningWriteResult(
         kind="query",
         data_path=paths.query_data,
-        model_path=paths.query_model,
-        example_count=model.example_count,
-        pattern_count=len(model.patterns),
+        model_path=paths.query_neural_weights,
+        example_count=bundle.result.example_count,
+        pattern_count=bundle.result.label_count,
     )
 
 
@@ -252,14 +259,13 @@ def save_manual_query_feedback(
             source=source,
         ),
     )
-    model = compile_query_model_from_jsonl(paths.query_data)
-    save_query_model(model, paths.query_model)
+    bundle = train_query_neural_model(paths.query_data, paths.query_neural_weights, paths.query_neural_meta)
     return LearningWriteResult(
         kind="query",
         data_path=paths.query_data,
-        model_path=paths.query_model,
-        example_count=model.example_count,
-        pattern_count=len(model.patterns),
+        model_path=paths.query_neural_weights,
+        example_count=bundle.result.example_count,
+        pattern_count=bundle.result.label_count,
     )
 
 
@@ -315,14 +321,17 @@ def save_manual_statement_feedback(
             source=source,
         ),
     )
-    model = compile_statement_model_from_jsonl(paths.statement_data)
-    save_statement_model(model, paths.statement_model)
+    bundle = train_statement_neural_model(
+        paths.statement_data,
+        paths.statement_neural_weights,
+        paths.statement_neural_meta,
+    )
     return LearningWriteResult(
         kind="statement",
         data_path=paths.statement_data,
-        model_path=paths.statement_model,
-        example_count=model.example_count,
-        pattern_count=len(model.patterns),
+        model_path=paths.statement_neural_weights,
+        example_count=bundle.result.example_count,
+        pattern_count=bundle.result.label_count,
     )
 
 

@@ -52,4 +52,4 @@
 - 陈述训练集：`data/statement_examples.jsonl`
 - Query 训练集：`data/query_examples.jsonl`
 - 意图训练 / 反馈集：`data/intent_examples.jsonl`
-- 运行时产物：`data/statement_model.json`、`data/query_model.json`、`data/dialog_answer_model.json`
+- 运行时产物：`data/statement_neural_model.pt/json`、`data/query_neural_model.pt/json`、`data/dialog_answer_model.json`

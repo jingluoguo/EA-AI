@@ -12,6 +12,8 @@ from .boundary import (
     structure_to_dict,
     with_neural_boundary,
 )
+from .query_classifier import default_neural_query_parser
+from .statement_classifier import default_neural_statement_parser
 
 __all__ = (
     "InMemoryNeuralBoundaryModel",
@@ -24,4 +26,6 @@ __all__ = (
     "load_neural_boundary_model",
     "structure_to_dict",
     "with_neural_boundary",
+    "default_neural_query_parser",
+    "default_neural_statement_parser",
 )
