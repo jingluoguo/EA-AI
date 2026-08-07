@@ -43,7 +43,7 @@
 ## 6. 对话与档案
 
 - 对话意图：`dialog_act`
-- 默认对话目标：`greeting`、`thanks`、`farewell`、`identity`、`capabilities`、`summary`
+- 默认对话目标：`greeting`、`thanks`、`farewell`、`identity`、`personhood`、`capabilities`、`limitations`、`preferences`、`summary`、`clarification`、`apology`、`emotion`、`affection`、`empathy`
 - 档案查询意图：`profile`
 - 续问片段的指代消解：`this chip`、`here` 以及类似的上下文指针
 

@@ -132,7 +132,7 @@ def compile_memory_model() -> None:
     parser.add_argument("--output", default="data/memory_model.json")
     args = parser.parse_args()
 
-    from .memory.long_term import compile_memory_model_from_jsonl, save_memory_model
+    from ..memory.long_term import compile_memory_model_from_jsonl, save_memory_model
 
     model = compile_memory_model_from_jsonl(Path(args.memory_direct_data), Path(args.memory_chat_data))
     save_memory_model(model, Path(args.output))

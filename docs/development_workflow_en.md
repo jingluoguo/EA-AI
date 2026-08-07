@@ -8,8 +8,8 @@ For each failing example, record:
 
 - The raw input and context.
 - The current `Structure.linearize()` output.
-- The expected `INTENT/QUERY/STATE` or answer.
-- The failing layer: lexing, normalization, statement parsing, Query parsing, state update, rule inference, or answer generation.
+- The expected `ENTITY/TYPE/ATTRIBUTE/FRAME/ROLE/STATE/TIME/SOURCE/BELIEF/CONDITION/CAUSE/QUERY/INTENT` or answer.
+- The failing layer: lexing, normalization, statement parsing, Query parsing, reference resolution, state update, belief view, causal expansion, rule inference, or answer generation.
 
 Recommended landing points:
 
@@ -20,6 +20,22 @@ Recommended landing points:
 - A new event changes the current world: edit `world/state.py` or `world/event_schema.py`.
 - `QUERY` and `FRAME/STATE` exist but no rule is inferred: edit `reasoning/rules/`.
 - A rule is inferred but the answer wording is wrong: edit `reasoning/answers/`.
+
+## Target Semantic Layers
+
+Complex sentences can carry several kinds of information at once. When adding a capability, first decide which layer it belongs to:
+
+- Objects and concepts: `ENTITY`, types, aliases, set membership.
+- Attributes and state: color, existence, access state, preference, identity, quantity, units.
+- Events and roles: `FRAME/ROLE`, participants, theme, source, destination, result.
+- Time and order: current, historical, before, after, initial, latest, counterfactual replay slices.
+- Polarity and modality: negation, correction, possibility, obligation, actual, hypothetical.
+- Source and belief: who said it, who believes it, factual world, personal belief worlds, evidence source.
+- Conditions and causality: if/then, because/therefore, conditional triggers, causal explanation.
+- Sets and comparison: containment closure, exclusions, counting, quantity comparison.
+- Reference and focus: pronouns, here/this, former/latter, dialogue context carryover.
+- Query and intent: single queries, compound queries, dialog acts, user goals, learning feedback.
+- Metacognition and output: confidence, confirmation policy, trusted answer sources, answer ordering.
 
 ## End-To-End Flow
 

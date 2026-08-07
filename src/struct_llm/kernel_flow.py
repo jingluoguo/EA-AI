@@ -43,6 +43,9 @@ def ingest_sentence(
 ) -> None:
     resolved_sentence = resolve_references(sentence, context.known_entities())
 
+    if not is_question and ingest_mixed_statement_fragments(sentence, context, capabilities):
+        return
+
     if not is_question and ingest_statement_sentence(resolved_sentence, context, capabilities):
         return
 
@@ -58,6 +61,36 @@ def ingest_sentence(
         ingest_query_fragment(fragment, is_question, context, capabilities)
 
 
+def ingest_mixed_statement_fragments(
+    sentence: str,
+    context: ParseContext,
+    capabilities: CognitiveCapabilities,
+) -> bool:
+    fragments = split_query_candidate(sentence)
+    if len(fragments) <= 1:
+        return False
+
+    parsed_fragments: list[tuple[str, tuple[list[Entity], list[Frame]] | None]] = []
+    has_statement = False
+    known_entities = context.known_entities()
+    for fragment in fragments:
+        resolved_fragment = resolve_references(fragment, known_entities)
+        extracted = capabilities.parse_statement(resolved_fragment)
+        parsed_fragments.append((fragment, extracted))
+        if extracted is not None:
+            has_statement = True
+
+    if not has_statement:
+        return False
+
+    for fragment, extracted in parsed_fragments:
+        if extracted is not None:
+            add_extracted_structure(extracted, context, capabilities)
+            continue
+        ingest_query_fragment(fragment, False, context, capabilities)
+    return True
+
+
 def ingest_statement_sentence(
     sentence: str,
     context: ParseContext,
@@ -68,7 +101,7 @@ def ingest_statement_sentence(
         return False
 
     sentence_query = resolve_query_candidate(sentence, context.known_entities(), capabilities.query_parsers)
-    if sentence_query is not None and profile_statement_should_yield_to_query(
+    if sentence_query is not None and statement_should_yield_to_query(
         extracted,
         sentence_query,
     ) and query_candidate_is_learned_unit(
@@ -81,6 +114,26 @@ def ingest_statement_sentence(
 
     add_extracted_structure(extracted, context, capabilities)
     return True
+
+
+def statement_should_yield_to_query(
+    extracted: tuple[list[Entity], list[Frame]],
+    query: Query,
+) -> bool:
+    if profile_statement_should_yield_to_query(extracted, query):
+        return True
+    if query.intent == "dialog_act" and query.target in {
+        "thanks",
+        "farewell",
+        "clarification",
+        "apology",
+        "emotion",
+        "affection",
+        "empathy",
+        "refusal",
+    }:
+        return True
+    return query.intent == "dialog_act" and profile_statement_value_is_under_specified(extracted)
 
 
 def ingest_query_fragment(

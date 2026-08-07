@@ -7,6 +7,7 @@ from ..selectors import *
 __all__ = (
     "answer_dialog_act",
     "answer_profile_lookup",
+    "answer_profile_statement_acknowledgement",
 )
 
 def answer_dialog_act(structure: Structure) -> str | None:
@@ -50,4 +51,19 @@ def answer_profile_lookup(structure: Structure) -> str | None:
         return f"{subject}喜欢{join_names(values)}。"
     if attribute == "dislikes":
         return f"{subject}不喜欢{join_names(values)}。"
+    return None
+
+
+def answer_profile_statement_acknowledgement(structure: Structure) -> str | None:
+    if structure.query is not None:
+        return None
+    name_values = profile_values(structure, "我", "name")
+    if name_values:
+        return f"我知道了，你叫{name_values[-1]}。"
+    like_values = profile_values(structure, "我", "likes")
+    if like_values:
+        return f"我知道了，你喜欢{join_names(like_values)}。"
+    dislike_values = profile_values(structure, "我", "dislikes")
+    if dislike_values:
+        return f"我知道了，你不喜欢{join_names(dislike_values)}。"
     return None

@@ -10,6 +10,7 @@ from .state import *
 __all__ = (
     "answer_dialog_act",
     "answer_profile_lookup",
+    "answer_profile_statement_acknowledgement",
     "answer_event_actor",
     "answer_latest_event_actor",
     "answer_earliest_event_actor",

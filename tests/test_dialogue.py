@@ -10,7 +10,55 @@ class DialogueTest(unittest.TestCase):
         examples = (
             ("你好", "QUERY dialog_act(greeting)", "你好，我在。"),
             ("谢谢你", "QUERY dialog_act(thanks)", "不客气。"),
+            ("再见", "QUERY dialog_act(farewell)", "再见。"),
+            ("明天见", "QUERY dialog_act(farewell)", "再见。"),
+            ("保重", "QUERY dialog_act(farewell)", "再见。"),
             ("你是谁？", "QUERY dialog_act(identity)", "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。"),
+            (
+                "你是人吗",
+                "QUERY dialog_act(personhood)",
+                "我不是真人，也没有人的身体和真实体验；我是 AI，会尽力用清楚、诚实的方式和你交流。",
+            ),
+            (
+                "你是真人吗",
+                "QUERY dialog_act(personhood)",
+                "我不是真人，也没有人的身体和真实体验；我是 AI，会尽力用清楚、诚实的方式和你交流。",
+            ),
+            (
+                "你会是人吗",
+                "QUERY dialog_act(personhood)",
+                "我不是真人，也没有人的身体和真实体验；我是 AI，会尽力用清楚、诚实的方式和你交流。",
+            ),
+            (
+                "我没听懂",
+                "QUERY dialog_act(clarification)",
+                "抱歉没说清楚，我换个方式再讲一遍，你看这样是否更明白？",
+            ),
+            (
+                "我没听明白",
+                "QUERY dialog_act(clarification)",
+                "抱歉没说清楚，我换个方式再讲一遍，你看这样是否更明白？",
+            ),
+            (
+                "你能解释一下吗",
+                "QUERY dialog_act(clarification)",
+                "抱歉没说清楚，我换个方式再讲一遍，你看这样是否更明白？",
+            ),
+            (
+                "你会想我吗",
+                "QUERY dialog_act(affection)",
+                "我不会像人一样想念你，但我会记得当前对话里的上下文；你回来找我时，我会认真接住你的话。",
+            ),
+            (
+                "你会喜欢我吗",
+                "QUERY dialog_act(affection)",
+                "我不会像人一样想念你，但我会记得当前对话里的上下文；你回来找我时，我会认真接住你的话。",
+            ),
+            (
+                "你爱我吗",
+                "QUERY dialog_act(affection)",
+                "我不会像人一样想念你，但我会记得当前对话里的上下文；你回来找我时，我会认真接住你的话。",
+            ),
             (
                 "你能做什么？",
                 "QUERY dialog_act(capabilities)",
@@ -54,6 +102,32 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("SUBQUERY profile(我,attribute=name)", structure)
         self.assertIn("SUBQUERY profile(我,attribute=likes)", structure)
         self.assertEqual(prediction.answer, "你叫小王；你喜欢咖啡。")
+
+    def test_profile_name_statement_without_task_query_is_acknowledged(self) -> None:
+        examples = (
+            "我是小郭",
+            "我是小郭，你知道吗",
+            "我叫小郭，你知道吗",
+            "我叫小郭。你知道吗？",
+        )
+
+        for text in examples:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn("REL name(我,小郭)", structure)
+                self.assertIn("FRAME f1 type=profile_name time=1", structure)
+                self.assertNotIn("QUERY dialog_act(greeting)", structure)
+                self.assertEqual(prediction.answer, "我知道了，你叫小郭。")
+
+    def test_profile_statement_with_identity_query_keeps_both_structures(self) -> None:
+        prediction = predict("我叫小郭，你叫什么")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("REL name(我,小郭)", structure)
+        self.assertIn("FRAME f1 type=profile_name time=1", structure)
+        self.assertIn("QUERY dialog_act(identity)", structure)
+        self.assertEqual(prediction.answer, "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。")
 
     def test_profile_name_overwrites_and_preferences_can_be_corrected(self) -> None:
         prediction = predict("我叫小王。其实我叫小李。我喜欢咖啡。后来我不喜欢咖啡。我叫什么，我喜欢什么，我不喜欢什么？")
@@ -123,6 +197,18 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("QUERY location(芯片)", structure)
         self.assertNotIn("SUBQUERY dialog_act(greeting)", structure)
         self.assertEqual(prediction.answer, "芯片在托盘里。")
+
+        for text in (
+            "小郭把芯片放进托盘。谢谢，芯片在哪里？",
+            "小郭把芯片放进托盘。再见，芯片在哪里？",
+            "小郭把芯片放进托盘。我没听明白，芯片在哪里？",
+        ):
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn("QUERY location(芯片)", structure)
+                self.assertNotIn("SUBQUERY dialog_act", structure)
+                self.assertEqual(prediction.answer, "芯片在托盘里。")
 
         # profile statement followed by dialog_act + profile query composes cleanly
         prediction = predict("我叫小王，你能做什么？我叫什么？")

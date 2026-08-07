@@ -140,12 +140,14 @@ def resolve_query_candidates(
 ) -> Query | None:
     parsed_queries: list[Query] = []
     errors: list[ParseError] = []
+    meaningful_candidates: list[str] = []
 
     for candidate in candidates:
-        if is_question_noise(candidate):
-            continue
-
         full_query = resolve_query_candidate(candidate, entities, parsers)
+        if is_question_noise(candidate) and not noise_candidate_has_meaningful_query(full_query):
+            continue
+        meaningful_candidates.append(candidate)
+
         fragments = split_query_candidate(candidate)
         if full_query is not None and (len(fragments) == 1 or query_candidate_is_learned_unit(candidate, entities, parsers)):
             parsed_queries.append(full_query)
@@ -175,7 +177,7 @@ def resolve_query_candidates(
     if len(parsed_queries) == 1:
         return parsed_queries[0]
 
-    combined = "，".join(candidates)
+    combined = "，".join(meaningful_candidates)
     if combined:
         try:
             return resolve_query_candidate_or_raise(combined, entities, parsers)
@@ -184,6 +186,14 @@ def resolve_query_candidates(
     if errors:
         raise errors[-1]
     return None
+
+
+def noise_candidate_has_meaningful_query(query: Query | None) -> bool:
+    if query is None:
+        return False
+    if query.intent != "dialog_act":
+        return True
+    return query.target not in {"greeting", "capabilities"}
 
 
 def resolve_query_candidate(

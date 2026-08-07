@@ -4,7 +4,7 @@
 
 这是一个最小的“结构智能型 LLM”实验骨架。它不从堆大模型开始，而是先验证一个更小的问题：
 
-> 模型能否从句子里抽取实体、事件、状态、规则和问题，再基于这些结构推理出答案？
+> 模型能否从句子里抽取对象、角色、事件、状态、时间、条件、因果、信念、来源、意图和问题，再基于这些结构推理出答案？
 
 当前主路径是“神经输入理解 + 显式结构推理”：Query 和 Statement 由 PyTorch 字符级双向 GRU 模型解析，世界状态、规则和答案仍走可检查的结构推理。
 
@@ -18,16 +18,24 @@
 
 也就是说：先把失败样例沉淀为 JSONL 训练/反馈数据，再评估缺的是结构标签、槽位、状态投影、规则还是答案。只有数据证明结构表达不足时，才改 parser、state、query 或 inference。
 
-核心中间结构是：
+面向复杂场景时，句子至少要能沉淀为这些目标语义层：
 
-- `ENTITY`：识别出的对象，例如人、物品、容器、地点。
-- `FRAME/ROLE`：按原文顺序保留的历史事件和事件角色。
-- `STATE`：由事件投影出的当前世界状态，后发生状态覆盖旧状态。
-- `QUERY`：把问题归一为可计算查询。
-- `INTENT`：从行为观察推断出的心智假设。
-- `RULE`：推理阶段命中的规则。
+- `ENTITY`：对象和概念，例如人、物品、容器、地点、组织、时间点、抽象主题。
+- `TYPE/ATTRIBUTE`：类别和属性，例如颜色、开闭、存在性、偏好、身份、数量、单位。
+- `FRAME/ROLE`：事件、动作、关系和叙述框架，以及 `actor/theme/goal/source/recipient/result` 等角色。
+- `STATE`：当前世界状态、个人资料状态、长期记忆状态和可覆盖状态。
+- `TIME/ORDER`：发生顺序、前后关系、历史切片、初始/最新/之前/之后。
+- `MODALITY/POLARITY`：否定、修正、可能性、反事实、实际/假设视图。
+- `SOURCE/BELIEF`：谁说的、谁认为的、证据来源、事实世界和个人信念世界的隔离。
+- `CONDITION/CAUSE`：如果/那么、因为/所以、条件触发、因果解释和规则展开。
+- `QUANTITY/COMPARISON`：数量、集合、包含闭包、排除项、比较关系。
+- `REFERENCE/FOCUS`：指代、指示词、前者/后者、对话焦点和上下文承接。
+- `QUERY`：位置、内容、数量、历史事件、来源、信念、矛盾、因果、反事实和复合问题。
+- `INTENT/DIALOG_ACT`：用户意图、寒暄、总结、能力询问、个人偏好和待学习反馈。
+- `CONFIDENCE/FEEDBACK`：置信度、待确认样本、低置信队列、可信回答来源。
+- `RULE/ANSWER`：可计算规则命中、答案候选、答案优先级和最终自然语言输出。
 
-`REL` 和 `EVENT` 仍会在 CLI 输出中显示，但只是兼容阅读视图；新增推理能力应优先基于 `FRAME/ROLE/STATE/QUERY`。
+`REL` 和 `EVENT` 仍会在 CLI 输出中显示，但只是兼容阅读视图；新增推理能力应优先落在上面的结构层，而不是只补一个端到端答案。
 
 ## 数据流
 
@@ -35,10 +43,13 @@
 原始文本
   -> perception/lexer.py 切句和查询候选保留
   -> perception/normalizer.py 表层剥离和槽位归一
+  -> perception/reference.py 指代、焦点和上下文承接
   -> my_neural.py 加载 Statement 神经模型，解析 Entity + FRAME/ROLE
-  -> world/state.py 把 FRAME 投影为当前 STATE
+  -> world/event_schema.py / world/state.py 把 FRAME 投影为当前 STATE
+  -> world/causal.py 展开条件、因果和假设视图
   -> my_neural.py 加载 Query 神经模型，解析 QUERY
   -> memory/long_term.py 注入已确认长期 STATE
+  -> belief/source 相关选择器隔离事实世界、说法和个人信念世界
   -> intent_analyzers 推断 INTENT
   -> reasoning/rules/* 根据 QUERY + FRAME/STATE 推导 RULE
   -> reasoning/answers/* 生成答案

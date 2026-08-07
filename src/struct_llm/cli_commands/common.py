@@ -322,7 +322,7 @@ def apply_neural_provider_args(capabilities, args):
     if provider:
         model = load_neural_boundary_model(provider)
     else:
-        from .neural import configured_neural_boundary_model
+        from ..neural import configured_neural_boundary_model
 
         model = configured_neural_boundary_model()
     if model is None:

@@ -28,6 +28,21 @@ class LearningTest(unittest.TestCase):
         self.assertIs(first.answerers[-1], second.answerers[-1])
         self.assertIs(default_learned_dialog_answerer(), default_learned_dialog_answerer())
 
+    def test_cli_neural_provider_default_path_imports_package_neural_module(self) -> None:
+        import os
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from struct_llm.cli_commands.common import apply_neural_provider_args
+
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        args = SimpleNamespace(neural_provider=None, neural_answer_priority="after_verified")
+
+        with patch.dict(os.environ, {"EA_AI_NEURAL_PROVIDER": ""}):
+            configured = apply_neural_provider_args(capabilities, args)
+
+        self.assertIs(configured, capabilities)
+
     def test_neural_query_parser_can_replace_input_boundary_without_kernel_branch(self) -> None:
         model = InMemoryNeuralBoundaryModel(
             {

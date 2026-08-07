@@ -44,7 +44,7 @@ It groups supported types by task family instead of keeping the catalog inside t
 ## 6. Dialog and profile
 
 - Dialog intent: `dialog_act`
-- Default dialog targets: `greeting`, `thanks`, `farewell`, `identity`, `capabilities`, `summary`
+- Default dialog targets: `greeting`, `thanks`, `farewell`, `identity`, `personhood`, `capabilities`, `limitations`, `preferences`, `summary`, `clarification`, `apology`, `emotion`, `affection`, `empathy`
 - Profile lookup intent: `profile`
 - Reference resolution for follow-up fragments: `this chip`, `here`, and similar context-based pointers
 
