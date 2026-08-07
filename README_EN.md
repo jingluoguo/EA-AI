@@ -437,12 +437,13 @@ make remember-state NAME=name LEFT=我 RIGHT=小王
 
 Long-term knowledge is separate from long-term state memory:
 
-- `data/why_knowledge_seed.jsonl` is the batch import source.
-- `data/memory_knowledge_examples.jsonl` stores verified knowledge examples.
+- `data/memory_knowledge_examples.jsonl` stores knowledge examples (QA + query structure).
 - `data/memory_knowledge_model.json` stores the compiled knowledge model.
 
+For batch import, pass a JSONL file via `--file`, or write a single entry with `QUESTION=... ANSWER=...`:
+
 ```bash
-make remember-knowledge-file FILE=data/why_knowledge_seed.jsonl
+make knowledge FILE=path/to/your_qa.jsonl
 ```
 
 ## Minimal Task

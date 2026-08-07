@@ -253,12 +253,13 @@ uv run struct add-memory "我叫小王"
 
 长期知识单独放在：
 
-- `data/why_knowledge_seed.jsonl`：可批量导入的问答源文件。
-- `data/memory_knowledge_examples.jsonl`：确认后的长期知识样本。
+- `data/memory_knowledge_examples.jsonl`：长期知识样本（问答 + query 结构）。
 - `data/memory_knowledge_model.json`：编译后的长期知识模型。
 
+批量导入时把 JSONL 文件传给 `--file`，或用 `QUESTION=... ANSWER=...` 单条写入：
+
 ```bash
-make knowledge FILE=data/why_knowledge_seed.jsonl
+make knowledge FILE=path/to/your_qa.jsonl
 ```
 
 ### 喂意图数据

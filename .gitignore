@@ -5,3 +5,4 @@
 __pycache__/
 *.py[cod]
 data/*.pt
+data/*_model.json

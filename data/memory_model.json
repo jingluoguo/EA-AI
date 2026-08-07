@@ -1,7 +1,0 @@
-{
-  "schema": "struct_llm.memory_model.v1",
-  "source_sha256": "8fbc708300ec868d6afa75acaa4275f1ac83d7a2d8774e043822a3a9db9ce5de",
-  "example_count": 0,
-  "state_count": 0,
-  "states": []
-}
