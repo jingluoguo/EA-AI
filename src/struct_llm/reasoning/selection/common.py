@@ -99,6 +99,8 @@ def structure_with_states(structure: Structure, states: list[State]) -> Structur
         query=structure.query,
         frames=structure.frames,
         states=tuple(states),
+        scoped_frames=structure.scoped_frames,
+        scoped_states=structure.scoped_states,
         intentions=structure.intentions,
     )
 def structure_with_query(structure: Structure, query: Query) -> Structure:
@@ -110,6 +112,8 @@ def structure_with_query(structure: Structure, query: Query) -> Structure:
         query=query,
         frames=structure.frames,
         states=structure.states,
+        scoped_frames=structure.scoped_frames,
+        scoped_states=structure.scoped_states,
         intentions=structure.intentions,
     )
 def states_before_time(structure: Structure, time: int) -> list[State]:

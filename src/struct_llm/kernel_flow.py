@@ -8,20 +8,28 @@ from .comprehension.structure_helpers import dedupe_entities, with_time
 from .errors import ParseError
 from .memory.long_term import memory_entities_from_states
 from .perception.lexer import split_query_candidate, split_sentences
-from .perception.reference import resolve_references
-from .structure import Entity, Frame, Query, State, Structure
+from .perception.reference import resolve_references, unresolved_reference_mention
+from .structure import Entity, Frame, Query, Role, ScopedFrame, ScopedState, State, Structure
 from .world.causal import expand_conditionals
 from .world.state import materialize_events, materialize_relations
 
 INTEGRATED_CLAUSE_FRAME_TYPES = frozenset({"if_then", "because"})
+SCOPED_PROPOSITION_ROLES: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "say": (("proposition", "claim", "speaker"),),
+    "believe": (("proposition", "belief", "person"),),
+    "because": (("cause", "cause", ""), ("effect", "effect", "")),
+}
 
 
 @dataclass
 class ParseContext:
     entities: list[Entity]
     discourse_entities: tuple[Entity, ...]
+    unresolved_references: list[Entity]
     frames: list[Frame]
     states: list[State]
+    scoped_frames: list[ScopedFrame]
+    scoped_states: list[ScopedState]
     query_candidates: list[str]
     next_time: int = 1
 
@@ -37,8 +45,11 @@ def initial_parse_context(capabilities: CognitiveCapabilities) -> ParseContext:
         discourse_entities=tuple(
             entity for entity in discourse_entities if all(entity.name != known.name for known in memory_entities)
         ),
+        unresolved_references=[],
         frames=[],
         states=list(capabilities.memory_states),
+        scoped_frames=[],
+        scoped_states=[],
         query_candidates=[],
     )
 
@@ -50,36 +61,41 @@ def ingest_sentence(
     capabilities: CognitiveCapabilities,
 ) -> None:
     resolved_sentence = resolve_references(sentence, context.known_entities())
-    fragments = split_query_candidate(sentence)
+    mention = unresolved_reference_mention(sentence, resolved_sentence)
+    try:
+        fragments = split_query_candidate(sentence)
 
-    if not is_question and ingest_mixed_statement_fragments(sentence, context, capabilities):
-        return
+        if not is_question and ingest_mixed_statement_fragments(sentence, context, capabilities):
+            return
 
-    if not is_question and ingest_statement_sentence(
-        resolved_sentence,
-        context,
-        capabilities,
-    ):
-        return
+        if not is_question and ingest_statement_sentence(
+            resolved_sentence,
+            context,
+            capabilities,
+        ):
+            return
 
-    if not is_question and query_candidate_is_learned_unit(
-        resolved_sentence,
-        context.known_entities(),
-        capabilities.query_parsers,
-    ):
-        context.query_candidates.append(resolved_sentence)
-        return
+        if not is_question and query_candidate_is_learned_unit(
+            resolved_sentence,
+            context.known_entities(),
+            capabilities.query_parsers,
+        ):
+            context.query_candidates.append(resolved_sentence)
+            return
 
-    if is_question and query_candidate_is_learned_unit(
-        resolved_sentence,
-        context.known_entities(),
-        capabilities.query_parsers,
-    ):
-        context.query_candidates.append(resolved_sentence)
-        return
+        if is_question and query_candidate_is_learned_unit(
+            resolved_sentence,
+            context.known_entities(),
+            capabilities.query_parsers,
+        ):
+            context.query_candidates.append(resolved_sentence)
+            return
 
-    for fragment in fragments:
-        ingest_query_fragment(fragment, is_question, context, capabilities)
+        for fragment in fragments:
+            ingest_query_fragment(fragment, is_question, context, capabilities)
+    finally:
+        if mention is not None:
+            context.unresolved_references.append(mention)
 
 
 def ingest_mixed_statement_fragments(
@@ -237,6 +253,55 @@ def add_extracted_structure(
         context.frames.append(timed_frame)
         for state in capabilities.states_from_frame(timed_frame):
             capabilities.apply_state(context.states, state)
+        add_scoped_proposition_structure(timed_frame, context, capabilities)
+
+
+def add_scoped_proposition_structure(
+    source_frame: Frame,
+    context: ParseContext,
+    capabilities: CognitiveCapabilities,
+) -> None:
+    for role_name, kind, owner_role in SCOPED_PROPOSITION_ROLES.get(source_frame.frame_type, ()):
+        proposition = source_frame.role(role_name)
+        if not proposition:
+            continue
+        parsed = capabilities.parse_statement(proposition)
+        if parsed is None:
+            continue
+        proposition_entities, proposition_frames = parsed
+        context.entities.extend(proposition_entities)
+        owner = source_frame.role(owner_role) if owner_role else ""
+        for index, frame in enumerate(proposition_frames, start=1):
+            scoped_frame_id = f"{source_frame.frame_id}:{role_name}{index}"
+            scoped_frame = retime_scoped_frame(frame, scoped_frame_id, source_frame.time)
+            context.scoped_frames.append(
+                ScopedFrame(
+                    scope=source_frame.frame_id,
+                    kind=kind,
+                    owner=owner or "",
+                    proposition=proposition,
+                    frame=scoped_frame,
+                )
+            )
+            for state in capabilities.states_from_frame(scoped_frame):
+                context.scoped_states.append(
+                    ScopedState(
+                        scope=source_frame.frame_id,
+                        kind=kind,
+                        owner=owner or "",
+                        proposition=proposition,
+                        state=state,
+                    )
+                )
+
+
+def retime_scoped_frame(frame: Frame, frame_id: str, time: int) -> Frame:
+    return Frame(
+        frame_id=frame_id,
+        frame_type=frame.frame_type,
+        time=time,
+        roles=tuple(Role(frame_id, role.name, role.value) for role in frame.roles),
+    )
 
 
 def finalize_parse_context(
@@ -269,7 +334,10 @@ def finalize_parse_context(
 
 
 def output_entities(context: ParseContext, query: Query | None) -> tuple[Entity, ...]:
-    entities = [entity for entity in context.entities if entity.role != "query_intent"]
+    entities = [
+        *(entity for entity in context.entities if entity.role != "query_intent"),
+        *context.unresolved_references,
+    ]
     if query is not None:
         entities.extend(query_referenced_discourse_entities(query, context.discourse_entities))
     return dedupe_entities(entities)
@@ -300,6 +368,8 @@ def structure_from_context(
         query=query,
         frames=tuple(context.frames),
         states=tuple(context.states),
+        scoped_frames=tuple(context.scoped_frames),
+        scoped_states=tuple(context.scoped_states),
     )
 
 

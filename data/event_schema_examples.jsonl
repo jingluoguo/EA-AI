@@ -1,0 +1,16 @@
+{"schema":"struct_llm.event_schema.v1","frame_type":"put_in","effects":[{"name":"in","left_role":"theme","right_role":"goal"}],"qualifier_roles":{"item":"theme","holder":"goal"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"be_in","effects":[{"name":"in","left_role":"theme","right_role":"goal"}],"qualifier_roles":{"item":"theme","holder":"goal"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"take_out","effects":[{"name":"not_in","left_role":"theme","right_role":"source"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"not_in","effects":[{"name":"not_in","left_role":"theme","right_role":"source"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"move","effects":[{"name":"at","left_role":"theme","right_role":"goal"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"give","effects":[{"name":"owner","left_role":"theme","right_role":"recipient"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"paint","effects":[{"name":"color","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"open","effects":[{"name":"access","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"close","effects":[{"name":"access","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"create","effects":[{"name":"exists","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"destroy","effects":[{"name":"exists","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"exist","effects":[{"name":"exists","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"not_exist","effects":[{"name":"exists","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"profile_name","effects":[{"name":"name","left_role":"subject","right_role":"value"}],"qualifier_roles":{}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"profile_like","effects":[{"name":"likes","left_role":"subject","right_role":"value"}],"qualifier_roles":{}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"profile_dislike","effects":[{"name":"dislikes","left_role":"subject","right_role":"value"}],"qualifier_roles":{}}

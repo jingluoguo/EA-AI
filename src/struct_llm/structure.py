@@ -38,6 +38,37 @@ class State:
 
 
 @dataclass(frozen=True)
+class ScopedFrame:
+    scope: str
+    kind: str
+    owner: str
+    proposition: str
+    frame: Frame
+
+    def linearize(self) -> str:
+        roles = ",".join(f"{role.name}={role.value}" for role in self.frame.roles)
+        return (
+            f"SCOPED_FRAME {self.scope} kind={self.kind} owner={self.owner} "
+            f"proposition={self.proposition} type={self.frame.frame_type} roles={roles}"
+        )
+
+
+@dataclass(frozen=True)
+class ScopedState:
+    scope: str
+    kind: str
+    owner: str
+    proposition: str
+    state: State
+
+    def linearize(self) -> str:
+        return (
+            f"SCOPED_STATE {self.scope} kind={self.kind} owner={self.owner} "
+            f"proposition={self.proposition} STATE {self.state.name}({self.state.left},{self.state.right})"
+        )
+
+
+@dataclass(frozen=True)
 class Event:
     name: str
     actor: str
@@ -183,6 +214,11 @@ class Frame:
             result = self.role("result") or ""
             qualifiers = (f"result={result}",) if result else ()
             return Event(self.frame_type, actor, theme, qualifiers)
+        if self.frame_type in {"exist", "not_exist"}:
+            theme = self.role("theme") or ""
+            result = self.role("result") or ""
+            qualifiers = (f"result={result}",) if result else ()
+            return Event(self.frame_type, "", theme, qualifiers)
         if self.frame_type in {"profile_name", "profile_like", "profile_dislike"}:
             subject = self.role("subject") or ""
             value = self.role("value") or ""
@@ -222,6 +258,8 @@ class Structure:
     query: Query | None = None
     frames: tuple[Frame, ...] = ()
     states: tuple[State, ...] = ()
+    scoped_frames: tuple[ScopedFrame, ...] = ()
+    scoped_states: tuple[ScopedState, ...] = ()
     intentions: tuple[Intention, ...] = ()
     pragmatic_acts: tuple[PragmaticAct, ...] = ()
 
@@ -236,6 +274,8 @@ class Structure:
         lines.extend(intention.linearize() for intention in self.intentions)
         lines.extend(act.linearize() for act in self.pragmatic_acts)
         lines.extend(frame.linearize() for frame in frames)
+        lines.extend(frame.linearize() for frame in self.scoped_frames)
+        lines.extend(state.linearize() for state in self.scoped_states)
         lines.extend(f"RULE {rule}" for rule in self.rules)
         query = self.query
         if query is not None:

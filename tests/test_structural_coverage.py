@@ -4,10 +4,39 @@ import unittest
 from collections import Counter
 
 from struct_llm.perception.lexer import split_query_candidate
+from struct_llm.perception.normalizer import bare_topic_followup, normalize_question
+from struct_llm.perception.reference import strip_ellipsis_particles
+from struct_llm.comprehension.surface_lexicon import load_surface_lexicon_jsonl, surface_forms, surface_replacements
+from struct_llm.world.event_schema import event_schemas, load_event_schema_jsonl
 from tests.support import *
 
 
 class StructuralCoverageTest(unittest.TestCase):
+    def test_terminal_discourse_particles_are_loaded_from_surface_lexicon_data(self) -> None:
+        entries = load_surface_lexicon_jsonl("data/surface_lexicon_examples.jsonl")
+
+        categories = {entry.category for entry in entries}
+        self.assertGreaterEqual(len(entries), 18)
+        self.assertIn("terminal_discourse_particle", categories)
+        self.assertIn("containment_verb", categories)
+        self.assertIn("object_pronoun", categories)
+        self.assertEqual(surface_forms("terminal_discourse_particle"), ("呢", "吗", "吧", "呀", "啊"))
+        self.assertIn(("放入", "放进"), surface_replacements("containment_verb"))
+        self.assertIn(("取走", "取出"), surface_replacements("take_out_verb"))
+        self.assertEqual(strip_ellipsis_particles("那个呢？"), "那个")
+        self.assertEqual(normalize_question("我想知道物品放入托盘里面了吗？"), "东西放进托盘里面")
+        self.assertEqual(bare_topic_followup("实验室呢"), "实验室")
+
+    def test_event_state_schemas_are_loaded_from_data(self) -> None:
+        schemas = load_event_schema_jsonl("data/event_schema_examples.jsonl")
+        by_type = event_schemas()
+
+        self.assertGreaterEqual(len(schemas), 14)
+        self.assertIn("put_in", by_type)
+        self.assertIn("profile_dislike", by_type)
+        self.assertEqual(by_type["put_in"].effects[0].name, "in")
+        self.assertEqual(by_type["put_in"].role_for_qualifier("holder"), "goal")
+
     def test_query_test_split_covers_core_structural_families(self) -> None:
         examples = load_query_jsonl("data/query_examples.jsonl")
         train_intents = query_intents_for_split(examples, "train")
@@ -156,6 +185,15 @@ class StructuralCoverageTest(unittest.TestCase):
         self.assertGreater(test_acts["repair_previous_understanding"], 0)
         self.assertGreater(train_acts["action_result_report"], 0)
         self.assertGreater(test_acts["action_result_report"], 0)
+        pronoun_reference_examples = [
+            example
+            for example in examples
+            if example.source == "structural_pattern_pronoun_reference_clarification"
+        ]
+        self.assertEqual({example.split for example in pronoun_reference_examples}, {"train", "test"})
+        self.assertTrue(all(example.known_world_state for example in pronoun_reference_examples))
+        self.assertTrue(all(example.expected_entities == (Entity("unresolved_reference", "它"),) for example in pronoun_reference_examples))
+        self.assertTrue(all("candidates=" in " ".join(act.qualifiers) for example in pronoun_reference_examples for act in example.expected_pragmatic_acts))
         self.assertGreater(episode_expected_frame_count(examples, "train", "repair_previous_understanding"), 0)
         self.assertGreater(episode_expected_frame_count(examples, "test", "repair_previous_understanding"), 0)
         self.assertGreater(episode_action_result_count(examples, "train"), 0)
@@ -179,7 +217,7 @@ class StructuralCoverageTest(unittest.TestCase):
             for record in records
             if record.source == "structural_pattern_intent_context"
         ]
-        self.assertGreaterEqual(len(structural_records), 26)
+        self.assertGreaterEqual(len(structural_records), 32)
         self.assertTrue(all(record.context for record in structural_records))
         self.assertTrue(all(record.belief_state for record in structural_records))
         self.assertTrue(all(record.intention.belief for record in structural_records))
@@ -201,6 +239,7 @@ class StructuralCoverageTest(unittest.TestCase):
             "repair_previous_understanding",
             "action_result_report",
             "resolved_reference_query",
+            "resolved_focus_ellipsis",
         ):
             with self.subTest(predicate=predicate):
                 self.assertGreater(train_predicates[predicate], 0)
@@ -292,6 +331,22 @@ class StructuralCoverageTest(unittest.TestCase):
         assert contents is not None
         self.assertEqual(contents.linearize(), "QUERY contents(盒子)")
 
+        topic_location = parser(
+            "药瓶呢",
+            (Entity("topic", "药瓶"), Entity("query_intent", "location")),
+        )
+        self.assertIsNotNone(topic_location)
+        assert topic_location is not None
+        self.assertEqual(topic_location.linearize(), "QUERY location(药瓶)")
+
+        topic_contents = parser(
+            "盒子呢",
+            (Entity("topic", "盒子"), Entity("query_intent", "contents")),
+        )
+        self.assertIsNotNone(topic_contents)
+        assert topic_contents is not None
+        self.assertEqual(topic_contents.linearize(), "QUERY contents(盒子)")
+
         capabilities = default_capabilities(use_environment=False, use_memory=False)
         first = predict("小郭把芯片放进托盘。小王把药瓶放进盒子。芯片在哪里？", capabilities)
         working = capabilities_with_working_turn(
@@ -305,6 +360,25 @@ class StructuralCoverageTest(unittest.TestCase):
         self.assertIn("REL focus_query_intent(user,location)", follow_up_structure)
         self.assertIn("QUERY location(盒子)", follow_up_structure)
         self.assertNotIn("QUERY object_state(盒子,state=access)", follow_up_structure)
+
+    def test_focus_topic_ellipsis_dataset_covers_object_and_container_carryover(self) -> None:
+        examples = [
+            example
+            for example in load_query_jsonl("data/query_examples.jsonl")
+            if example.source == "structural_pattern_focus_topic_ellipsis_eval"
+        ]
+        self.assertGreaterEqual(len(examples), 4)
+
+        splits = {example.split for example in examples}
+        intents = {example.query.intent for example in examples if example.query is not None}
+        entity_roles = {
+            tuple(entity.role for entity in example.entities)
+            for example in examples
+        }
+
+        self.assertEqual(splits, {"train", "test"})
+        self.assertEqual(intents, {"location", "contents"})
+        self.assertEqual(entity_roles, {("topic", "query_intent")})
 
     def test_statement_sequence_keeps_history_while_current_state_overwrites(self) -> None:
         parser = default_neural_statement_parser()

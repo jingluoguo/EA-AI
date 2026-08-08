@@ -36,6 +36,13 @@ def answer_dialog_act(structure: Structure) -> str | None:
 
 def answer_pragmatic_response_policy(structure: Structure) -> str | None:
     rules = set(structure.rules)
+    for act in structure.pragmatic_acts:
+        if act.act == "ambiguous_reference":
+            candidates = pragmatic_candidates(act.qualifiers)
+            if candidates:
+                return f"你说的是{join_alternatives(candidates)}？"
+        if act.act == "underspecified_reference_query" and act.target:
+            return f"你想问{act.target}的哪方面？比如位置、状态、归属或相关信息。"
     if "pragmatic_recall_previous_turn_found" in rules:
         return f"你刚刚说的是：{last_user_utterance(structure.states)}"
     if "pragmatic_recall_previous_turn_unknown" in rules:
@@ -51,6 +58,21 @@ def answer_pragmatic_response_policy(structure: Structure) -> str | None:
     if "pragmatic_response_acknowledge" in rules:
         return "我知道了。"
     return None
+
+
+def pragmatic_candidates(qualifiers: tuple[str, ...]) -> tuple[str, ...]:
+    for qualifier in qualifiers:
+        if qualifier.startswith("candidates="):
+            return tuple(value for value in qualifier.split("=", 1)[1].split("|") if value)
+    return ()
+
+
+def join_alternatives(candidates: tuple[str, ...]) -> str:
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) == 2:
+        return f"{candidates[0]}还是{candidates[1]}"
+    return f"{'、'.join(candidates[:-1])}还是{candidates[-1]}"
 
 
 def answer_profile_lookup(structure: Structure) -> str | None:
@@ -80,16 +102,34 @@ def answer_profile_lookup(structure: Structure) -> str | None:
 def answer_profile_statement_acknowledgement(structure: Structure) -> str | None:
     if structure.query is not None:
         return None
+    profile_like_frames = sorted(
+        (
+            frame
+            for frame in structure.frames
+            if frame.frame_type == "profile_like" and frame.role("value")
+        ),
+        key=lambda frame: frame.time,
+    )
+    if profile_like_frames:
+        subject = profile_statement_subject(profile_like_frames[-1].role("subject"))
+        values = tuple(frame.role("value") for frame in profile_like_frames if frame.role("value"))
+        return f"我知道了，{subject}喜欢{join_names(values)}。"
     latest_frame = latest_profile_frame(structure)
     if latest_frame is not None:
         value = latest_frame.role("value")
         if value and latest_frame.frame_type == "profile_name":
             return f"我知道了，你叫{value}。"
         if value and latest_frame.frame_type == "profile_like":
-            return f"我知道了，你喜欢{value}。"
+            return f"我知道了，{profile_statement_subject(latest_frame.role('subject'))}喜欢{value}。"
         if value and latest_frame.frame_type == "profile_dislike":
-            return f"我知道了，你不喜欢{value}。"
+            return f"我知道了，{profile_statement_subject(latest_frame.role('subject'))}不喜欢{value}。"
     return None
+
+
+def profile_statement_subject(subject: str | None) -> str:
+    if subject in {"", None, "我", "self"}:
+        return "你"
+    return subject
 
 
 def latest_profile_frame(structure: Structure):

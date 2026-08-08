@@ -61,6 +61,16 @@ def answer_subquery(structure: Structure, query: Query) -> str:
         query=substructure.query,
         frames=substructure.frames,
         states=substructure.states,
+        scoped_frames=substructure.scoped_frames,
+        scoped_states=substructure.scoped_states,
         intentions=substructure.intentions,
+        pragmatic_acts=substructure.pragmatic_acts,
     )
-    return answer_from_structure(substructure)
+    return answer_from_structure(substructure, default_subquery_answerers())
+
+
+def default_subquery_answerers() -> tuple[Answerer, ...]:
+    from ..motor.dialogue import default_learned_dialog_answerer
+    from .answers import DEFAULT_ANSWERERS
+
+    return (default_learned_dialog_answerer(), *DEFAULT_ANSWERERS)

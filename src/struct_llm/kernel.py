@@ -42,7 +42,7 @@ def default_capabilities(
         state_reducers=DEFAULT_STATE_REDUCERS,
         query_parsers=(default_neural_query_parser(),),
         rule_inferers=DEFAULT_RULE_INFERERS,
-        answerers=(*DEFAULT_ANSWERERS, default_learned_dialog_answerer()),
+        answerers=(default_learned_dialog_answerer(), *DEFAULT_ANSWERERS),
     )
     if use_memory:
         memory_states = default_memory_states()

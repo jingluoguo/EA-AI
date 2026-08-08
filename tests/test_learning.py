@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from my_neural import structure_from_dict as local_structure_from_dict
+from struct_llm.neural import structure_to_dict
 from tests.support import *
 
 
@@ -25,7 +27,8 @@ class LearningTest(unittest.TestCase):
 
         self.assertIs(first.query_parsers[0], second.query_parsers[0])
         self.assertIs(first.statement_parsers[0], second.statement_parsers[0])
-        self.assertIs(first.answerers[-1], second.answerers[-1])
+        self.assertIs(first.answerers[0], second.answerers[0])
+        self.assertIsInstance(first.answerers[0], LearnedDialogActAnswerer)
         self.assertIs(default_learned_dialog_answerer(), default_learned_dialog_answerer())
 
     def test_cli_neural_provider_default_path_imports_package_neural_module(self) -> None:
@@ -65,7 +68,7 @@ class LearningTest(unittest.TestCase):
         self.assertIn("QUERY dialog_act(identity)", prediction.structure.linearize())
         self.assertEqual(
             prediction.answer,
-            "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。",
+            "我是你的 AI 助手，可以陪你聊天、回答问题、帮你处理各种任务。",
         )
 
     def test_neural_statement_parser_projects_into_existing_state_reasoning(self) -> None:
@@ -170,7 +173,7 @@ class LearningTest(unittest.TestCase):
         self.assertIn("QUERY dialog_act(identity)", prediction.structure.linearize())
         self.assertEqual(
             prediction.answer,
-            "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。",
+            "我是你的 AI 助手，可以陪你聊天、回答问题、帮你处理各种任务。",
         )
 
     def test_neural_provider_answers_knowledge_questions_via_learned_memory(self) -> None:
@@ -530,6 +533,16 @@ class LearningTest(unittest.TestCase):
         self.assertEqual(example.answer, answer)
         self.assertEqual(model.example_count, 1)
         self.assertEqual(answerer(structure), answer)
+
+    def test_neural_boundary_structure_roundtrip_preserves_scoped_propositions(self) -> None:
+        prediction = predict("小王认为芯片被放进盒子了。小王认为芯片在哪里？")
+        payload = structure_to_dict(prediction.structure)
+        restored = local_structure_from_dict(payload)
+
+        self.assertIsNotNone(restored)
+        assert restored is not None
+        self.assertEqual(len(restored.scoped_states), 1)
+        self.assertIn("SCOPED_STATE f1 kind=belief owner=小王 proposition=芯片在盒子里 STATE in(芯片,盒子)", restored.linearize())
 
     def test_candidate_dialog_answer_feedback_is_not_runtime_answer(self) -> None:
         query = Query("dialog_act", "emotion_status")

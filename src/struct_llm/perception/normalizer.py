@@ -1,60 +1,7 @@
 from __future__ import annotations
 
+from ..comprehension.surface_lexicon import surface_forms, surface_replacements
 from ..structure import Entity
-
-
-QUESTION_FRAMES = (
-    "你知道的话",
-    "可以告诉我",
-    "你可以告诉我",
-    "给我说一下",
-    "我想知道",
-    "我想问",
-    "想知道",
-    "想问",
-    "想了解",
-    "帮我看看",
-    "告诉我",
-)
-QUESTION_FILLERS = (
-    "现在",
-    "目前",
-    "实际",
-    "事实上",
-    "后来",
-    "之后",
-    "随后",
-    "请问",
-    "到底",
-    "其实",
-    "又",
-    "再",
-    "还",
-    "是",
-    "的",
-    "了",
-    "吗",
-    "嘛",
-    "呢",
-    "下",
-)
-QUESTION_INNER_FILLERS = (
-    "现在",
-    "目前",
-    "实际",
-    "事实上",
-    "请问",
-    "到底",
-    "其实",
-)
-QUESTION_SURFACE_SYNONYMS = (
-    ("物品", "东西"),
-)
-CONTAINMENT_VERBS = ("放到", "放入", "放进")
-TAKE_OUT_VERBS = ("取出来", "拿出来", "取出", "拿出", "取走", "拿走")
-CONTAINER_SUFFIXES = ("里面", "里边", "里头", "内部", "里", "内", "中")
-CONTAINER_SURFACE_SUFFIXES = ("里面", "里边", "里头", "内部")
-DEMONSTRATIVE_PREFIXES = ("这个", "这件", "那个", "那件")
 
 
 def normalize_question(sentence: str) -> str:
@@ -71,11 +18,28 @@ def normalize_question(sentence: str) -> str:
     return normalized
 
 
+def bare_topic_followup(sentence: str) -> str | None:
+    stripped = sentence.strip().rstrip("。！？!?，,；;")
+    particles = tuple(sorted(surface_forms("bare_topic_particle"), key=len, reverse=True))
+    if not particles or not any(stripped.endswith(particle) for particle in particles):
+        return None
+    particle = next(particle for particle in particles if stripped.endswith(particle))
+    topic = stripped[: -len(particle)].strip()
+    if not topic or any(separator in topic for separator in ("，", ",", "；", ";")):
+        return None
+    normalized = normalize_slot_value(topic)
+    if not normalized or normalized in surface_forms("bare_reference_word"):
+        return None
+    if any(marker in normalized for marker in surface_forms("query_marker")):
+        return None
+    return normalized
+
+
 def normalize_question_surface_words(sentence: str) -> str:
     normalized = sentence
-    for source, target in QUESTION_SURFACE_SYNONYMS:
+    for source, target in surface_replacements("question_surface_synonym"):
         normalized = normalized.replace(source, target)
-    for word in QUESTION_INNER_FILLERS:
+    for word in surface_forms("question_inner_filler"):
         normalized = normalized.replace(word, "")
     return normalized
 
@@ -85,7 +49,7 @@ def strip_question_frames(sentence: str) -> str:
     changed = True
     while changed:
         changed = False
-        for frame in sorted(QUESTION_FRAMES, key=len, reverse=True):
+        for frame in sorted(surface_forms("question_frame"), key=len, reverse=True):
             if normalized == frame:
                 return ""
             if normalized.startswith(frame) and len(normalized) > len(frame):
@@ -99,11 +63,11 @@ def normalize_slot_value(value: str) -> str:
     changed = True
     while changed:
         changed = False
-        for prefix in sorted(DEMONSTRATIVE_PREFIXES, key=len, reverse=True):
+        for prefix in sorted(surface_forms("demonstrative_prefix"), key=len, reverse=True):
             if normalized.startswith(prefix) and len(normalized) > len(prefix):
                 normalized = normalized[len(prefix) :]
                 changed = True
-        for word in sorted(QUESTION_FILLERS, key=len, reverse=True):
+        for word in sorted(surface_forms("question_filler"), key=len, reverse=True):
             if normalized.startswith(word) and len(normalized) > len(word):
                 normalized = normalized[len(word) :]
                 changed = True
@@ -118,7 +82,7 @@ def normalize_container_slot(value: str) -> str:
     changed = True
     while changed:
         changed = False
-        for suffix in sorted(CONTAINER_SUFFIXES, key=len, reverse=True):
+        for suffix in sorted(surface_forms("container_suffix"), key=len, reverse=True):
             if normalized.endswith(suffix) and len(normalized) > len(suffix):
                 normalized = normalized[: -len(suffix)]
                 changed = True
@@ -127,8 +91,8 @@ def normalize_container_slot(value: str) -> str:
 
 def normalize_container_surface(sentence: str) -> str:
     normalized = sentence
-    for suffix in CONTAINER_SURFACE_SUFFIXES:
-        normalized = normalized.replace(suffix, "里")
+    for source, target in surface_replacements("container_surface_suffix"):
+        normalized = normalized.replace(source, target)
     return normalized
 
 
@@ -142,14 +106,13 @@ def normalize_entity_slot(value: str, entities: tuple[Entity, ...]) -> str:
 
 def normalize_containment_expression(sentence: str) -> str:
     normalized = sentence
-    for verb in CONTAINMENT_VERBS:
-        normalized = normalized.replace(verb, "放进")
+    for source, target in surface_replacements("containment_verb"):
+        normalized = normalized.replace(source, target)
     return normalized
 
 
 def normalize_take_out_expression(sentence: str) -> str:
     normalized = sentence
-    for verb in TAKE_OUT_VERBS:
-        normalized = normalized.replace(verb, "取出")
+    for source, target in surface_replacements("take_out_verb"):
+        normalized = normalized.replace(source, target)
     return normalized
-

@@ -27,6 +27,7 @@ VERIFIED_ANSWER_SOURCES = frozenset(
         "training",
     }
 )
+STRUCTURE_DEPENDENT_DIALOG_TARGETS = frozenset({"summary"})
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,8 @@ class LearnedDialogActAnswerer:
     def __call__(self, structure: Structure) -> str | None:
         query = structure.query
         if query is None or query.intent != "dialog_act":
+            return None
+        if query.target in STRUCTURE_DEPENDENT_DIALOG_TARGETS:
             return None
         for pattern in self.patterns:
             if query_signature(pattern.query) == query_signature(query):

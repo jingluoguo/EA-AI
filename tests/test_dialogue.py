@@ -8,12 +8,12 @@ from tests.support import *
 class DialogueTest(unittest.TestCase):
     def test_dialog_act_queries_can_answer_without_domain_state(self) -> None:
         examples = (
-            ("你好", "QUERY dialog_act(greeting)", "你好，我在。"),
-            ("谢谢你", "QUERY dialog_act(thanks)", "不客气。"),
-            ("再见", "QUERY dialog_act(farewell)", "再见。"),
-            ("明天见", "QUERY dialog_act(farewell)", "再见。"),
-            ("保重", "QUERY dialog_act(farewell)", "再见。"),
-            ("你是谁？", "QUERY dialog_act(identity)", "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。"),
+            ("你好", "QUERY dialog_act(greeting)", "你好呀，很高兴见到你，有什么我可以帮你的吗？"),
+            ("谢谢你", "QUERY dialog_act(thanks)", "不客气，能帮到你就好，有需要随时找我。"),
+            ("再见", "QUERY dialog_act(farewell)", "再见，很高兴和你聊天，欢迎随时再来找我。"),
+            ("明天见", "QUERY dialog_act(farewell)", "再见，很高兴和你聊天，欢迎随时再来找我。"),
+            ("保重", "QUERY dialog_act(farewell)", "再见，很高兴和你聊天，欢迎随时再来找我。"),
+            ("你是谁？", "QUERY dialog_act(identity)", "我是你的 AI 助手，可以陪你聊天、回答问题、帮你处理各种任务。"),
             (
                 "你是人吗",
                 "QUERY dialog_act(personhood)",
@@ -62,17 +62,17 @@ class DialogueTest(unittest.TestCase):
             (
                 "你能做什么？",
                 "QUERY dialog_act(capabilities)",
-                "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要。",
+                "我可以陪你聊天、回答问题、整理信息、写作、翻译、做总结，还能帮你梳理思路。",
             ),
             (
                 "你能干嘛",
                 "QUERY dialog_act(capabilities)",
-                "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要。",
+                "我可以陪你聊天、回答问题、整理信息、写作、翻译、做总结，还能帮你梳理思路。",
             ),
             (
                 "你好，你能干嘛",
                 "QUERY dialog_act(capabilities)",
-                "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要。",
+                "我可以陪你聊天、回答问题、整理信息、写作、翻译、做总结，还能帮你梳理思路。",
             ),
         )
 
@@ -122,6 +122,35 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("REL likes(我,徒步)", structure)
         self.assertIn("QUERY profile(我,attribute=likes)", structure)
         self.assertEqual(second.answer, "你喜欢徒步。")
+
+    def test_profile_like_coordination_preserves_all_values(self) -> None:
+        prediction = predict("我爱爬山，也爱游泳")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("FRAME f1 type=profile_like time=1", structure)
+        self.assertIn("FRAME f2 type=profile_like time=2", structure)
+        self.assertIn("REL likes(我,爬山)", structure)
+        self.assertIn("REL likes(我,游泳)", structure)
+        self.assertEqual(prediction.answer, "我知道了，你喜欢爬山和游泳。")
+
+    def test_unresolved_profile_pronouns_request_contextual_referent_choice(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        first = predict("我爱爬山，也爱游泳", capabilities)
+        capabilities = capabilities_with_working_turn(capabilities, "我爱爬山，也爱游泳", first.structure.states)
+
+        for text in ("它是什么", "它对于身体的好处是啥"):
+            with self.subTest(text=text):
+                follow_up = predict(text, capabilities)
+                structure = follow_up.structure.linearize()
+                self.assertIn("ENTITY unresolved_reference=它", structure)
+                self.assertIn("REL likes(我,爬山)", structure)
+                self.assertIn("REL likes(我,游泳)", structure)
+                self.assertIn(
+                    "PRAGMATIC_ACT ambiguous_reference(它,missing=referent,candidates=爬山|游泳,depends_on=focus,response_policy=ask_clarification)",
+                    structure,
+                )
+                self.assertIn("RULE pragmatic_response_ask_clarification", structure)
+                self.assertEqual(follow_up.answer, "你说的是爬山还是游泳？")
 
     def test_self_profile_queries_use_discourse_participant_context(self) -> None:
         examples = ("我是谁", "我叫啥", "我叫什么")
@@ -190,6 +219,30 @@ class DialogueTest(unittest.TestCase):
                 "PRAGMATIC_ACT incomplete_utterance(user_intention,intent=learn,missing=topic,response_policy=wait_for_completion)",
                 "RULE pragmatic_response_wait_for_completion",
                 "我先等你把话说完整。",
+            ),
+            (
+                "小郭呢",
+                "PRAGMATIC_ACT underspecified_reference_query(小郭,missing=query_intent,response_policy=ask_clarification)",
+                "RULE pragmatic_response_ask_clarification",
+                "你想问小郭的哪方面？比如位置、状态、归属或相关信息。",
+            ),
+            (
+                "爬山呢",
+                "PRAGMATIC_ACT underspecified_reference_query(爬山,missing=query_intent,response_policy=ask_clarification)",
+                "RULE pragmatic_response_ask_clarification",
+                "你想问爬山的哪方面？比如位置、状态、归属或相关信息。",
+            ),
+            (
+                "实验室呢",
+                "PRAGMATIC_ACT underspecified_reference_query(实验室,missing=query_intent,response_policy=ask_clarification)",
+                "RULE pragmatic_response_ask_clarification",
+                "你想问实验室的哪方面？比如位置、状态、归属或相关信息。",
+            ),
+            (
+                "游泳呢",
+                "PRAGMATIC_ACT underspecified_reference_query(游泳,missing=query_intent,response_policy=ask_clarification)",
+                "RULE pragmatic_response_ask_clarification",
+                "你想问游泳的哪方面？比如位置、状态、归属或相关信息。",
             ),
         )
 
@@ -274,6 +327,41 @@ class DialogueTest(unittest.TestCase):
         self.assertNotIn("PRAGMATIC_ACT incomplete_utterance", structure)
         self.assertEqual(second.answer, "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。")
 
+    def test_focus_topic_ellipsis_reuses_previous_query_intent(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        first = predict("芯片在哪里？", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "芯片在哪里？",
+            first.structure.states,
+            first.structure.query,
+        )
+
+        follow_up = predict("那个呢", capabilities)
+
+        structure = follow_up.structure.linearize()
+        self.assertIn("REL focus_topic(user,芯片)", structure)
+        self.assertIn("REL focus_query_intent(user,location)", structure)
+        self.assertIn("QUERY location(芯片)", structure)
+        self.assertNotIn("PRAGMATIC_ACT ambiguous_reference", structure)
+        self.assertEqual(follow_up.answer, "不知道芯片在哪里。")
+
+        known = predict("小王把芯片放进盒子。盒子里有什么？", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "小王把芯片放进盒子。盒子里有什么？",
+            known.structure.states,
+            known.structure.query,
+        )
+
+        pronoun_follow_up = predict("它呢", capabilities)
+
+        pronoun_structure = pronoun_follow_up.structure.linearize()
+        self.assertIn("REL focus_topic(user,盒子)", pronoun_structure)
+        self.assertIn("REL focus_query_intent(user,contents)", pronoun_structure)
+        self.assertIn("QUERY contents(盒子)", pronoun_structure)
+        self.assertEqual(pronoun_follow_up.answer, "盒子里至少有芯片。")
+
     def test_observation_query_can_replace_stale_profile_focus(self) -> None:
         capabilities = default_capabilities(use_environment=False, use_memory=False).with_answerers(
             default_learned_memory_knowledge_answerer("data/memory_knowledge_model.json")
@@ -348,7 +436,7 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("REL name(我,小郭)", structure)
         self.assertIn("FRAME f1 type=profile_name time=1", structure)
         self.assertIn("QUERY dialog_act(identity)", structure)
-        self.assertEqual(prediction.answer, "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。")
+        self.assertEqual(prediction.answer, "我是你的 AI 助手，可以陪你聊天、回答问题、帮你处理各种任务。")
 
     def test_profile_name_overwrites_and_preferences_can_be_corrected(self) -> None:
         prediction = predict("我叫小王。其实我叫小李。我喜欢咖啡。后来我不喜欢咖啡。我叫什么，我喜欢什么，我不喜欢什么？")
@@ -440,7 +528,7 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("SUBQUERY profile(我,attribute=name)", structure)
         self.assertEqual(
             prediction.answer,
-            "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要；你叫小王。",
+            "我可以陪你聊天、回答问题、整理信息、写作、翻译、做总结，还能帮你梳理思路；你叫小王。",
         )
 
     def test_learned_statement_uses_role_boundaries_instead_of_exact_sentence_text(self) -> None:
@@ -548,6 +636,14 @@ class DialogueTest(unittest.TestCase):
         structure = prediction.structure.linearize()
         self.assertIn("EVENT believe(小王,芯片在托盘里)", structure)
         self.assertIn("EVENT believe(小王,芯片在盒子里)", structure)
+        self.assertEqual(prediction.answer, "小王认为芯片在盒子里。")
+
+    def test_belief_propositions_materialize_scoped_structure_without_leaking_fact_state(self) -> None:
+        prediction = predict("小王认为芯片被放进盒子了。小王认为芯片在哪里？")
+        structure = prediction.structure.linearize()
+        self.assertIn("SCOPED_FRAME f1 kind=belief owner=小王 proposition=芯片在盒子里 type=be_in", structure)
+        self.assertIn("SCOPED_STATE f1 kind=belief owner=小王 proposition=芯片在盒子里 STATE in(芯片,盒子)", structure)
+        self.assertNotIn("REL in(芯片,盒子)", structure)
         self.assertEqual(prediction.answer, "小王认为芯片在盒子里。")
 
     def test_contradiction_query_covers_found_missing_and_no_contradiction_cases(self) -> None:

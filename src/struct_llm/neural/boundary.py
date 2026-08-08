@@ -9,7 +9,7 @@ from typing import Any, Callable, Mapping, Optional, Protocol
 from ..capabilities import CognitiveCapabilities, StatementParseResult
 from ..comprehension.query import query_from_dict
 from ..perception.normalizer import normalize_slot_value
-from ..structure import Entity, Frame, Intention, PragmaticAct, Query, Relation, Role, State, Structure
+from ..structure import Entity, Frame, Intention, PragmaticAct, Query, Relation, Role, ScopedFrame, ScopedState, State, Structure
 
 
 NeuralPayload = Mapping[str, Any]
@@ -368,6 +368,8 @@ def structure_to_dict(structure: Structure) -> dict[str, Any]:
         "query": query_to_payload(structure.query) if structure.query is not None else None,
         "frames": [frame_to_dict(frame) for frame in structure.frames],
         "states": [state_to_dict(state) for state in structure.states],
+        "scoped_frames": [scoped_frame_to_dict(frame) for frame in structure.scoped_frames],
+        "scoped_states": [scoped_state_to_dict(state) for state in structure.scoped_states],
         "intentions": [intention_to_dict(intention) for intention in structure.intentions],
         "pragmatic_acts": [pragmatic_act_to_dict(act) for act in structure.pragmatic_acts],
         "linearized": structure.linearize(),
@@ -404,6 +406,26 @@ def frame_to_dict(frame: Frame) -> dict[str, Any]:
         "frame_type": frame.frame_type,
         "time": frame.time,
         "roles": {role.name: role.value for role in frame.roles},
+    }
+
+
+def scoped_frame_to_dict(scoped_frame: ScopedFrame) -> dict[str, Any]:
+    return {
+        "scope": scoped_frame.scope,
+        "kind": scoped_frame.kind,
+        "owner": scoped_frame.owner,
+        "proposition": scoped_frame.proposition,
+        "frame": frame_to_dict(scoped_frame.frame),
+    }
+
+
+def scoped_state_to_dict(scoped_state: ScopedState) -> dict[str, Any]:
+    return {
+        "scope": scoped_state.scope,
+        "kind": scoped_state.kind,
+        "owner": scoped_state.owner,
+        "proposition": scoped_state.proposition,
+        "state": state_to_dict(scoped_state.state),
     }
 
 

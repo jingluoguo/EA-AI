@@ -91,6 +91,8 @@ def structure_with_frames_states(structure: Structure, frames: list[Frame], stat
         query=structure.query,
         frames=tuple(frames),
         states=tuple(states),
+        scoped_frames=structure.scoped_frames,
+        scoped_states=structure.scoped_states,
         intentions=structure.intentions,
     )
 

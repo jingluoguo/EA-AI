@@ -38,7 +38,6 @@ from struct_llm.comprehension.statement import (
 from struct_llm.kernel import default_capabilities
 from struct_llm.motor.dialogue import (
     DIALOG_ANSWER_DATA_PATH,
-    default_learned_dialog_answerer,
     compile_dialog_answer_model_from_jsonl,
 )
 from struct_llm.neural.query_classifier import (
@@ -51,7 +50,7 @@ from struct_llm.neural.statement_classifier import (
     statement_neural_summary,
     train_statement_neural_model,
 )
-from struct_llm.structure import Entity, Event, Frame, Intention, PragmaticAct, Query, Relation, Role, State, Structure
+from struct_llm.structure import Entity, Event, Frame, Intention, PragmaticAct, Query, Relation, Role, ScopedFrame, ScopedState, State, Structure
 
 
 TRAINING_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
@@ -175,7 +174,6 @@ def build_trained_capabilities() -> CognitiveCapabilities:
         capabilities = capabilities.with_intent_analyzers(
             InMemoryIntentAnalyzer.from_jsonl(intent_data_path)
         )
-    capabilities = capabilities.with_answerers(default_learned_dialog_answerer())
     return capabilities
 
 
@@ -335,6 +333,26 @@ def frame_to_dict(frame: Frame) -> dict[str, Any]:
     }
 
 
+def scoped_frame_from_dict(record: dict[str, Any]) -> ScopedFrame:
+    return ScopedFrame(
+        scope=str(record.get("scope") or "").strip(),
+        kind=str(record.get("kind") or "").strip(),
+        owner=str(record.get("owner") or "").strip(),
+        proposition=str(record.get("proposition") or "").strip(),
+        frame=frame_from_dict(record.get("frame") or {}),
+    )
+
+
+def scoped_state_from_dict(record: dict[str, Any]) -> ScopedState:
+    return ScopedState(
+        scope=str(record.get("scope") or "").strip(),
+        kind=str(record.get("kind") or "").strip(),
+        owner=str(record.get("owner") or "").strip(),
+        proposition=str(record.get("proposition") or "").strip(),
+        state=state_from_dict(record.get("state") or {}),
+    )
+
+
 def event_from_dict(record: dict[str, Any]) -> Event:
     return Event(
         name=str(record.get("name") or "").strip(),
@@ -381,6 +399,8 @@ def structure_from_dict(record: Any) -> Structure | None:
             query=query_from_payload(record["query"]) if isinstance(record.get("query"), dict) else None,
             frames=tuple(frame_from_dict(value) for value in record.get("frames", ()) if isinstance(value, dict)),
             states=tuple(state_from_dict(value) for value in record.get("states", ()) if isinstance(value, dict)),
+            scoped_frames=tuple(scoped_frame_from_dict(value) for value in record.get("scoped_frames", ()) if isinstance(value, dict)),
+            scoped_states=tuple(scoped_state_from_dict(value) for value in record.get("scoped_states", ()) if isinstance(value, dict)),
             intentions=tuple(intention_from_dict(value) for value in record.get("intentions", ()) if isinstance(value, dict)),
             pragmatic_acts=tuple(pragmatic_act_from_dict(value) for value in record.get("pragmatic_acts", ()) if isinstance(value, dict)),
         )

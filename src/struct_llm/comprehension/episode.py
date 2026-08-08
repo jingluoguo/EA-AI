@@ -5,14 +5,22 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from ..dataset_io import append_jsonl_object, file_sha256, load_jsonl_objects
-from ..perception.normalizer import normalize_question
-from ..structure import Frame, PragmaticAct, Query, Role, State
+from ..memory.long_term import memory_entities_from_states
+from ..perception.normalizer import bare_topic_followup, normalize_question
+from ..structure import Entity, Frame, PragmaticAct, Query, Role, State, Structure
 from .query import query_from_dict, query_to_dict
 
 
 EPISODE_DATA_PATH = Path(__file__).resolve().parents[3] / "data" / "episode_examples.jsonl"
 EPISODE_MODEL_SCHEMA = "struct_llm.episode_model.v1"
 EPISODE_RECORD_SCHEMA = "struct_llm.episode_example.v1"
+RESOLVED_QUERY_SUPPRESSED_ACTS = frozenset(
+    {
+        "ambiguous_reference",
+        "underspecified_action_request",
+        "incomplete_utterance",
+    }
+)
 RESPONSE_POLICIES = frozenset(
     {
         "answer",
@@ -66,6 +74,7 @@ class EpisodeTrainingExample:
     belief_state: tuple[State, ...] = ()
     relationship_state: tuple[State, ...] = ()
     focus: tuple[str, ...] = ()
+    expected_entities: tuple[Entity, ...] = ()
     expected_query: Query | None = None
     expected_frames: tuple[Frame, ...] = ()
     expected_state_delta: tuple[State, ...] = ()
@@ -121,7 +130,7 @@ class InMemoryPragmaticAnalyzer:
                 examples = tuple(
                     example
                     for example in self.examples
-                    if example.expected_response_policy != "wait_for_completion"
+                    if not resolved_query_suppresses_pragmatic_example(example)
                 )
             else:
                 examples = self.examples
@@ -139,14 +148,93 @@ class InMemoryPragmaticAnalyzer:
         ]
         acts: list[PragmaticAct] = []
         seen: set[tuple[str, str, tuple[str, ...]]] = set()
+        structural_acts = (
+            bare_topic_followup_act(text, structure),
+            ambiguous_reference_act(structure),
+        )
+        structural_targets: set[tuple[str, str]] = set()
+        for structural_act in structural_acts:
+            if structural_act is None:
+                continue
+            signature = (structural_act.act, structural_act.target, structural_act.qualifiers)
+            seen.add(signature)
+            structural_targets.add((structural_act.act, structural_act.target))
+            acts.append(structural_act)
         for candidate_acts in matches:
             for act in candidate_acts:
                 signature = (act.act, act.target, act.qualifiers)
-                if signature in seen:
+                if signature in seen or (act.act, act.target) in structural_targets:
                     continue
                 seen.add(signature)
                 acts.append(act)
         return tuple(acts[:3])
+
+
+def resolved_query_suppresses_pragmatic_example(example: EpisodeTrainingExample) -> bool:
+    return any(act.act in RESOLVED_QUERY_SUPPRESSED_ACTS for act in example.expected_pragmatic_acts)
+
+
+def bare_topic_followup_act(text: str, structure) -> PragmaticAct | None:
+    if structure is not None and getattr(structure, "query", None) is not None:
+        return None
+    topic = bare_topic_followup(text)
+    if topic is None:
+        return None
+    return PragmaticAct(
+        "underspecified_reference_query",
+        topic,
+        ("missing=query_intent", "response_policy=ask_clarification"),
+        confidence=1.0,
+        source="structural",
+    )
+
+
+def ambiguous_reference_act(structure) -> PragmaticAct | None:
+    if structure is None or getattr(structure, "query", None) is not None:
+        return None
+    if getattr(structure, "frames", ()):
+        return None
+    reference = unresolved_reference_entity(structure)
+    if reference is None:
+        return None
+    candidates = discourse_reference_candidates(structure)
+    if len(candidates) < 2:
+        return None
+    return PragmaticAct(
+        "ambiguous_reference",
+        reference.name,
+        (
+            "missing=referent",
+            f"candidates={'|'.join(candidates)}",
+            "depends_on=focus",
+            "response_policy=ask_clarification",
+        ),
+        confidence=1.0,
+        source="structural",
+    )
+
+
+def unresolved_reference_entity(structure):
+    return next(
+        (entity for entity in getattr(structure, "entities", ()) if entity.role == "unresolved_reference"),
+        None,
+    )
+
+
+def discourse_reference_candidates(structure) -> tuple[str, ...]:
+    entities = tuple(getattr(structure, "entities", ()))
+    states = tuple(getattr(structure, "states", ()))
+    candidate_roles = {"profile_value", "item", "container", "thing", "person", "giver", "receiver", "place"}
+    candidate_states = {"name", "likes", "dislikes", "at", "in", "owner"}
+    candidates = [entity.name for entity in entities if entity.role in candidate_roles and entity.name]
+    for state in states:
+        if state.name not in candidate_states:
+            continue
+        if state.name in {"name", "likes", "dislikes", "at"} and state.right:
+            candidates.append(state.right)
+        elif state.name in {"in", "owner"}:
+            candidates.extend(value for value in (state.left, state.right) if value)
+    return tuple(dict.fromkeys(candidates))
 
 
 def compile_episode_examples(
@@ -196,10 +284,25 @@ def evaluate_pragmatic_analyzer(
 ) -> EpisodeEvaluationResult:
     matched = 0
     for example in examples:
-        predictions = analyzer(example.text, None)
+        predictions = analyzer(example.text, episode_evaluation_structure(example))
         if all(any(pragmatic_act_matches(prediction, expected) for prediction in predictions) for expected in example.expected_pragmatic_acts):
             matched += 1
     return EpisodeEvaluationResult(total=len(examples), matched=matched)
+
+
+def episode_evaluation_structure(example: EpisodeTrainingExample) -> Structure:
+    states = (
+        *example.known_world_state,
+        *example.belief_state,
+        *example.relationship_state,
+    )
+    return Structure(
+        entities=(*memory_entities_from_states(states), *example.expected_entities),
+        rules=(),
+        query=example.expected_query,
+        frames=example.expected_frames,
+        states=states,
+    )
 
 
 def load_episode_jsonl(path: str | Path) -> tuple[EpisodeTrainingExample, ...]:
@@ -229,6 +332,7 @@ def build_episode_record(
     belief_state: tuple[State, ...] = (),
     relationship_state: tuple[State, ...] = (),
     focus: Iterable[str] = (),
+    expected_entities: tuple[Entity, ...] = (),
     expected_query: Query | None = None,
     expected_frames: tuple[Frame, ...] = (),
     expected_state_delta: tuple[State, ...] = (),
@@ -252,6 +356,7 @@ def build_episode_record(
             belief_state=belief_state,
             relationship_state=relationship_state,
             focus=clean_string_tuple(focus),
+            expected_entities=expected_entities,
             expected_query=expected_query,
             expected_frames=expected_frames,
             expected_state_delta=expected_state_delta,
@@ -289,6 +394,8 @@ def episode_example_to_record(example: EpisodeTrainingExample) -> dict[str, Any]
         record["relationship_state"] = [state_to_dict(state) for state in example.relationship_state]
     if example.focus:
         record["focus"] = list(example.focus)
+    if example.expected_entities:
+        record["expected_entities"] = [entity_to_dict(entity) for entity in example.expected_entities]
     if example.expected_query is not None:
         record["expected_query"] = query_to_dict(example.expected_query)
     if example.expected_frames:
@@ -336,6 +443,7 @@ def episode_example_from_dict(record: dict[str, Any], *, line_number: int | None
         belief_state=tuple(state_from_dict(value, prefix) for value in list_field(record, "belief_state", prefix)),
         relationship_state=tuple(state_from_dict(value, prefix) for value in list_field(record, "relationship_state", prefix)),
         focus=field_to_tuple(record.get("focus"), "focus", prefix),
+        expected_entities=tuple(entity_from_dict(value, prefix) for value in list_field(record, "expected_entities", prefix)),
         expected_query=query_from_dict(raw_query, prefix) if isinstance(raw_query, dict) else None,
         expected_frames=tuple(frame_from_dict(value, prefix) for value in list_field(record, "expected_frames", prefix)),
         expected_state_delta=tuple(state_from_dict(value, prefix) for value in list_field(record, "expected_state_delta", prefix)),
@@ -421,6 +529,20 @@ def state_to_dict(state: State) -> dict[str, str]:
     if state.source is not None:
         record["source"] = state.source
     return record
+
+
+def entity_from_dict(record: Any, prefix: str) -> Entity:
+    if not isinstance(record, dict):
+        raise ValueError(f"{prefix} entity entries must be objects.")
+    role = str(record.get("role") or "").strip()
+    name = str(record.get("name") or "").strip()
+    if not role or not name:
+        raise ValueError(f"{prefix} entities require role and name.")
+    return Entity(role, name)
+
+
+def entity_to_dict(entity: Entity) -> dict[str, str]:
+    return {"role": entity.role, "name": entity.name}
 
 
 def frame_from_dict(record: Any, prefix: str) -> Frame:
