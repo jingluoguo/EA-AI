@@ -262,6 +262,7 @@ class Structure:
     scoped_states: tuple[ScopedState, ...] = ()
     intentions: tuple[Intention, ...] = ()
     pragmatic_acts: tuple[PragmaticAct, ...] = ()
+    current_frame_start_time: int = 1
 
     def linearize(self) -> str:
         lines = [entity.linearize() for entity in self.entities]

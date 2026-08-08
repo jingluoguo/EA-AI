@@ -26,5 +26,15 @@ def with_time(frame: Frame, time: int) -> Frame:
 def dedupe_entities(entities: list[Entity]) -> tuple[Entity, ...]:
     by_name: dict[str, Entity] = {}
     for entity in entities:
-        by_name.setdefault(entity.name, entity)
+        previous = by_name.get(entity.name)
+        if previous is None or entity_role_priority(entity.role) > entity_role_priority(previous.role):
+            by_name[entity.name] = entity
     return tuple(by_name.values())
+
+
+def entity_role_priority(role: str) -> int:
+    if role in {"query_intent", "topic"}:
+        return 0
+    if role in {"unresolved_reference", "profile_value"}:
+        return 1
+    return 2

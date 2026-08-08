@@ -222,6 +222,7 @@ def with_neural_boundary(
         intent_analyzers=intent_analyzers,
         pragmatic_analyzers=pragmatic_analyzers,
         memory_states=capabilities.memory_states,
+        memory_frames=capabilities.memory_frames,
     )
 
 
@@ -372,6 +373,7 @@ def structure_to_dict(structure: Structure) -> dict[str, Any]:
         "scoped_states": [scoped_state_to_dict(state) for state in structure.scoped_states],
         "intentions": [intention_to_dict(intention) for intention in structure.intentions],
         "pragmatic_acts": [pragmatic_act_to_dict(act) for act in structure.pragmatic_acts],
+        "current_frame_start_time": structure.current_frame_start_time,
         "linearized": structure.linearize(),
     }
 

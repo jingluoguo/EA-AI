@@ -21,6 +21,7 @@ from .core import (
     infer_pragmatic_response_policy,
     infer_earliest_event_actor_matches,
     infer_event_actor_matches,
+    infer_structural_update_acknowledgement,
     infer_events_after_event,
     infer_existence_unknown,
     infer_holder_contains_things,
@@ -95,4 +96,5 @@ DEFAULT_RULE_INFERERS: tuple[RuleInferer, ...] = (
     infer_transfer_changes_owner,
     infer_paint_changes_color,
     infer_object_access_state,
+    infer_structural_update_acknowledgement,
 )

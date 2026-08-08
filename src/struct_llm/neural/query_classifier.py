@@ -33,11 +33,15 @@ from ..comprehension.query import (
     infer_entities_from_abstract_pattern,
     instantiate_query,
     load_query_jsonl,
+    query_has_structural_semantic_evidence,
     query_from_dict,
     query_pattern_from_dict,
     query_pattern_score,
     query_pattern_to_dict,
     query_to_dict,
+    active_dialog_focus,
+    meal_alternative_request,
+    meal_preference_value,
 )
 from ..structure import Entity, Query
 
@@ -196,16 +200,27 @@ class LoadedNeuralQueryParser:
             pattern = self.patterns[label_index]
             if pattern.query is None:
                 continue
+            if not query_pattern_is_meal_followup_compatible(sentence, entities, pattern):
+                continue
             structural_score = query_structural_score(sentence, query_entities, pattern)
-            if confidence < QUERY_NEURAL_STRICT_CONFIDENCE and structural_score < QUERY_NEURAL_WHOLE_CANDIDATE_SCORE:
-                continue
-            if confidence < QUERY_NEURAL_STRICT_CONFIDENCE and structural_score < QUERY_NEURAL_MIN_PROTOTYPE_OVERLAP:
-                continue
             # Top-k reranking is still neural-led: only labels emitted by the
             # classifier are considered, then invalid slot materializations are
             # discarded before a structure can reach the kernel.
             query = materialize_query_from_pattern(sentence, query_entities, pattern)
             if query is None or query_with_topic_evidence(sentence, query_entities, pattern, query) is None:
+                continue
+            has_semantic_evidence = query_has_structural_semantic_evidence(sentence, query)
+            if (
+                confidence < QUERY_NEURAL_STRICT_CONFIDENCE
+                and structural_score < QUERY_NEURAL_WHOLE_CANDIDATE_SCORE
+                and not has_semantic_evidence
+            ):
+                continue
+            if (
+                confidence < QUERY_NEURAL_STRICT_CONFIDENCE
+                and structural_score < QUERY_NEURAL_MIN_PROTOTYPE_OVERLAP
+                and not has_semantic_evidence
+            ):
                 continue
             candidates.append((neural_query_rank(confidence, structural_score), confidence, pattern))
         if not candidates:
@@ -645,6 +660,16 @@ def entities_referenced_by_text(sentence: str, entities: Iterable[Any]) -> tuple
         for entity in entities
         if getattr(entity, "name", "") and canonical_text(getattr(entity, "name")) in text
     ]
+    explicit_names = {
+        canonical_text(getattr(entity, "name"))
+        for entity in referenced
+        if getattr(entity, "role", "") != "topic"
+    }
+    referenced = [
+        entity
+        for entity in referenced
+        if getattr(entity, "role", "") != "topic" or canonical_text(getattr(entity, "name")) not in explicit_names
+    ]
     return tuple(sorted(referenced, key=lambda entity: text.index(canonical_text(getattr(entity, "name")))))
 
 
@@ -741,6 +766,8 @@ def query_has_unresolved_slot(query: Query) -> bool:
 def value_contains_unresolved_slot(value: str) -> bool:
     if "$" in value:
         return True
+    if "<" in value and ">" in value:
+        return True
     return any(f"#{index}" in value for index in range(1, 10))
 
 
@@ -762,6 +789,24 @@ def query_structural_score(
         query_pattern_score(pattern, abstract_sentence),
         character_set_similarity(pattern.abstract_question, abstract_sentence),
     )
+
+
+def query_pattern_is_meal_followup_compatible(
+    sentence: str,
+    entities: tuple[Entity, ...],
+    pattern: CompiledQueryPattern,
+) -> bool:
+    if active_dialog_focus(entities) != "meal_suggestion":
+        return True
+    if not (meal_preference_value(sentence) or meal_alternative_request(sentence)):
+        return True
+    if pattern.query is None:
+        return False
+    if pattern.query.intent != "dialog_act":
+        return False
+    if pattern.query.target in {"meal_suggestion", "capabilities"}:
+        return True
+    return pattern.query.target not in {"thanks", "greeting", "farewell", "identity", "clarification", "apology"}
 
 
 def materialize_query_from_pattern(

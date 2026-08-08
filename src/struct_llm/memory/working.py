@@ -6,6 +6,7 @@ from ..capabilities import CognitiveCapabilities
 from ..structure import Entity, Frame, Query, State
 
 LAST_USER_UTTERANCE_STATE = "last_user_utterance"
+ONGOING_DIALOG_ACT_TARGETS = frozenset({"meal_suggestion"})
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,15 @@ class WorkingMemory:
 def focus_states_for_query(query: Query | None) -> tuple[State, ...]:
     if query is None:
         return ()
-    if query.intent in {"dialog_act", "compound"}:
+    if query.intent == "dialog_act":
+        if query.target not in ONGOING_DIALOG_ACT_TARGETS:
+            return ()
+        states = [State("focus_dialog_act", "user", query.target, "working_memory")]
+        preference = query_qualifier(query, "preference")
+        if preference:
+            states.append(State("focus_dialog_preference", query.target, preference, "working_memory"))
+        return tuple(states)
+    if query.intent in {"compound", "profile"}:
         return ()
     target = query.target.strip()
     if not target or "$" in target or target == "multi":
@@ -75,6 +84,7 @@ def capabilities_with_working_turn(
     text: str,
     states: tuple[State, ...],
     query: Query | None = None,
+    frames: tuple[Frame, ...] = (),
 ) -> CognitiveCapabilities:
     preserved = [
         state
@@ -90,7 +100,16 @@ def capabilities_with_working_turn(
     cleaned = text.strip()
     if cleaned:
         preserved.append(State(LAST_USER_UTTERANCE_STATE, "user", cleaned, "working_memory"))
-    return capabilities.evolve(memory_states=tuple(preserved))
+    existing_frames = tuple(capabilities.memory_frames)
+    if frames and frames[: len(existing_frames)] == existing_frames:
+        new_frames = frames[len(existing_frames) :]
+    else:
+        new_frames = frames
+    for frame in new_frames:
+        for state in capabilities.states_from_frame(frame):
+            capabilities.apply_state(preserved, state)
+    preserved_frames = (*existing_frames, *new_frames) if new_frames else existing_frames
+    return capabilities.evolve(memory_states=tuple(preserved), memory_frames=preserved_frames)
 
 
 def last_user_utterance(states: tuple[State, ...]) -> str:
@@ -99,4 +118,10 @@ def last_user_utterance(states: tuple[State, ...]) -> str:
         for state in states
         if state.name == LAST_USER_UTTERANCE_STATE and state.left == "user" and state.right
     ]
+    return matches[-1] if matches else ""
+
+
+def query_qualifier(query: Query, key: str) -> str:
+    prefix = f"{key}="
+    matches = [qualifier.removeprefix(prefix) for qualifier in query.qualifiers if qualifier.startswith(prefix)]
     return matches[-1] if matches else ""

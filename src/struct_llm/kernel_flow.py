@@ -32,6 +32,7 @@ class ParseContext:
     scoped_states: list[ScopedState]
     query_candidates: list[str]
     next_time: int = 1
+    current_frame_start_time: int = 1
 
     def known_entities(self) -> tuple[Entity, ...]:
         return dedupe_entities(self.entities)
@@ -39,18 +40,23 @@ class ParseContext:
 
 def initial_parse_context(capabilities: CognitiveCapabilities) -> ParseContext:
     memory_entities = list(memory_entities_from_states(capabilities.memory_states))
+    memory_entities.extend(memory_entities_from_frames(capabilities.memory_frames))
     discourse_entities = (Entity("self", "我"),)
+    memory_frames = tuple(capabilities.memory_frames)
+    next_time = next_time_for_memory_frames(memory_frames)
     return ParseContext(
         entities=memory_entities,
         discourse_entities=tuple(
             entity for entity in discourse_entities if all(entity.name != known.name for known in memory_entities)
         ),
         unresolved_references=[],
-        frames=[],
+        frames=list(memory_frames),
         states=list(capabilities.memory_states),
         scoped_frames=[],
         scoped_states=[],
         query_candidates=[],
+        next_time=next_time,
+        current_frame_start_time=next_time,
     )
 
 
@@ -256,6 +262,49 @@ def add_extracted_structure(
         add_scoped_proposition_structure(timed_frame, context, capabilities)
 
 
+def next_time_for_memory_frames(frames: tuple[Frame, ...]) -> int:
+    if not frames:
+        return 1
+    return max(frame.time for frame in frames) + 1
+
+
+def memory_entities_from_frames(frames: tuple[Frame, ...]) -> tuple[Entity, ...]:
+    entities: list[Entity] = []
+    for frame in frames:
+        for role in frame.roles:
+            entity_role = entity_role_for_frame_role(frame, role.name)
+            if entity_role is None or not role.value:
+                continue
+            entities.append(Entity(entity_role, role.value))
+    return dedupe_entities(tuple(entities))
+
+
+def entity_role_for_frame_role(frame: Frame, role_name: str) -> str | None:
+    if role_name in {"actor", "speaker", "person", "giver", "receiver"}:
+        return "person"
+    if role_name in {"theme", "item", "object"}:
+        return "item"
+    if role_name == "subject":
+        return "person"
+    if role_name == "value":
+        return "profile_value"
+    if role_name == "goal":
+        if frame.frame_type in {"put_in", "give", "handle"}:
+            return "container"
+        if frame.frame_type in {"move", "be_in", "if_then", "because"}:
+            return "place"
+        return "place"
+    if role_name == "source":
+        if frame.frame_type == "take_out":
+            return "container"
+        return "place"
+    if role_name == "recipient":
+        return "person"
+    if role_name == "proposition":
+        return "thing"
+    return None
+
+
 def add_scoped_proposition_structure(
     source_frame: Frame,
     context: ParseContext,
@@ -370,6 +419,7 @@ def structure_from_context(
         states=tuple(context.states),
         scoped_frames=tuple(context.scoped_frames),
         scoped_states=tuple(context.scoped_states),
+        current_frame_start_time=context.current_frame_start_time,
     )
 
 

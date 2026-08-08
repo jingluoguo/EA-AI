@@ -403,6 +403,7 @@ def structure_from_dict(record: Any) -> Structure | None:
             scoped_states=tuple(scoped_state_from_dict(value) for value in record.get("scoped_states", ()) if isinstance(value, dict)),
             intentions=tuple(intention_from_dict(value) for value in record.get("intentions", ()) if isinstance(value, dict)),
             pragmatic_acts=tuple(pragmatic_act_from_dict(value) for value in record.get("pragmatic_acts", ()) if isinstance(value, dict)),
+            current_frame_start_time=int(record.get("current_frame_start_time") or 1),
         )
     except (TypeError, ValueError):
         return None

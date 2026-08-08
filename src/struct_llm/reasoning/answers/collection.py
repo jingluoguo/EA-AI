@@ -114,6 +114,12 @@ def answer_compare_count(structure: Structure) -> str | None:
 def answer_inventories(structure: Structure) -> str | None:
     if "owner_inventories" not in set(structure.rules):
         return None
+    query = require_query(structure)
     inventories = inventory_by_owner(structure)
+    if query.target and query.target != "person":
+        items = inventories.get(query.target)
+        if not items:
+            return f"不知道{query.target}手里有什么。"
+        return f"{query.target}手里有{join_names(items)}。"
     parts = [f"{owner}手里有{join_names(items)}" for owner, items in inventories.items()]
     return "；".join(parts) + "。"

@@ -91,4 +91,5 @@ def ask_symbolic() -> None:
                     text,
                     prediction.structure.states,
                     prediction.structure.query,
+                    prediction.structure.frames,
                 )

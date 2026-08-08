@@ -29,6 +29,7 @@ class CognitiveCapabilities:
     intent_analyzers: tuple[IntentAnalyzer, ...] = ()
     pragmatic_analyzers: tuple[PragmaticAnalyzer, ...] = ()
     memory_states: tuple[State, ...] = ()
+    memory_frames: tuple[Frame, ...] = ()
 
     def parse_statement(self, sentence: str) -> StatementParseResult | None:
         return self._first_non_none(parser(sentence) for parser in self.statement_parsers)
@@ -115,3 +116,6 @@ class CognitiveCapabilities:
 
     def with_memory_states(self, *states: State) -> CognitiveCapabilities:
         return self._with_tuple("memory_states", *states)
+
+    def with_memory_frames(self, *frames: Frame) -> CognitiveCapabilities:
+        return self._with_tuple("memory_frames", *frames)

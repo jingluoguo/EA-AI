@@ -65,6 +65,7 @@ def answer_subquery(structure: Structure, query: Query) -> str:
         scoped_states=substructure.scoped_states,
         intentions=substructure.intentions,
         pragmatic_acts=substructure.pragmatic_acts,
+        current_frame_start_time=substructure.current_frame_start_time,
     )
     return answer_from_structure(substructure, default_subquery_answerers())
 

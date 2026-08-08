@@ -102,6 +102,8 @@ def structure_with_states(structure: Structure, states: list[State]) -> Structur
         scoped_frames=structure.scoped_frames,
         scoped_states=structure.scoped_states,
         intentions=structure.intentions,
+        pragmatic_acts=structure.pragmatic_acts,
+        current_frame_start_time=structure.current_frame_start_time,
     )
 def structure_with_query(structure: Structure, query: Query) -> Structure:
     return Structure(
@@ -115,6 +117,8 @@ def structure_with_query(structure: Structure, query: Query) -> Structure:
         scoped_frames=structure.scoped_frames,
         scoped_states=structure.scoped_states,
         intentions=structure.intentions,
+        pragmatic_acts=structure.pragmatic_acts,
+        current_frame_start_time=structure.current_frame_start_time,
     )
 def states_before_time(structure: Structure, time: int) -> list[State]:
     states: list[State] = []

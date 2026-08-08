@@ -10,11 +10,16 @@ __all__ = (
     "answer_pragmatic_response_policy",
     "answer_profile_lookup",
     "answer_profile_statement_acknowledgement",
+    "answer_structural_update_acknowledgement",
 )
 
 def answer_dialog_act(structure: Structure) -> str | None:
     query = structure.query
     if query is None or query.intent != "dialog_act":
+        return None
+    if query.target == "clarification" and any(
+        act.act == "underspecified_action_request" for act in structure.pragmatic_acts
+    ):
         return None
     rules = set(structure.rules)
     if "dialog_greeting" in rules:
@@ -27,6 +32,19 @@ def answer_dialog_act(structure: Structure) -> str | None:
         return "我是结构智能原型，会把对话里的事实、状态、信念和问题先整理成结构再回答。"
     if "dialog_capabilities" in rules:
         return "我可以整理聊天里的事实、状态变化、信念、条件和追问，再回答位置、归属、历史事件、矛盾和摘要。"
+    if "dialog_meal_suggestion" in rules:
+        preference = optional_query_qualifier(query, "preference")
+        request = optional_query_qualifier(query, "request")
+        if request == "alternative" and preference == "light":
+            return "也可以换成虾仁蒸蛋、冬瓜丸子汤、鸡丝凉面，或者一份青菜瘦肉粥。"
+        if request == "alternative" and preference == "rich":
+            return "那可以再看看卤肉饭、咖喱鸡饭、牛肉粉，或者加蛋加菜的盖饭。"
+        if request == "alternative":
+            return "可以，再给你几个方向：面条、盖饭、汤粉、沙拉碗，或者热汤配主食。"
+        if preference == "light":
+            return "清淡点的话，可以考虑小米粥配鸡蛋、番茄鸡蛋面、青菜豆腐汤，或者蒸鱼配米饭。"
+        if preference == "rich":
+            return "想吃得满足一点，可以考虑牛肉饭、鸡腿饭、热汤面，或者一份有主食和蛋白质的简餐。"
     if "conversation_summary" in rules:
         return f"已知：{'；'.join(summary_descriptions(structure))}。"
     if "conversation_summary_empty" in rules:
@@ -102,28 +120,18 @@ def answer_profile_lookup(structure: Structure) -> str | None:
 def answer_profile_statement_acknowledgement(structure: Structure) -> str | None:
     if structure.query is not None:
         return None
-    profile_like_frames = sorted(
-        (
-            frame
-            for frame in structure.frames
-            if frame.frame_type == "profile_like" and frame.role("value")
-        ),
-        key=lambda frame: frame.time,
-    )
-    if profile_like_frames:
-        subject = profile_statement_subject(profile_like_frames[-1].role("subject"))
-        values = tuple(frame.role("value") for frame in profile_like_frames if frame.role("value"))
-        return f"我知道了，{subject}喜欢{join_names(values)}。"
-    latest_frame = latest_profile_frame(structure)
-    if latest_frame is not None:
-        value = latest_frame.role("value")
-        if value and latest_frame.frame_type == "profile_name":
-            return f"我知道了，你叫{value}。"
-        if value and latest_frame.frame_type == "profile_like":
-            return f"我知道了，{profile_statement_subject(latest_frame.role('subject'))}喜欢{value}。"
-        if value and latest_frame.frame_type == "profile_dislike":
-            return f"我知道了，{profile_statement_subject(latest_frame.role('subject'))}不喜欢{value}。"
+    latest = latest_profile_frame(structure)
+    if latest is not None and latest.time >= structure.current_frame_start_time:
+        return "我知道了。"
     return None
+
+
+def answer_structural_update_acknowledgement(structure: Structure) -> str | None:
+    if structure.query is not None:
+        return None
+    if "structural_update_acknowledgement" not in set(structure.rules):
+        return None
+    return "我知道了。"
 
 
 def profile_statement_subject(subject: str | None) -> str:

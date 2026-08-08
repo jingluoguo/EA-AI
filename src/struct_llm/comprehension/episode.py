@@ -177,6 +177,8 @@ def resolved_query_suppresses_pragmatic_example(example: EpisodeTrainingExample)
 def bare_topic_followup_act(text: str, structure) -> PragmaticAct | None:
     if structure is not None and getattr(structure, "query", None) is not None:
         return None
+    if recall_previous_turn_surface(text):
+        return None
     topic = bare_topic_followup(text)
     if topic is None:
         return None
@@ -187,6 +189,11 @@ def bare_topic_followup_act(text: str, structure) -> PragmaticAct | None:
         confidence=1.0,
         source="structural",
     )
+
+
+def recall_previous_turn_surface(text: str) -> bool:
+    normalized = normalize_question(text)
+    return "刚刚说" in normalized or "刚才说" in normalized
 
 
 def ambiguous_reference_act(structure) -> PragmaticAct | None:

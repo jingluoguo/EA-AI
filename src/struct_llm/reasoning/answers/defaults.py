@@ -54,6 +54,7 @@ from .core import (
     answer_places_visited,
     answer_profile_lookup,
     answer_profile_statement_acknowledgement,
+    answer_structural_update_acknowledgement,
     answer_same_location_false,
     answer_same_location_true,
     answer_same_location_unknown,
@@ -123,4 +124,5 @@ DEFAULT_ANSWERERS: tuple[Answerer, ...] = (
     answer_transfer_changes_owner,
     answer_paint_changes_color,
     answer_object_access_state,
+    answer_structural_update_acknowledgement,
 )

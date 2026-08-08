@@ -19,12 +19,24 @@ def normalize_question(sentence: str) -> str:
 
 
 def bare_topic_followup(sentence: str) -> str | None:
-    stripped = sentence.strip().rstrip("。！？!?，,；;")
+    raw = sentence.strip()
+    has_question_mark = raw.endswith(("？", "?"))
+    stripped = raw.rstrip("。！？!?，,；;")
     particles = tuple(sorted(surface_forms("bare_topic_particle"), key=len, reverse=True))
-    if not particles or not any(stripped.endswith(particle) for particle in particles):
+    has_topic_particle = bool(particles) and any(stripped.endswith(particle) for particle in particles)
+    if not has_topic_particle and not has_question_mark:
         return None
-    particle = next(particle for particle in particles if stripped.endswith(particle))
-    topic = stripped[: -len(particle)].strip()
+    if has_question_mark and not has_topic_particle:
+        terminal_particles = tuple(surface_forms("terminal_discourse_particle"))
+        if any(stripped.endswith(particle) for particle in terminal_particles):
+            return None
+        core = raw[:-1].strip()
+        if any(separator in core for separator in ("。", "！", "!", "？", "?", "；", ";", "，", ",")):
+            return None
+    topic = stripped
+    if has_topic_particle:
+        particle = next(particle for particle in particles if stripped.endswith(particle))
+        topic = stripped[: -len(particle)].strip()
     if not topic or any(separator in topic for separator in ("，", ",", "；", ";")):
         return None
     normalized = normalize_slot_value(topic)

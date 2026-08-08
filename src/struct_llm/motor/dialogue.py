@@ -90,6 +90,10 @@ class LearnedDialogActAnswerer:
         query = structure.query
         if query is None or query.intent != "dialog_act":
             return None
+        if query.target == "clarification" and any(
+            act.act == "underspecified_action_request" for act in structure.pragmatic_acts
+        ):
+            return None
         if query.target in STRUCTURE_DEPENDENT_DIALOG_TARGETS:
             return None
         for pattern in self.patterns:

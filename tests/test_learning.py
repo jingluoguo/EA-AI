@@ -161,8 +161,11 @@ class LearningTest(unittest.TestCase):
         )
         capabilities = default_capabilities(neural_model=model)
 
-        with self.assertRaises(ParseError):
-            predict("星图回声？", capabilities)
+        prediction = predict("星图回声？", capabilities)
+
+        self.assertIn("PRAGMATIC_ACT underspecified_reference_query(星图回声,missing=query_intent,response_policy=ask_clarification)", prediction.structure.linearize())
+        self.assertIn("RULE pragmatic_response_ask_clarification", prediction.structure.linearize())
+        self.assertEqual(prediction.answer, "你想问星图回声的哪方面？比如位置、状态、归属或相关信息。")
 
     def test_project_root_neural_provider_can_be_loaded_from_cli_spec(self) -> None:
         model = load_neural_boundary_model("my_neural:make_model")
@@ -867,6 +870,21 @@ class LearningTest(unittest.TestCase):
                     "expected_pragmatic_acts": [{"act": "underspecified_action_request"}],
                 }
             )
+
+    def test_episode_dataset_includes_title_question_supervision(self) -> None:
+        examples = load_episode_jsonl(Path("data/episode_examples.jsonl"))
+        matched_ids = {example.episode_id for example in examples if example.episode_id.startswith("ctx-title-question-")}
+        analyzer = InMemoryPragmaticAnalyzer.from_jsonl(Path("data/episode_examples.jsonl"))
+        evaluation = evaluate_pragmatic_analyzer(
+            analyzer,
+            tuple(example for example in examples if example.episode_id in matched_ids),
+        )
+
+        self.assertIn("ctx-title-question-001", matched_ids)
+        self.assertIn("ctx-title-question-002", matched_ids)
+        self.assertEqual(evaluation.accuracy, 1.0)
+        acts = analyzer("星图回声？", None)
+        self.assertTrue(any(act.act == "underspecified_reference_query" and act.target == "星图回声" for act in acts))
 
 
 if __name__ == "__main__":

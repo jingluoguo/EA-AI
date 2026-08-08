@@ -172,20 +172,24 @@ class LoadedNeuralStatementParser:
             lengths = torch.tensor([token_ids.shape[1]], dtype=torch.long)
             class_logits, tag_logits = self.model(token_ids, lengths)
             probabilities = torch.softmax(class_logits, dim=-1)[0]
-            confidence, label_index = torch.max(probabilities, dim=-1)
-            if float(confidence.item()) < self.min_confidence:
+            label_index, confidence = select_statement_label(probabilities, self.patterns)
+            if confidence < self.min_confidence:
                 return None
             predicted_tags = torch.argmax(tag_logits, dim=-1)[0].tolist()[: int(lengths[0].item())]
 
-        pattern = self.patterns[int(label_index.item())]
-        if not pattern.entities and not pattern.frames:
+        pattern = self.patterns[label_index]
+        if not pattern.frames:
             return None
         entities = decode_entities(normalized, predicted_tags, self.tag_labels)
+        entities = expand_short_entity_boundaries(normalized, entities)
+        entities = recover_missing_actor_entities(normalized, entities, pattern.entities)
         entities = filter_expected_entities(entities, pattern.entities)
         if not expected_entities_present(entities, pattern.entities):
             return None
         frames = instantiate_pattern_frames(pattern, entities)
         if frames is None:
+            return None
+        if not integrated_frame_roles_have_text_evidence(normalized, frames):
             return None
         return entities, frames
 
@@ -496,6 +500,39 @@ def statement_pattern_from_dict(record: Any) -> NeuralStatementPattern:
     return NeuralStatementPattern(entities, frames, int(record.get("support") or 1))
 
 
+def select_statement_label(
+    probabilities: Tensor,
+    patterns: tuple[NeuralStatementPattern, ...],
+) -> tuple[int, float]:
+    confidence, label_index = torch.max(probabilities, dim=-1)
+    best_index = int(label_index.item())
+    best_confidence = float(confidence.item())
+    grouped: dict[tuple[Any, ...], tuple[float, int]] = {}
+    for index, pattern in enumerate(patterns):
+        signature = statement_semantic_signature(pattern)
+        total, representative = grouped.get(signature, (0.0, index))
+        score = float(probabilities[index].item())
+        if score > float(probabilities[representative].item()):
+            representative = index
+        grouped[signature] = (total + score, representative)
+    if not grouped:
+        return best_index, best_confidence
+    aggregate, representative = max(grouped.values(), key=lambda item: item[0])
+    if aggregate > best_confidence:
+        return representative, aggregate
+    return best_index, best_confidence
+
+
+def statement_semantic_signature(pattern: NeuralStatementPattern) -> tuple[Any, ...]:
+    entity_counts: dict[str, int] = {}
+    for entity in pattern.entities:
+        entity_counts[entity.role] = entity_counts.get(entity.role, 0) + 1
+    return (
+        tuple(sorted(entity_counts.items())),
+        tuple((frame.frame_type, tuple(frame.roles)) for frame in pattern.frames),
+    )
+
+
 def build_training_example(
     example: StatementTrainingExample,
     tag_index: dict[str, int],
@@ -546,12 +583,81 @@ def decode_entities(text: str, tag_ids: list[int], tag_labels: tuple[str, ...]) 
             flush(index)
             current_role = label[2:]
             current_start = index
-        elif label.startswith("I:") and current_role == label[2:]:
-            continue
+        elif label.startswith("I:"):
+            role = label[2:]
+            if current_role == role:
+                continue
+            flush(index)
+            current_role = role
+            current_start = index
         else:
             flush(index)
     flush(len(tag_ids))
     return entities
+
+
+def expand_short_entity_boundaries(text: str, entities: list[Entity]) -> list[Entity]:
+    return [expand_short_entity_boundary(text, entity) for entity in entities]
+
+
+def expand_short_entity_boundary(text: str, entity: Entity) -> Entity:
+    if entity.role not in EXPANDABLE_SHORT_ENTITY_ROLES or len(entity.name) != 1:
+        return entity
+    start = text.find(entity.name)
+    if start < 0:
+        return entity
+    end = start + len(entity.name)
+    while end < len(text) and text[end] not in ENTITY_BOUNDARY_STOP_CHARS:
+        end += 1
+    expanded = text[start:end].strip()
+    if len(expanded) <= len(entity.name):
+        return entity
+    return Entity(entity.role, expanded)
+
+
+EXPANDABLE_SHORT_ENTITY_ROLES = frozenset(
+    {"person", "giver", "receiver", "item", "thing", "container", "place", "profile_value", "color"}
+)
+ENTITY_BOUNDARY_STOP_CHARS = frozenset(" ，,。！？!?；;、的是了吗呢吧和与及把被从到给在里中上下注放交搬带取拿")
+
+
+def recover_missing_actor_entities(
+    text: str,
+    entities: list[Entity],
+    expected: tuple[EntitySlot, ...],
+) -> list[Entity]:
+    if any(entity.role == "person" for entity in entities):
+        return entities
+    if not any(entity.role == "person" for entity in expected):
+        return entities
+    actor = leading_actor_before_action(text)
+    if not actor:
+        return entities
+    return [Entity("person", actor), *entities]
+
+
+def leading_actor_before_action(text: str) -> str:
+    stripped = strip_clause_prefix(text)
+    for marker in ("把", "从", "给", "打开", "关闭", "关上", "合上"):
+        index = stripped.find(marker)
+        if index <= 0:
+            continue
+        candidate = stripped[:index].strip()
+        if candidate and len(candidate) <= 6:
+            return candidate
+    return ""
+
+
+def strip_clause_prefix(text: str) -> str:
+    stripped = text.strip()
+    changed = True
+    while changed:
+        changed = False
+        for prefix in ("因为", "由于", "既然", "如果", "假如", "假使", "后来", "随后", "起初", "先", "刚才"):
+            if stripped.startswith(prefix) and len(stripped) > len(prefix):
+                stripped = stripped[len(prefix) :].strip()
+                changed = True
+    return stripped
 
 
 def filter_expected_entities(entities: list[Entity], expected: tuple[EntitySlot, ...]) -> list[Entity]:
@@ -626,6 +732,19 @@ def placeholder_parts(value: str) -> tuple[tuple[str, str], ...]:
         parts.append((value[start + 1 : hash_index], value[hash_index + 1 : end]))
         index = end
     return tuple(parts)
+
+
+def integrated_frame_roles_have_text_evidence(text: str, frames: list[Frame]) -> bool:
+    checked_roles = {
+        "if_then": ("antecedent", "consequent"),
+        "because": ("cause", "effect"),
+    }
+    for frame in frames:
+        for role_name in checked_roles.get(frame.frame_type, ()):
+            value = frame.role(role_name)
+            if value and normalize_statement_text(value) not in text:
+                return False
+    return True
 
 
 def collate_statement_batch(batch: list[tuple[list[int], int, list[int]]]) -> tuple[Tensor, Tensor, Tensor, Tensor]:

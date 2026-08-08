@@ -199,3 +199,15 @@
 {"question": "说说你的想法", "query": {"intent": "dialog_act", "target": "opinion", "qualifiers": [], "subqueries": []}, "answer": "我觉得可以从利弊两方面想，你愿意我具体分析一下吗？", "source": "self_model", "split": "test"}
 {"question": "评价一下我", "query": {"intent": "dialog_act", "target": "feedback_request", "qualifiers": [], "subqueries": []}, "answer": "从对话来看你很认真也愿意思考，要不要我具体说说哪里可以更好？", "source": "self_model", "split": "test"}
 {"question": "我答得怎么样", "query": {"intent": "dialog_act", "target": "feedback_request", "qualifiers": [], "subqueries": []}, "answer": "你答得很到位，关键点都抓住了，需要我补充哪里可以更完善吗？", "source": "self_model", "split": "test"}
+{"question": "我有点烦", "query": {"intent": "dialog_act", "target": "empathy", "qualifiers": [], "subqueries": []}, "answer": "听起来你现在有点被事情压住了。先缓一口气，愿意的话慢慢跟我说。", "source": "self_model", "split": "train"}
+{"question": "你能安慰我吗", "query": {"intent": "dialog_act", "target": "empathy", "qualifiers": [], "subqueries": []}, "answer": "可以。我在这儿陪你，先别急着把自己撑得太紧，我们一点点来。", "source": "self_model", "split": "train"}
+{"question": "算了", "query": {"intent": "dialog_act", "target": "refusal", "qualifiers": [], "subqueries": []}, "answer": "好的，那就先放一放。你想继续的时候我还在。", "source": "self_model", "split": "train"}
+{"question": "等一下", "query": {"intent": "dialog_act", "target": "pause", "qualifiers": [], "subqueries": []}, "answer": "好，我等你。", "source": "self_model", "split": "train"}
+{"question": "稍等一下", "query": {"intent": "dialog_act", "target": "pause", "qualifiers": [], "subqueries": []}, "answer": "好，我等你。", "source": "self_model", "split": "test"}
+{"question": "你能帮我写邮件吗", "query": {"intent": "dialog_act", "target": "task_request", "qualifiers": ["task=email"], "subqueries": []}, "answer": "当然可以。你把收件人、目的和大致内容告诉我，我来帮你起草。", "source": "self_model", "split": "train"}
+{"question": "帮我写封邮件", "query": {"intent": "dialog_act", "target": "task_request", "qualifiers": ["task=email"], "subqueries": []}, "answer": "当然可以。你把收件人、目的和大致内容告诉我，我来帮你起草。", "source": "self_model", "split": "test"}
+{"question": "可以帮我写邮件吗", "query": {"intent": "dialog_act", "target": "task_request", "qualifiers": ["task=email"], "subqueries": []}, "answer": "当然可以。你把收件人、目的和大致内容告诉我，我来帮你起草。", "source": "self_model", "split": "train"}
+{"question": "能帮我想想明天吃什么吗", "query": {"intent": "dialog_act", "target": "meal_suggestion", "qualifiers": [], "subqueries": []}, "answer": "可以呀。你想吃清淡点还是有满足感一点？不知道的话，明天可以先考虑粥粉面、简餐或热汤这几类。", "source": "self_model", "split": "test"}
+{"question": "清淡点的", "query": {"intent": "dialog_act", "target": "meal_suggestion", "qualifiers": ["preference=light"], "subqueries": []}, "answer": "清淡点的话，可以考虑小米粥配鸡蛋、番茄鸡蛋面、青菜豆腐汤，或者蒸鱼配米饭。", "source": "self_model", "split": "test"}
+{"question": "有满足感一点", "query": {"intent": "dialog_act", "target": "meal_suggestion", "qualifiers": ["preference=rich"], "subqueries": []}, "answer": "想吃得满足一点，可以考虑牛肉饭、鸡腿饭、热汤面，或者一份有主食和蛋白质的简餐。", "source": "self_model", "split": "test"}
+{"question": "你会记住我吗", "query": {"intent": "dialog_act", "target": "memory_capability", "qualifiers": [], "subqueries": []}, "answer": "我会记住当前对话里你告诉我的信息，并在后续聊天里尽量接上上下文。", "source": "self_model", "split": "test"}

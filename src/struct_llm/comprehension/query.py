@@ -9,6 +9,7 @@ from ..dataset_io import append_jsonl_object, file_sha256, load_jsonl_objects
 from ..errors import ParseError
 from ..structure import Entity, Query
 from ..capabilities import QueryParser
+from .surface_lexicon import surface_forms
 from ..perception.lexer import split_query_candidate
 from ..perception.normalizer import normalize_question
 
@@ -147,7 +148,11 @@ def resolve_query_candidates(
         meaningful_candidates.append(candidate)
 
         fragments = split_query_candidate(candidate)
-        if full_query is not None and (len(fragments) == 1 or query_candidate_is_learned_unit(candidate, entities, parsers)):
+        if full_query is not None and (
+            len(fragments) == 1
+            or query_candidate_is_learned_unit(candidate, entities, parsers)
+            or dialog_query_can_integrate_fragments(full_query)
+        ):
             parsed_queries.append(full_query)
             continue
 
@@ -192,16 +197,218 @@ def resolve_query_candidate(
     normalized = normalize_question(sentence)
     if contains_unresolved_reference(normalized, entities):
         return None
+    structural_query = structural_dialog_query(sentence, entities)
+    if structural_query is not None:
+        return structural_query
+    fallback_entities: tuple[Entity, ...] = ()
     for parser in parsers:
         for candidate in dict.fromkeys((sentence, normalized)):
             query = parser(candidate, entities)
-            if query is not None:
+            if query is not None and query_has_required_semantic_evidence(candidate, query, entities):
                 return query
+            if entities and candidate == normalized:
+                fallback_query = parser(candidate, fallback_entities)
+                if fallback_query is not None and query_has_required_semantic_evidence(candidate, fallback_query, fallback_entities):
+                    return fallback_query
     return None
 
 
 def contains_unresolved_reference(sentence: str, entities: tuple[Entity, ...]) -> bool:
     return any(word in sentence for word in UNRESOLVED_REFERENCE_WORDS)
+
+
+def query_has_required_semantic_evidence(sentence: str, query: Query, entities: tuple[Entity, ...] = ()) -> bool:
+    if query.intent == "compound":
+        return all(query_has_required_semantic_evidence(sentence, subquery, entities) for subquery in query.subqueries)
+    if query.intent == "places_visited":
+        return query_has_structural_semantic_evidence(sentence, query)
+    if query.intent == "dialog_act" and query.target == "meal_suggestion" and query_request(query) == "alternative":
+        return active_dialog_focus(entities) == "meal_suggestion" and meal_alternative_request(sentence)
+    if query.intent == "dialog_act" and query.target == "meal_suggestion" and query_preference(query):
+        return active_dialog_focus(entities) == "meal_suggestion" and meal_preference_value(sentence) == query_preference(query)
+    if query.intent == "dialog_act" and query.target == "meal_suggestion":
+        return structural_meal_suggestion(sentence) or (
+            active_dialog_focus(entities) == "meal_suggestion" and meal_alternative_request(sentence)
+        )
+    if active_dialog_focus(entities) == "meal_suggestion" and (
+        meal_preference_value(sentence)
+        or meal_alternative_request(sentence)
+        or contains_surface_form(sentence, "meal_topic_marker")
+    ):
+        return query.intent == "dialog_act" and query.target == "meal_suggestion"
+    if query.intent != "profile":
+        return True
+    attribute = query_attribute(query)
+    if attribute == "name":
+        return contains_surface_form(sentence, "profile_name_query_marker")
+    if attribute == "likes":
+        return contains_surface_form(sentence, "profile_like_query_marker")
+    if attribute != "dislikes":
+        return True
+    return contains_surface_form(sentence, "profile_dislike_query_marker")
+
+
+def query_has_structural_semantic_evidence(sentence: str, query: Query) -> bool:
+    if query.intent == "places_visited":
+        return structural_places_visited_query(sentence, query)
+    if query.intent == "belief_location":
+        return structural_belief_location_query(sentence, query)
+    return False
+
+
+def query_attribute(query: Query) -> str:
+    for qualifier in query.qualifiers:
+        key, separator, value = qualifier.partition("=")
+        if separator and key.strip() == "attribute":
+            return value.strip()
+    return ""
+
+
+def query_preference(query: Query) -> str:
+    for qualifier in query.qualifiers:
+        key, separator, value = qualifier.partition("=")
+        if separator and key.strip() == "preference":
+            return value.strip()
+    return ""
+
+
+def query_request(query: Query) -> str:
+    for qualifier in query.qualifiers:
+        key, separator, value = qualifier.partition("=")
+        if separator and key.strip() == "request":
+            return value.strip()
+    return ""
+
+
+def query_qualifier_value(query: Query, name: str) -> str:
+    for qualifier in query.qualifiers:
+        key, separator, value = qualifier.partition("=")
+        if separator and key.strip() == name:
+            return value.strip()
+    return ""
+
+
+def structural_dialog_query(sentence: str, entities: tuple[Entity, ...] = ()) -> Query | None:
+    if structural_capabilities_query(sentence):
+        return Query("dialog_act", "capabilities")
+    if structural_meal_suggestion(sentence):
+        return Query("dialog_act", "meal_suggestion")
+    followup = structural_dialog_followup_query(sentence, entities)
+    if followup is not None:
+        return followup
+    return None
+
+
+def structural_capabilities_query(sentence: str) -> bool:
+    normalized = normalize_question(sentence)
+    return contains_surface_form(sentence, "capabilities_query_marker") or contains_surface_form(
+        normalized,
+        "capabilities_query_marker",
+    )
+
+
+def structural_meal_suggestion(sentence: str) -> bool:
+    normalized = normalize_question(sentence)
+    if not contains_surface_form(normalized, "meal_topic_marker"):
+        return False
+    if contains_surface_form(normalized, "advice_request_marker"):
+        return True
+    if contains_surface_form(normalized, "choice_uncertainty_marker") and not (
+        contains_surface_form(normalized, "profile_dislike_query_marker") and "什么" in normalized
+    ):
+        return True
+    return False
+
+
+def structural_dialog_followup_query(sentence: str, entities: tuple[Entity, ...]) -> Query | None:
+    focus = active_dialog_focus(entities)
+    if focus != "meal_suggestion":
+        return None
+    preference = meal_preference_value(sentence)
+    if preference:
+        return Query("dialog_act", "meal_suggestion", (f"preference={preference}",))
+    if meal_alternative_request(sentence):
+        qualifiers = tuple(
+            value
+            for value in (
+                f"preference={active_dialog_preference(entities, focus)}" if active_dialog_preference(entities, focus) else "",
+                "request=alternative",
+            )
+            if value
+        )
+        return Query("dialog_act", "meal_suggestion", qualifiers)
+    return None
+
+
+def active_dialog_focus(entities: tuple[Entity, ...]) -> str:
+    focuses = tuple(entity.name for entity in entities if entity.role == "dialog_focus" and entity.name)
+    return focuses[-1] if focuses else ""
+
+
+def active_dialog_preference(entities: tuple[Entity, ...], focus: str) -> str:
+    prefix = f"{focus}:"
+    preferences = tuple(
+        entity.name.removeprefix(prefix)
+        for entity in entities
+        if entity.role == "dialog_preference" and entity.name.startswith(prefix)
+    )
+    return preferences[-1] if preferences else ""
+
+
+def meal_preference_value(sentence: str) -> str:
+    normalized = normalize_question(sentence)
+    if contains_surface_form(normalized, "meal_light_preference_marker"):
+        return "light"
+    if contains_surface_form(normalized, "meal_rich_preference_marker"):
+        return "rich"
+    return ""
+
+
+def meal_alternative_request(sentence: str) -> bool:
+    normalized = normalize_question(sentence)
+    return contains_surface_form(sentence, "alternative_request_marker") or contains_surface_form(
+        normalized,
+        "alternative_request_marker",
+    )
+
+
+def structural_places_visited_query(sentence: str, query: Query) -> bool:
+    normalized = normalize_question(sentence)
+    if not (
+        compact_query_text(query.target) in compact_query_text(normalized)
+        or contains_surface_form(normalized, "object_pronoun")
+    ):
+        return False
+    return contains_surface_form(normalized, "route_history_verb_marker") and contains_surface_form(
+        normalized,
+        "place_collection_query_marker",
+    )
+
+
+def structural_belief_location_query(sentence: str, query: Query) -> bool:
+    normalized = normalize_question(sentence)
+    person = query_qualifier_value(query, "person")
+    if not person or compact_query_text(person) not in compact_query_text(normalized):
+        return False
+    if compact_query_text(query.target) not in compact_query_text(normalized):
+        return False
+    return contains_surface_form(normalized, "belief_attitude_marker") and contains_surface_form(
+        normalized,
+        "location_query_marker",
+    )
+
+
+def contains_surface_form(sentence: str, category: str) -> bool:
+    text = compact_query_text(sentence)
+    return any(compact_query_text(form) in text for form in surface_forms(category))
+
+
+def compact_query_text(text: str) -> str:
+    return str(text).translate(str.maketrans("", "", " \t\r\n\u3000。！？!?，,；;、")).strip()
+
+
+def dialog_query_can_integrate_fragments(query: Query) -> bool:
+    return query.intent == "dialog_act" and query.target in surface_forms("integrated_dialog_act_target")
 
 
 def resolve_query_candidate_or_raise(
@@ -220,15 +427,22 @@ def query_candidate_is_learned_unit(
     entities: tuple[Entity, ...],
     parsers: tuple[QueryParser, ...],
 ) -> bool:
+    structural_query = structural_dialog_query(sentence, entities)
+    if structural_query is not None and dialog_query_can_integrate_fragments(structural_query):
+        return True
     for parser in parsers:
         structural_unit = getattr(parser, "candidate_is_structural_unit", None)
         if structural_unit is not None and structural_unit(sentence, entities):
+            return True
+        if structural_unit is not None and entities and structural_unit(sentence, ()):
             return True
 
         best_match = getattr(parser, "best_match", None)
         if best_match is None:
             continue
         best = best_match(sentence, entities)
+        if best is None and entities:
+            best = best_match(sentence, ())
         if best is None or best[0] < 0.96:
             continue
         if best[1].query is None:

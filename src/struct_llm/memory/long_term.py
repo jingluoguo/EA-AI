@@ -263,6 +263,10 @@ def entities_for_state(state: State) -> tuple[Entity, ...]:
         return (Entity("topic", state.right),)
     if state.name == "focus_query_intent":
         return (Entity("query_intent", state.right),)
+    if state.name == "focus_dialog_act":
+        return (Entity("dialog_focus", state.right),)
+    if state.name == "focus_dialog_preference":
+        return (Entity("dialog_preference", f"{state.left}:{state.right}"),)
     if state.name == "at":
         return (Entity("thing", state.left), Entity("place", state.right))
     if state.name == "in":

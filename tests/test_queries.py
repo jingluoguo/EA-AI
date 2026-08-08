@@ -497,6 +497,28 @@ class QueryTest(unittest.TestCase):
         self.assertIn("RULE places_visited", structure)
         self.assertEqual(prediction.answer, "芯片经过了实验室和办公室。")
 
+    def test_places_visited_query_uses_route_semantics_across_surface_forms(self) -> None:
+        cases = (
+            (
+                "小郭把药瓶放进托盘。托盘被带到仓库。托盘被带到诊室。药瓶被带到过哪里？",
+                "QUERY places_visited(药瓶)",
+                "药瓶经过了仓库和诊室。",
+            ),
+            (
+                "小王把芯片放进托盘。托盘被带到实验室。托盘被带到办公室。托盘移动过哪些位置？",
+                "QUERY places_visited(托盘)",
+                "托盘经过了实验室和办公室。",
+            ),
+        )
+
+        for text, query_line, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(query_line, structure)
+                self.assertIn("RULE places_visited", structure)
+                self.assertEqual(prediction.answer, answer)
+
     def test_actions_by_actors_query_uses_event_frames(self) -> None:
         cases = (
             ("小郭把芯片放进托盘。小王把托盘带到了实验室。小王把芯片从托盘里取出。小郭和小王分别做了什么？",

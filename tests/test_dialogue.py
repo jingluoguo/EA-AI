@@ -113,7 +113,7 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("REL name(我,郭士君)", first_structure)
         self.assertIn("REL likes(我,徒步)", first_structure)
         self.assertIn("FRAME f1 type=profile_like time=1", first_structure)
-        self.assertEqual(first.answer, "我知道了，你喜欢徒步。")
+        self.assertEqual(first.answer, "我知道了。")
 
         capabilities = capabilities_with_working_turn(capabilities, "我喜欢徒步", first.structure.states)
         second = predict("我喜欢什么", capabilities)
@@ -131,7 +131,7 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("FRAME f2 type=profile_like time=2", structure)
         self.assertIn("REL likes(我,爬山)", structure)
         self.assertIn("REL likes(我,游泳)", structure)
-        self.assertEqual(prediction.answer, "我知道了，你喜欢爬山和游泳。")
+        self.assertEqual(prediction.answer, "我知道了。")
 
     def test_unresolved_profile_pronouns_request_contextual_referent_choice(self) -> None:
         capabilities = default_capabilities(use_environment=False, use_memory=False)
@@ -427,7 +427,7 @@ class DialogueTest(unittest.TestCase):
                 self.assertIn("REL name(我,小郭)", structure)
                 self.assertIn("FRAME f1 type=profile_name time=1", structure)
                 self.assertNotIn("QUERY dialog_act(greeting)", structure)
-                self.assertEqual(prediction.answer, "我知道了，你叫小郭。")
+                self.assertEqual(prediction.answer, "我知道了。")
 
     def test_profile_statement_with_identity_query_keeps_both_structures(self) -> None:
         prediction = predict("我叫小郭，你叫什么")
@@ -519,6 +519,50 @@ class DialogueTest(unittest.TestCase):
                 self.assertNotIn("SUBQUERY dialog_act", structure)
                 self.assertEqual(prediction.answer, "芯片在托盘里。")
 
+    def test_continuous_dialogue_keeps_event_history_and_state_updates(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+
+        turns = (
+            ("星图回声？", "你想问星图回声的哪方面？比如位置、状态、归属或相关信息。"),
+            ("小郭把芯片放进托盘", "我知道了。"),
+            ("你好", "你好呀，很高兴见到你，有什么我可以帮你的吗？"),
+            ("托盘被带到实验室", "我知道了。"),
+            ("谁把芯片放进托盘？", "小郭把芯片放进托盘。"),
+            ("芯片在哪里？", "芯片在实验室的托盘里。"),
+            ("总结一下", "已知：小郭把芯片放进托盘；托盘被带到实验室。"),
+        )
+
+        for text, answer in turns:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                structure = prediction.structure.linearize()
+                self.assertEqual(prediction.answer, answer)
+                if text == "星图回声？":
+                    self.assertIn("PRAGMATIC_ACT underspecified_reference_query(星图回声,missing=query_intent,response_policy=ask_clarification)", structure)
+                    self.assertIn("RULE pragmatic_response_ask_clarification", structure)
+                elif text == "小郭把芯片放进托盘":
+                    self.assertIn("RULE structural_update_acknowledgement", structure)
+                    self.assertIn("FRAME f1 type=put_in time=1", structure)
+                elif text == "托盘被带到实验室":
+                    self.assertIn("REL at(托盘,实验室)", structure)
+                    self.assertIn("FRAME f3 type=move time=3", structure)
+                elif text == "谁把芯片放进托盘？":
+                    self.assertIn("QUERY actor_for_event(put_in,item=芯片,holder=托盘)", structure)
+                    self.assertIn("RULE event_actor_matches", structure)
+                elif text == "芯片在哪里？":
+                    self.assertIn("QUERY location(芯片)", structure)
+                    self.assertIn("RULE container_moves_contents", structure)
+                elif text == "总结一下":
+                    self.assertIn("QUERY dialog_act(summary)", structure)
+                    self.assertIn("RULE conversation_summary", structure)
+                capabilities = capabilities_with_working_turn(
+                    capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
+
         # profile statement followed by dialog_act + profile query composes cleanly
         prediction = predict("我叫小王，你能做什么？我叫什么？")
         structure = prediction.structure.linearize()
@@ -530,6 +574,331 @@ class DialogueTest(unittest.TestCase):
             prediction.answer,
             "我可以陪你聊天、回答问题、整理信息、写作、翻译、做总结，还能帮你梳理思路；你叫小王。",
         )
+
+    def test_continuous_dialogue_keeps_profile_acknowledgements_natural(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        turns = (
+            ("你好", "你好呀，很高兴见到你，有什么我可以帮你的吗？"),
+            ("我叫郭士君", "我知道了。"),
+            ("我喜欢徒步", "我知道了。"),
+            ("小郭把芯片放进托盘", "我知道了。"),
+            ("托盘被带到实验室", "我知道了。"),
+            ("你能做什么？", "我可以陪你聊天、回答问题、整理信息、写作、翻译、做总结，还能帮你梳理思路。"),
+            ("我叫什么，我喜欢什么？", "你叫郭士君；你喜欢徒步。"),
+        )
+
+        for text, answer in turns:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                self.assertEqual(prediction.answer, answer)
+                capabilities = capabilities_with_working_turn(
+                    capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
+
+    def test_daily_task_requests_do_not_ack_stale_profile_memory(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        turns = (
+            ("我叫张三", "我知道了。"),
+            ("我叫什么", "你叫张三。"),
+            ("你能帮我写邮件吗", "当然可以。你把收件人、目的和大致内容告诉我，我来帮你起草。"),
+            ("帮我写封邮件", "当然可以。你把收件人、目的和大致内容告诉我，我来帮你起草。"),
+            (
+                "能帮我想想明天吃什么吗",
+                "可以呀。你想吃清淡点还是有满足感一点？不知道的话，明天可以先考虑粥粉面、简餐或热汤这几类。",
+            ),
+            ("你会记住我吗", "我会记住当前对话里你告诉我的信息，并在后续聊天里尽量接上上下文。"),
+        )
+
+        for text, answer in turns:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                structure = prediction.structure.linearize()
+                self.assertEqual(prediction.answer, answer)
+                if text == "你能帮我写邮件吗":
+                    self.assertIn("QUERY dialog_act(task_request,task=email)", structure)
+                    self.assertIn("RULE dialog_task_request", structure)
+                    self.assertNotIn("RULE structural_update_acknowledgement", structure)
+                    self.assertNotIn("QUERY profile(我,attribute=dislikes)", structure)
+                elif text == "帮我写封邮件":
+                    self.assertIn("QUERY dialog_act(task_request,task=email)", structure)
+                elif text == "能帮我想想明天吃什么吗":
+                    self.assertIn("QUERY dialog_act(meal_suggestion)", structure)
+                elif text == "你会记住我吗":
+                    self.assertIn("QUERY dialog_act(memory_capability)", structure)
+                capabilities = capabilities_with_working_turn(
+                    capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
+
+    def test_meal_suggestion_uses_semantic_structure_not_profile_dislikes(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        name = predict("我叫张三", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "我叫张三",
+            name.structure.states,
+            name.structure.query,
+            name.structure.frames,
+        )
+        seed = predict("能帮我想想明天吃什么吗", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "能帮我想想明天吃什么吗",
+            seed.structure.states,
+            seed.structure.query,
+            seed.structure.frames,
+        )
+
+        examples = (
+            "我明天不知道吃啥，你有什么建议吗",
+            "明天不知道吃什么，有什么建议吗",
+            "不知道吃啥，你有什么建议",
+            "我不知道吃什么",
+            "给我推荐明天吃什么",
+            "明天吃啥比较好",
+            "我不知道午饭吃什么，你帮我推荐一下",
+        )
+
+        for text in examples:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                structure = prediction.structure.linearize()
+                self.assertEqual(
+                    prediction.answer,
+                    "可以呀。你想吃清淡点还是有满足感一点？不知道的话，明天可以先考虑粥粉面、简餐或热汤这几类。",
+                )
+                self.assertIn("QUERY dialog_act(meal_suggestion)", structure)
+                self.assertIn("RULE dialog_meal_suggestion", structure)
+                self.assertNotIn("QUERY profile(我,attribute=dislikes)", structure)
+                self.assertNotIn("RULE profile_dislikes_unknown", structure)
+
+    def test_meal_suggestion_preference_followup_uses_dialog_focus(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        seed = predict("明天吃东西你有什么建议吗", capabilities)
+        self.assertEqual(
+            seed.answer,
+            "可以呀。你想吃清淡点还是有满足感一点？不知道的话，明天可以先考虑粥粉面、简餐或热汤这几类。",
+        )
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "明天吃东西你有什么建议吗",
+            seed.structure.states,
+            seed.structure.query,
+            seed.structure.frames,
+        )
+
+        cases = (
+            (
+                "清淡点的",
+                "QUERY dialog_act(meal_suggestion,preference=light)",
+                "清淡点的话，可以考虑小米粥配鸡蛋、番茄鸡蛋面、青菜豆腐汤，或者蒸鱼配米饭。",
+            ),
+            (
+                "别太油的",
+                "QUERY dialog_act(meal_suggestion,preference=light)",
+                "清淡点的话，可以考虑小米粥配鸡蛋、番茄鸡蛋面、青菜豆腐汤，或者蒸鱼配米饭。",
+            ),
+            (
+                "有满足感一点",
+                "QUERY dialog_act(meal_suggestion,preference=rich)",
+                "想吃得满足一点，可以考虑牛肉饭、鸡腿饭、热汤面，或者一份有主食和蛋白质的简餐。",
+            ),
+        )
+
+        for text, query_line, answer in cases:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                structure = prediction.structure.linearize()
+                self.assertIn("REL focus_dialog_act(user,meal_suggestion)", structure)
+                self.assertIn(query_line, structure)
+                self.assertIn("RULE dialog_meal_suggestion", structure)
+                self.assertEqual(prediction.answer, answer)
+
+    def test_meal_suggestion_can_request_more_options_after_preference(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        seed = predict("马上中午了，吃啥有好的建议吗", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "马上中午了，吃啥有好的建议吗",
+            seed.structure.states,
+            seed.structure.query,
+            seed.structure.frames,
+        )
+        first = predict("清淡点吧", capabilities)
+        self.assertIn("QUERY dialog_act(meal_suggestion,preference=light)", first.structure.linearize())
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "清淡点吧",
+            first.structure.states,
+            first.structure.query,
+            first.structure.frames,
+        )
+
+        followups = (
+            ("还有别的建议吗", "QUERY dialog_act(meal_suggestion,preference=light,request=alternative)", "也可以换成虾仁蒸蛋、冬瓜丸子汤、鸡丝凉面，或者一份青菜瘦肉粥。"),
+            ("换几个", "QUERY dialog_act(meal_suggestion,preference=light,request=alternative)", "也可以换成虾仁蒸蛋、冬瓜丸子汤、鸡丝凉面，或者一份青菜瘦肉粥。"),
+        )
+
+        for text, query_line, answer in followups:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                structure = prediction.structure.linearize()
+                self.assertIn("REL focus_dialog_act(user,meal_suggestion)", structure)
+                self.assertIn(query_line, structure)
+                self.assertIn("RULE dialog_meal_suggestion", structure)
+                self.assertEqual(prediction.answer, answer)
+
+    def test_meal_preference_fragment_requires_meal_dialog_focus(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+
+        with self.assertRaises(ParseError):
+            predict("清淡点的", capabilities)
+
+    def test_previous_turn_recall_does_not_block_next_profile_statement(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        turns = (
+            ("我叫小李", "我知道了。"),
+            ("你好", "你好呀，很高兴见到你，有什么我可以帮你的吗？"),
+            ("我刚刚说什么？", "你刚刚说的是：你好"),
+            ("我喜欢游泳", "我知道了。"),
+            ("我叫什么，我喜欢什么？", "你叫小李；你喜欢游泳。"),
+        )
+
+        for text, answer in turns:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                self.assertEqual(prediction.answer, answer)
+                capabilities = capabilities_with_working_turn(
+                    capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
+
+    def test_owner_followup_prefers_explicit_item_over_stale_topic(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        turns = (
+            ("小红把药瓶交给医生", "我知道了。"),
+            ("现在谁拥有药瓶？", "医生拥有药瓶。"),
+            ("医生把药瓶交给老师", "我知道了。"),
+            ("现在谁拥有药瓶？", "老师拥有药瓶。"),
+        )
+
+        for text, answer in turns:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                structure = prediction.structure.linearize()
+                self.assertEqual(prediction.answer, answer)
+                if text == "现在谁拥有药瓶？":
+                    self.assertIn("QUERY owner(药瓶)", structure)
+                    self.assertIn("RULE transfer_changes_owner", structure)
+                capabilities = capabilities_with_working_turn(
+                    capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
+
+    def test_daily_profile_name_nickname_and_preference_phrasing(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        turns = (
+            ("我叫陈一诺", "我知道了。"),
+            ("你记得我叫什么吗？", "你叫陈一诺。"),
+            ("其实你叫我一诺就行", "我知道了。"),
+            ("我最近喜欢喝拿铁", "我知道了。"),
+            ("也爱看纪录片", "我知道了。"),
+            ("我不太喜欢熬夜", "我知道了。"),
+            ("我叫什么？", "你叫一诺。"),
+            ("我喜欢什么，不喜欢什么？", "你喜欢拿铁和纪录片；你不喜欢熬夜。"),
+        )
+
+        for text, answer in turns:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                self.assertEqual(prediction.answer, answer)
+                capabilities = capabilities_with_working_turn(
+                    capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
+
+    def test_daily_empathy_pause_and_recall_phrasing(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        turns = (
+            ("我有点烦", "听你这么说我也心疼，难过的时候不用硬扛，想说说看吗？我陪着你。"),
+            ("你能安慰我吗", "听你这么说我也心疼，难过的时候不用硬扛，想说说看吗？我陪着你。"),
+            ("算了", "没关系的，不想做就先放一放，愿意告诉我是什么让你不想做吗？"),
+            ("我刚刚说了啥？", "你刚刚说的是：算了"),
+            ("等一下", "好，我等你。"),
+            ("我今天有点累", "听你这么说我也心疼，难过的时候不用硬扛，想说说看吗？我陪着你。"),
+            ("我想先缓一缓", "好，我等你。"),
+            ("我先去忙了", "再见，很高兴和你聊天，欢迎随时再来找我。"),
+        )
+
+        for text, answer in turns:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                self.assertEqual(prediction.answer, answer)
+                capabilities = capabilities_with_working_turn(
+                    capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
+
+    def test_daily_task_phrasing_corrections_and_person_inventory(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        turns = (
+            ("刚才小周把钥匙放到抽屉里", "我知道了。"),
+            ("后来抽屉被搬到办公室", "我知道了。"),
+            ("那钥匙现在在哪儿？", "钥匙在办公室的抽屉里。"),
+            ("抽屉里都有啥？", "抽屉里至少有钥匙。"),
+            ("其实钥匙不在抽屉里", "我知道了。"),
+            ("钥匙在哪里？", "不知道钥匙在哪里。"),
+        )
+
+        for text, answer in turns:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                self.assertEqual(prediction.answer, answer)
+                capabilities = capabilities_with_working_turn(
+                    capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
+
+        ownership = default_capabilities(use_environment=False, use_memory=False)
+        for text, answer in (
+            ("妈妈把伞交给爸爸", "我知道了。"),
+            ("爸爸又把伞交给孩子", "我知道了。"),
+            ("现在伞归谁？", "孩子拥有伞。"),
+            ("爸爸手里有什么？", "不知道爸爸手里有什么。"),
+            ("孩子手里有什么？", "孩子手里有伞。"),
+        ):
+            with self.subTest(text=text):
+                prediction = predict(text, ownership)
+                self.assertEqual(prediction.answer, answer)
+                ownership = capabilities_with_working_turn(
+                    ownership,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
 
     def test_learned_statement_uses_role_boundaries_instead_of_exact_sentence_text(self) -> None:
         examples = (

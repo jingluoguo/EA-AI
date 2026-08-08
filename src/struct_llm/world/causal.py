@@ -94,6 +94,8 @@ def structure_with_frames_states(structure: Structure, frames: list[Frame], stat
         scoped_frames=structure.scoped_frames,
         scoped_states=structure.scoped_states,
         intentions=structure.intentions,
+        pragmatic_acts=structure.pragmatic_acts,
+        current_frame_start_time=structure.current_frame_start_time,
     )
 
 
