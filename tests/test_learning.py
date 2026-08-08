@@ -8,7 +8,7 @@ from tests.support import *
 
 
 class LearningTest(unittest.TestCase):
-    def test_default_capabilities_register_single_neural_query_and_statement_parsers(self) -> None:
+    def test_default_capabilities_register_local_neural_input_analyzers(self) -> None:
         capabilities = default_capabilities()
 
         self.assertIsInstance(capabilities, CognitiveCapabilities)
@@ -20,6 +20,14 @@ class LearningTest(unittest.TestCase):
         statement_parser = capabilities.statement_parsers[0]
         assert isinstance(statement_parser, LoadedNeuralStatementParser)
         self.assertGreater(len(statement_parser.patterns), 0)
+        self.assertEqual(len(capabilities.intent_analyzers), 1)
+        intent_analyzer = capabilities.intent_analyzers[0]
+        assert isinstance(intent_analyzer, LoadedNeuralIntentAnalyzer)
+        self.assertGreater(len(intent_analyzer.intentions), 0)
+        self.assertEqual(len(capabilities.pragmatic_analyzers), 1)
+        pragmatic_analyzer = capabilities.pragmatic_analyzers[0]
+        assert isinstance(pragmatic_analyzer, LoadedNeuralPragmaticAnalyzer)
+        self.assertGreater(len(pragmatic_analyzer.acts_by_label), 0)
 
     def test_default_capabilities_reuse_cached_loaded_components(self) -> None:
         first = default_capabilities()
@@ -27,6 +35,8 @@ class LearningTest(unittest.TestCase):
 
         self.assertIs(first.query_parsers[0], second.query_parsers[0])
         self.assertIs(first.statement_parsers[0], second.statement_parsers[0])
+        self.assertIs(first.intent_analyzers[0], second.intent_analyzers[0])
+        self.assertIs(first.pragmatic_analyzers[0], second.pragmatic_analyzers[0])
         self.assertIs(first.answerers[0], second.answerers[0])
         self.assertIsInstance(first.answerers[0], LearnedDialogActAnswerer)
         self.assertIs(default_learned_dialog_answerer(), default_learned_dialog_answerer())
@@ -257,11 +267,35 @@ class LearningTest(unittest.TestCase):
         self.assertIn("statement", summary)
         self.assertIn("statement_neural", summary)
         self.assertIn("intent", summary)
+        self.assertIn("intent_neural", summary)
+        self.assertIn("pragmatic_neural", summary)
         self.assertIn("dialog_answer", summary)
         self.assertGreater(summary["query_neural"]["examples"], 0)
         self.assertGreater(summary["statement"]["examples"], 0)
         self.assertGreater(summary["statement_neural"]["examples"], 0)
         self.assertGreater(summary["intent"]["examples"], 0)
+        self.assertGreater(summary["intent_neural"]["examples"], 0)
+        self.assertGreater(summary["pragmatic_neural"]["examples"], 0)
+
+    def test_local_neural_intent_and_pragmatic_analyzers_consume_datasets(self) -> None:
+        intent_analyzer = default_neural_intent_analyzer()
+        intent_examples = tuple(
+            example
+            for example in InMemoryIntentAnalyzer.from_jsonl("data/intent_examples.jsonl").examples
+            if example.intention.source == "structural_pattern_intent_context"
+        )
+        intent_result = evaluate_intent_analyzer(intent_analyzer, intent_examples)
+
+        pragmatic_analyzer = default_neural_pragmatic_analyzer()
+        episode_examples = load_episode_jsonl("data/episode_examples.jsonl")
+        pragmatic_result = evaluate_pragmatic_analyzer(pragmatic_analyzer, episode_examples)
+
+        self.assertIsInstance(intent_analyzer, LoadedNeuralIntentAnalyzer)
+        self.assertGreater(intent_result.total, 0)
+        self.assertEqual(intent_result.matched, intent_result.total)
+        self.assertIsInstance(pragmatic_analyzer, LoadedNeuralPragmaticAnalyzer)
+        self.assertGreater(pragmatic_result.total, 0)
+        self.assertEqual(pragmatic_result.matched, pragmatic_result.total)
 
     def test_neural_statement_parser_normalizes_active_passive_and_reordered_sentences(self) -> None:
         parser = default_neural_statement_parser()

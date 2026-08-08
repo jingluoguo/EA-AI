@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .capabilities import CognitiveCapabilities
-from .comprehension.episode import EPISODE_DATA_PATH, InMemoryPragmaticAnalyzer
+from .comprehension.episode import EPISODE_DATA_PATH
 from .kernel_flow import finalize_parse_context, ingest_sentence, initial_parse_context
 from .motor.dialogue import default_learned_dialog_answerer
 from .neural import NeuralBoundaryModel, configured_neural_boundary_model, with_neural_boundary
+from .neural.intent_classifier import default_neural_intent_analyzer
+from .neural.pragmatic_classifier import default_neural_pragmatic_analyzer
 from .neural.query_classifier import default_neural_query_parser
 from .neural.statement_classifier import default_neural_statement_parser
 from .memory.long_term import default_memory_states
@@ -43,6 +45,7 @@ def default_capabilities(
         query_parsers=(default_neural_query_parser(),),
         rule_inferers=DEFAULT_RULE_INFERERS,
         answerers=(default_learned_dialog_answerer(), *DEFAULT_ANSWERERS),
+        intent_analyzers=(default_neural_intent_analyzer(),),
     )
     if use_memory:
         memory_states = default_memory_states()
@@ -50,7 +53,7 @@ def default_capabilities(
             capabilities = capabilities.with_memory_states(*memory_states)
     if EPISODE_DATA_PATH.exists():
         capabilities = capabilities.with_pragmatic_analyzers(
-            InMemoryPragmaticAnalyzer.from_jsonl(EPISODE_DATA_PATH)
+            default_neural_pragmatic_analyzer(EPISODE_DATA_PATH)
         )
     if neural_model is None and use_environment:
         neural_model = configured_neural_boundary_model()

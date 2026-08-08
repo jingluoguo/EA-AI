@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from ..comprehension.intent import InMemoryIntentAnalyzer, evaluate_intent_analyzer, from_jsonl
+from ..comprehension.intent import evaluate_intent_analyzer, from_jsonl
 from ..comprehension.intent_dataset import append_intent_record, build_intent_record
 from ..motor.dialogue import compile_dialog_answer_model_from_jsonl, save_dialog_answer_model
+from ..neural.intent_classifier import default_neural_intent_analyzer
 from ..neural.query_classifier import train_query_neural_model
 from ..neural.statement_classifier import train_statement_neural_model
 
@@ -59,7 +60,7 @@ def eval_intent_examples() -> None:
     parser.add_argument("--intent-min-score", type=float, default=0.6)
     args = parser.parse_args()
 
-    analyzer = InMemoryIntentAnalyzer.from_jsonl(Path(args.train_data), min_score=args.intent_min_score)
+    analyzer = default_neural_intent_analyzer(Path(args.train_data))
     examples = from_jsonl(Path(args.eval_data or args.train_data))
     result = evaluate_intent_analyzer(analyzer, examples)
     print(f"意图样本={result.total} 命中={result.matched} 准确率={result.accuracy:.2f}")

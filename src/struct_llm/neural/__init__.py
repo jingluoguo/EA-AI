@@ -15,6 +15,8 @@ from .boundary import (
 )
 from .query_classifier import default_neural_query_parser
 from .statement_classifier import default_neural_statement_parser
+from .intent_classifier import default_neural_intent_analyzer
+from .pragmatic_classifier import default_neural_pragmatic_analyzer
 
 __all__ = (
     "InMemoryNeuralBoundaryModel",
@@ -30,4 +32,6 @@ __all__ = (
     "with_neural_boundary",
     "default_neural_query_parser",
     "default_neural_statement_parser",
+    "default_neural_intent_analyzer",
+    "default_neural_pragmatic_analyzer",
 )

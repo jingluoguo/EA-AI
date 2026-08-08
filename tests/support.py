@@ -87,6 +87,16 @@ from struct_llm.neural.query_classifier import (
     default_neural_query_parser,
     train_query_neural_model,
 )
+from struct_llm.neural.intent_classifier import (
+    LoadedNeuralIntentAnalyzer,
+    default_neural_intent_analyzer,
+    train_intent_neural_model,
+)
+from struct_llm.neural.pragmatic_classifier import (
+    LoadedNeuralPragmaticAnalyzer,
+    default_neural_pragmatic_analyzer,
+    train_pragmatic_neural_model,
+)
 from struct_llm.neural.statement_classifier import (
     LoadedNeuralStatementParser,
     default_neural_statement_parser,

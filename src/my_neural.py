@@ -18,13 +18,7 @@ from typing import Any, Mapping
 from struct_llm.capabilities import CognitiveCapabilities
 from struct_llm.comprehension.episode import (
     EPISODE_DATA_PATH,
-    InMemoryPragmaticAnalyzer,
-    compile_episode_model_from_jsonl,
-    evaluate_pragmatic_analyzer,
-    load_episode_jsonl,
 )
-from struct_llm.comprehension.intent import InMemoryIntentAnalyzer
-from struct_llm.comprehension.intent import evaluate_intent_analyzer, load_intent_jsonl
 from struct_llm.comprehension.query import (
     QUERY_DATA_PATH,
     query_from_dict,
@@ -49,6 +43,16 @@ from struct_llm.neural.statement_classifier import (
     default_neural_statement_parser,
     statement_neural_summary,
     train_statement_neural_model,
+)
+from struct_llm.neural.intent_classifier import (
+    default_neural_intent_analyzer,
+    intent_neural_summary,
+    train_intent_neural_model,
+)
+from struct_llm.neural.pragmatic_classifier import (
+    default_neural_pragmatic_analyzer,
+    pragmatic_neural_summary,
+    train_pragmatic_neural_model,
 )
 from struct_llm.structure import Entity, Event, Frame, Intention, PragmaticAct, Query, Relation, Role, ScopedFrame, ScopedState, State, Structure
 
@@ -155,10 +159,12 @@ def make_model() -> LocalNeuralBoundaryModel:
 
 
 def train() -> None:
-    # Rebuild both input classifiers from the current datasets, then report the
+    # Rebuild all local input classifiers from the current datasets, then report the
     # complete boundary summary.
     train_query_neural_model()
     train_statement_neural_model()
+    train_intent_neural_model()
+    train_pragmatic_neural_model()
     model = make_model()
     summary = train_summary(model)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -169,11 +175,9 @@ def build_trained_capabilities() -> CognitiveCapabilities:
     capabilities = default_capabilities(use_environment=False, use_memory=False)
     capabilities = capabilities.replace_statement_parsers(default_neural_statement_parser())
     capabilities = capabilities.replace_query_parsers(default_neural_query_parser())
-    intent_data_path = TRAINING_DATA_DIR / "intent_examples.jsonl"
-    if intent_data_path.exists():
-        capabilities = capabilities.with_intent_analyzers(
-            InMemoryIntentAnalyzer.from_jsonl(intent_data_path)
-        )
+    capabilities = capabilities.evolve(intent_analyzers=(default_neural_intent_analyzer(),))
+    if EPISODE_DATA_PATH.exists():
+        capabilities = capabilities.evolve(pragmatic_analyzers=(default_neural_pragmatic_analyzer(EPISODE_DATA_PATH),))
     return capabilities
 
 
@@ -197,14 +201,8 @@ def train_summary(model: LocalNeuralBoundaryModel) -> dict[str, Any]:
 
     intent_data_path = TRAINING_DATA_DIR / "intent_examples.jsonl"
     if intent_data_path.exists():
-        intent_examples = load_intent_jsonl(intent_data_path)
-        intent_analyzer = capabilities.intent_analyzers[0] if capabilities.intent_analyzers else InMemoryIntentAnalyzer()
-        intent_result = evaluate_intent_analyzer(intent_analyzer, intent_examples)
-        summary["intent"] = {
-            "examples": intent_result.total,
-            "matched": intent_result.matched,
-            "accuracy": round(intent_result.accuracy, 4),
-        }
+        summary["intent_neural"] = intent_neural_summary(intent_data_path)
+        summary["intent"] = dict(summary["intent_neural"])
 
     if DIALOG_ANSWER_DATA_PATH.exists():
         dialog_model = compile_dialog_answer_model_from_jsonl(DIALOG_ANSWER_DATA_PATH)
@@ -214,20 +212,8 @@ def train_summary(model: LocalNeuralBoundaryModel) -> dict[str, Any]:
         }
 
     if EPISODE_DATA_PATH.exists():
-        episode_examples = load_episode_jsonl(EPISODE_DATA_PATH)
-        episode_model = compile_episode_model_from_jsonl(EPISODE_DATA_PATH)
-        pragmatic_analyzer = (
-            capabilities.pragmatic_analyzers[0]
-            if capabilities.pragmatic_analyzers
-            else InMemoryPragmaticAnalyzer()
-        )
-        pragmatic_result = evaluate_pragmatic_analyzer(pragmatic_analyzer, episode_examples)
-        summary["episode"] = {
-            "examples": episode_model.example_count,
-            "patterns": len(episode_model.patterns),
-            "matched": pragmatic_result.matched,
-            "accuracy": round(pragmatic_result.accuracy, 4),
-        }
+        summary["pragmatic_neural"] = pragmatic_neural_summary(EPISODE_DATA_PATH)
+        summary["episode"] = dict(summary["pragmatic_neural"])
 
     return summary
 
