@@ -9,7 +9,7 @@ from .errors import ParseError
 from .memory.long_term import memory_entities_from_states
 from .perception.lexer import split_query_candidate, split_sentences
 from .perception.reference import resolve_references, unresolved_reference_mention
-from .structure import Entity, Frame, Query, Role, ScopedFrame, ScopedState, State, Structure
+from .structure import Entity, Frame, PragmaticAct, Query, Role, ScopedFrame, ScopedState, State, Structure
 from .world.causal import expand_conditionals
 from .world.state import materialize_events, materialize_relations
 
@@ -436,7 +436,42 @@ def structure_with_pragmatics(
     structure: Structure,
     capabilities: CognitiveCapabilities,
 ) -> Structure:
-    return replace(structure, pragmatic_acts=capabilities.analyze_pragmatics(text, structure))
+    return replace(
+        structure,
+        pragmatic_acts=filter_resolved_pragmatic_acts(
+            capabilities.analyze_pragmatics(text, structure),
+            structure,
+        ),
+    )
+
+
+def filter_resolved_pragmatic_acts(
+    acts: tuple[PragmaticAct, ...],
+    structure: Structure,
+) -> tuple[PragmaticAct, ...]:
+    if not acts:
+        return ()
+    return tuple(act for act in acts if not pragmatic_act_is_resolved_by_structure(act, structure))
+
+
+def pragmatic_act_is_resolved_by_structure(act: PragmaticAct, structure: Structure) -> bool:
+    if structure.query is not None and act.act in {
+        "ambiguous_reference",
+        "clarification_request",
+        "incomplete_utterance",
+        "underspecified_action_request",
+        "underspecified_reference_query",
+    }:
+        return True
+    if any(frame.time >= structure.current_frame_start_time for frame in structure.frames) and act.act in {
+        "ambiguous_reference",
+        "clarification_request",
+        "incomplete_utterance",
+        "underspecified_action_request",
+        "underspecified_reference_query",
+    }:
+        return True
+    return False
 
 
 def structure_with_rules(

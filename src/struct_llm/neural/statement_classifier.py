@@ -191,6 +191,8 @@ class LoadedNeuralStatementParser:
             return None
         if not integrated_frame_roles_have_text_evidence(normalized, frames):
             return None
+        if not statement_has_required_frame_text_evidence(normalized, frames):
+            return None
         return entities, frames
 
 
@@ -745,6 +747,20 @@ def integrated_frame_roles_have_text_evidence(text: str, frames: list[Frame]) ->
             if value and normalize_statement_text(value) not in text:
                 return False
     return True
+
+
+def statement_has_required_frame_text_evidence(text: str, frames: list[Frame]) -> bool:
+    if not frames:
+        return False
+    # Semantic evidence comes from the trained label and role tagger. Keep
+    # this final check surface-neutral: only empty placeholder values are
+    # rejected here, while lexical variation is learned from the dataset.
+    return not any(
+        role.value.strip() in {"……", "..."}
+        for frame in frames
+        for role in frame.roles
+        if role.value is not None
+    )
 
 
 def collate_statement_batch(batch: list[tuple[list[int], int, list[int]]]) -> tuple[Tensor, Tensor, Tensor, Tensor]:

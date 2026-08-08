@@ -133,6 +133,25 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("REL likes(我,游泳)", structure)
         self.assertEqual(prediction.answer, "我知道了。")
 
+    def test_profile_statements_are_not_swallowed_by_pragmatic_clarification(self) -> None:
+        for text in ("我喜欢徒步", "我叫陈一诺", "我是小郭", "刚才小周把钥匙放到抽屉里", "我不太喜欢熬夜"):
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertNotIn("PRAGMATIC_ACT incomplete_utterance", structure)
+                self.assertNotIn("PRAGMATIC_ACT underspecified_action_request", structure)
+                self.assertIn("RULE structural_update_acknowledgement", structure)
+
+    def test_clarification_dialog_act_keeps_plain_explanations_without_task_underspecification(self) -> None:
+        for text in ("我没听懂", "我没听明白"):
+            with self.subTest(text=text):
+                prediction = predict(text)
+                self.assertIn("QUERY dialog_act(clarification)", prediction.structure.linearize())
+                self.assertEqual(
+                    prediction.answer,
+                    "抱歉没说清楚，我换个方式再讲一遍，你看这样是否更明白？",
+                )
+
     def test_unresolved_profile_pronouns_request_contextual_referent_choice(self) -> None:
         capabilities = default_capabilities(use_environment=False, use_memory=False)
         first = predict("我爱爬山，也爱游泳", capabilities)
@@ -636,6 +655,21 @@ class DialogueTest(unittest.TestCase):
                     prediction.structure.query,
                     prediction.structure.frames,
                 )
+
+    def test_complex_task_request_and_memory_capability_queries_are_structural(self) -> None:
+        cases = (
+            ("我想让你帮我给郭士君发送一个邮件", "QUERY dialog_act(task_request,task=email)"),
+            ("请帮我给小王发一封邮件", "QUERY dialog_act(task_request,task=email)"),
+            ("你可以记住我说过的事吗", "QUERY dialog_act(memory_capability)"),
+            ("你能不能记住我的信息", "QUERY dialog_act(memory_capability)"),
+        )
+
+        for text, query_line in cases:
+            with self.subTest(text=text):
+                prediction = predict(text)
+                structure = prediction.structure.linearize()
+                self.assertIn(query_line, structure)
+                self.assertNotIn("PRAGMATIC_ACT incomplete_utterance", structure)
 
     def test_meal_suggestion_uses_semantic_structure_not_profile_dislikes(self) -> None:
         capabilities = default_capabilities(use_environment=False, use_memory=False)

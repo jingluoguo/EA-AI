@@ -244,6 +244,7 @@
 {"entities": [{"name": "芯片", "role": "item"}, {"name": "托盘", "role": "container"}], "query": {"intent": "actor_for_event", "qualifiers": ["item=$item#1", "source=$container#1"], "target": "take_out"}, "question": "谁将芯片从托盘里取出", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "芯片", "role": "item"}, {"name": "托盘", "role": "container"}], "query": {"intent": "actor_for_event", "qualifiers": ["item=$item#1", "source=$container#1"], "target": "take_out"}, "question": "把芯片从托盘里拿出来的人是谁", "source": "migrated_training", "split": "train"}
 {"entities": [], "query": {"intent": "belief_source", "qualifiers": [], "target": "芯片在托盘里"}, "question": "谁以为芯片在托盘里", "source": "migrated_training", "split": "train"}
+{"entities": [{"name": "芯片", "role": "item"}, {"name": "托盘", "role": "container"}], "query": {"intent": "belief_source", "qualifiers": [], "target": "$item#1在$container#1里"}, "question": "谁相信芯片在托盘里", "source": "structural_pattern_source_eval", "split": "train"}
 {"entities": [], "query": {"intent": "belief_source", "qualifiers": [], "target": "芯片的位置在盒子"}, "question": "谁觉得芯片的位置在盒子", "source": "migrated_training", "split": "train"}
 {"entities": [], "query": {"intent": "belief_source", "qualifiers": [], "target": "芯片在盒子里"}, "question": "谁相信芯片在盒子里", "source": "migrated_training", "split": "train"}
 {"entities": [], "query": {"intent": "belief_source", "qualifiers": [], "target": "芯片在托盘里"}, "question": "谁猜测芯片在托盘里", "source": "migrated_training", "split": "train"}
@@ -909,8 +910,8 @@
 {"question": "你能安慰我吗", "entities": [], "query": {"intent": "dialog_act", "target": "empathy", "qualifiers": [], "subqueries": []}, "source": "daily_chat_dialog_regression", "split": "train"}
 {"question": "算了", "entities": [], "query": {"intent": "dialog_act", "target": "refusal", "qualifiers": [], "subqueries": []}, "source": "daily_chat_dialog_regression", "split": "train"}
 {"question": "等一下", "entities": [], "query": {"intent": "dialog_act", "target": "pause", "qualifiers": [], "subqueries": []}, "source": "daily_chat_dialog_regression", "split": "train"}
-{"question": "帮我弄一下", "entities": [], "query": {"intent": "dialog_act", "target": "clarification", "qualifiers": [], "subqueries": []}, "source": "daily_chat_dialog_regression", "split": "train"}
-{"question": "麻烦帮我弄一下", "entities": [], "query": {"intent": "dialog_act", "target": "clarification", "qualifiers": [], "subqueries": []}, "source": "daily_chat_dialog_regression", "split": "test"}
+{"question": "帮我弄一下", "entities": [], "query": null, "source": "daily_chat_dialog_regression", "split": "train"}
+{"question": "麻烦帮我弄一下", "entities": [], "query": null, "source": "daily_chat_dialog_regression", "split": "test"}
 {"question": "你还能帮我总结刚才的信息吗", "entities": [], "query": {"intent": "dialog_act", "target": "summary", "qualifiers": [], "subqueries": []}, "source": "daily_chat_dialog_regression", "split": "train"}
 {"question": "我有点烦躁", "entities": [], "query": {"intent": "dialog_act", "target": "empathy", "qualifiers": [], "subqueries": []}, "source": "daily_chat_dialog_regression", "split": "test"}
 {"question": "安慰我一下", "entities": [], "query": {"intent": "dialog_act", "target": "empathy", "qualifiers": [], "subqueries": []}, "source": "daily_chat_dialog_regression", "split": "test"}
@@ -955,3 +956,10 @@
 {"question": "药瓶被带到过哪里", "entities": [{"role": "item", "name": "药瓶"}], "query": {"intent": "places_visited", "target": "$item#1", "qualifiers": [], "subqueries": []}, "source": "structural_route_history_query_semantics", "split": "train"}
 {"question": "托盘移动过哪些位置", "entities": [{"role": "container", "name": "托盘"}], "query": {"intent": "places_visited", "target": "$container#1", "qualifiers": [], "subqueries": []}, "source": "structural_route_history_query_semantics", "split": "test"}
 {"question": "笔记本到过什么地方", "entities": [{"role": "item", "name": "笔记本"}], "query": {"intent": "places_visited", "target": "$item#1", "qualifiers": [], "subqueries": []}, "source": "structural_route_history_query_semantics", "split": "train"}
+{"question": "我想让你帮我给郭士君发送一个邮件", "entities": [], "query": {"intent": "dialog_act", "target": "task_request", "qualifiers": ["task=email"], "subqueries": []}, "source": "structural_dialog_task_request", "split": "train"}
+{"question": "请帮我给小王发一封邮件", "entities": [], "query": {"intent": "dialog_act", "target": "task_request", "qualifiers": ["task=email"], "subqueries": []}, "source": "structural_dialog_task_request", "split": "test"}
+{"question": "我想让你帮我写一封邮件", "entities": [], "query": {"intent": "dialog_act", "target": "task_request", "qualifiers": ["task=email"], "subqueries": []}, "source": "structural_dialog_task_request", "split": "train"}
+{"question": "你可以记住我说过的事吗", "entities": [], "query": {"intent": "dialog_act", "target": "memory_capability", "qualifiers": [], "subqueries": []}, "source": "structural_dialog_memory_capability", "split": "train"}
+{"question": "你能不能记住我的信息", "entities": [], "query": {"intent": "dialog_act", "target": "memory_capability", "qualifiers": [], "subqueries": []}, "source": "structural_dialog_memory_capability", "split": "test"}
+{"question": "回声是怎么形成的", "entities": [{"role": "topic", "name": "会产生回声"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_open_knowledge_query", "split": "train"}
+{"question": "回声形成的原因是什么", "entities": [{"role": "topic", "name": "会产生回声"}], "query": {"intent": "why", "target": "$topic#1", "qualifiers": ["type=why"], "subqueries": []}, "source": "structural_open_knowledge_query", "split": "test"}

@@ -211,3 +211,7 @@
 {"question": "清淡点的", "query": {"intent": "dialog_act", "target": "meal_suggestion", "qualifiers": ["preference=light"], "subqueries": []}, "answer": "清淡点的话，可以考虑小米粥配鸡蛋、番茄鸡蛋面、青菜豆腐汤，或者蒸鱼配米饭。", "source": "self_model", "split": "test"}
 {"question": "有满足感一点", "query": {"intent": "dialog_act", "target": "meal_suggestion", "qualifiers": ["preference=rich"], "subqueries": []}, "answer": "想吃得满足一点，可以考虑牛肉饭、鸡腿饭、热汤面，或者一份有主食和蛋白质的简餐。", "source": "self_model", "split": "test"}
 {"question": "你会记住我吗", "query": {"intent": "dialog_act", "target": "memory_capability", "qualifiers": [], "subqueries": []}, "answer": "我会记住当前对话里你告诉我的信息，并在后续聊天里尽量接上上下文。", "source": "self_model", "split": "test"}
+{"question": "你可以记住我说过的事吗", "query": {"intent": "dialog_act", "target": "memory_capability", "qualifiers": [], "subqueries": []}, "answer": "我会记住当前对话里你告诉我的信息，并在后续聊天里尽量接上上下文。", "source": "self_model", "split": "train"}
+{"question": "你能不能记住我的信息", "query": {"intent": "dialog_act", "target": "memory_capability", "qualifiers": [], "subqueries": []}, "answer": "我会记住当前对话里你告诉我的信息，并在后续聊天里尽量接上上下文。", "source": "self_model", "split": "test"}
+{"question": "我想让你帮我给郭士君发送一个邮件", "query": {"intent": "dialog_act", "target": "task_request", "qualifiers": ["task=email"], "subqueries": []}, "answer": "当然可以。你把收件人、目的和大致内容告诉我，我来帮你起草。", "source": "self_model", "split": "train"}
+{"question": "请帮我给小王发一封邮件", "query": {"intent": "dialog_act", "target": "task_request", "qualifiers": ["task=email"], "subqueries": []}, "answer": "当然可以。你把收件人、目的和大致内容告诉我，我来帮你起草。", "source": "self_model", "split": "test"}

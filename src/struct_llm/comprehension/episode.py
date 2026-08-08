@@ -292,7 +292,13 @@ def evaluate_pragmatic_analyzer(
     matched = 0
     for example in examples:
         predictions = analyzer(example.text, episode_evaluation_structure(example))
-        if all(any(pragmatic_act_matches(prediction, expected) for prediction in predictions) for expected in example.expected_pragmatic_acts):
+        if not example.expected_pragmatic_acts:
+            if not predictions:
+                matched += 1
+        elif all(
+            any(pragmatic_act_matches(prediction, expected) for prediction in predictions)
+            for expected in example.expected_pragmatic_acts
+        ):
             matched += 1
     return EpisodeEvaluationResult(total=len(examples), matched=matched)
 
@@ -430,8 +436,8 @@ def episode_example_from_dict(record: dict[str, Any], *, line_number: int | None
     if response_policy not in RESPONSE_POLICIES:
         raise ValueError(f"{prefix} expected_response_policy must be one of {sorted(RESPONSE_POLICIES)}.")
     raw_acts = record.get("expected_pragmatic_acts", ())
-    if not isinstance(raw_acts, list) or not raw_acts:
-        raise ValueError(f"{prefix} requires non-empty expected_pragmatic_acts list.")
+    if not isinstance(raw_acts, list):
+        raise ValueError(f"{prefix} expected_pragmatic_acts must be a list.")
 
     raw_query = record.get("expected_query")
     raw_action = record.get("action_result")

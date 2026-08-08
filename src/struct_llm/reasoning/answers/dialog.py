@@ -17,10 +17,6 @@ def answer_dialog_act(structure: Structure) -> str | None:
     query = structure.query
     if query is None or query.intent != "dialog_act":
         return None
-    if query.target == "clarification" and any(
-        act.act == "underspecified_action_request" for act in structure.pragmatic_acts
-    ):
-        return None
     rules = set(structure.rules)
     if "dialog_greeting" in rules:
         return "你好，我在。"

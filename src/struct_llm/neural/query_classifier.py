@@ -23,6 +23,7 @@ from .common import (
     set_seed,
 )
 from ..perception.lexer import split_query_candidate
+from ..perception.normalizer import normalize_question
 from ..comprehension.query import (
     QUERY_DATA_PATH,
     CompiledQueryPattern,
@@ -628,8 +629,9 @@ def materialize_topic_value(value: str, topic_slots: dict[str, str]) -> str:
 
 
 def build_query_input(sentence: str, entities: Iterable[Any]) -> str:
-    parts = [canonical_text(sentence)]
-    ordered_entities = query_input_entities(sentence, tuple(entities))
+    normalized_sentence = normalize_question(sentence)
+    parts = [canonical_text(normalized_sentence)]
+    ordered_entities = query_input_entities(normalized_sentence, tuple(entities))
     if ordered_entities:
         entity_bits = [f"{canonical_text(entity.role)}:{canonical_text(entity.name)}" for entity in ordered_entities if entity.role and entity.name]
         if entity_bits:
@@ -721,6 +723,8 @@ def query_with_topic_evidence(
         return query
     focus_topic = unique_runtime_topic(entities)
     if focus_topic is None:
+        if any(entity.role == "query_intent" for entity in entities):
+            return query
         return None
     return Query(
         query.intent,

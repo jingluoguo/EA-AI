@@ -868,6 +868,27 @@ class LearningTest(unittest.TestCase):
         self.assertEqual(model.schema, "struct_llm.episode_model.v1")
         self.assertGreaterEqual(len(model.patterns), 1)
 
+    def test_episode_dataset_supports_empty_pragmatic_act_negative_examples(self) -> None:
+        example = episode_example_from_dict(
+            {
+                "text": "小郭把芯片放进托盘",
+                "expected_response_policy": "acknowledge",
+                "expected_pragmatic_acts": [],
+            }
+        )
+
+        self.assertEqual(example.expected_pragmatic_acts, ())
+        matched = evaluate_pragmatic_analyzer(
+            lambda text, structure: (),
+            (example,),
+        )
+        mismatched = evaluate_pragmatic_analyzer(
+            lambda text, structure: (PragmaticAct("confirmation_check", "proposition"),),
+            (example,),
+        )
+        self.assertEqual(matched.accuracy, 1.0)
+        self.assertEqual(mismatched.accuracy, 0.0)
+
     def test_episode_feedback_appends_structural_supervision(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             paths = LearningPaths(episode_data=Path(directory) / "episode_examples.jsonl")

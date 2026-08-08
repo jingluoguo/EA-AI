@@ -1,6 +1,6 @@
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"terminal_discourse_particle","forms":["呢","吗","吧","呀","啊"],"source":"linguistic_lexicon"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"bare_topic_particle","forms":["呢"],"source":"linguistic_lexicon"}
-{"schema":"struct_llm.surface_lexicon_example.v1","category":"question_frame","forms":["你知道的话","可以告诉我","你可以告诉我","给我说一下","我想知道","我想问","想知道","想问","想了解","帮我看看","告诉我"],"source":"linguistic_lexicon"}
+{"schema":"struct_llm.surface_lexicon_example.v1","category":"question_frame","forms":["你知道的话","可以告诉我","你可以告诉我","给我说一下","我想知道下","我想了解下","我想知道","我想问","想知道","想问","想了解","帮我看看","告诉我"],"source":"linguistic_lexicon"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"question_filler","forms":["现在","目前","实际","事实上","后来","之后","随后","请问","到底","其实","又","再","还","是","的","了","吗","嘛","呢","下"],"source":"linguistic_lexicon"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"question_inner_filler","forms":["现在","目前","实际","事实上","请问","到底","其实"],"source":"linguistic_lexicon"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"question_surface_synonym","forms":["物品"],"canonical":"东西","source":"linguistic_lexicon"}
