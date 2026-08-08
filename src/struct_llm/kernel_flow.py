@@ -13,6 +13,8 @@ from .structure import Entity, Frame, Query, State, Structure
 from .world.causal import expand_conditionals
 from .world.state import materialize_events, materialize_relations
 
+INTEGRATED_CLAUSE_FRAME_TYPES = frozenset({"if_then", "because"})
+
 
 @dataclass
 class ParseContext:
@@ -92,6 +94,8 @@ def ingest_mixed_statement_fragments(
     parsed_fragments: list[tuple[str, tuple[list[Entity], list[Frame]] | None]] = []
     has_statement = False
     known_entities = context.known_entities()
+    resolved_sentence = resolve_references(sentence, known_entities)
+    full_statement = capabilities.parse_statement(resolved_sentence)
     for fragment in fragments:
         resolved_fragment = resolve_references(fragment, known_entities)
         extracted = capabilities.parse_statement(resolved_fragment)
@@ -106,6 +110,10 @@ def ingest_mixed_statement_fragments(
         if extracted is not None:
             has_statement = True
 
+    if full_statement_should_cover_fragments(full_statement, tuple(extracted for _, extracted in parsed_fragments)):
+        add_extracted_structure(full_statement, context, capabilities)
+        return True
+
     if not has_statement:
         return False
 
@@ -115,6 +123,31 @@ def ingest_mixed_statement_fragments(
             continue
         ingest_query_fragment(fragment, False, context, capabilities)
     return True
+
+
+def full_statement_should_cover_fragments(
+    full_statement: tuple[list[Entity], list[Frame]] | None,
+    fragment_statements: tuple[tuple[list[Entity], list[Frame]] | None, ...],
+) -> bool:
+    if full_statement is None:
+        return False
+    # Integrated clause frames must stay whole; fragment parses are only a fallback.
+    if any(frame.frame_type in INTEGRATED_CLAUSE_FRAME_TYPES for frame in full_statement[1]):
+        return True
+    fragment_signatures = {
+        frame_signature(frame)
+        for extracted in fragment_statements
+        if extracted is not None
+        for frame in extracted[1]
+    }
+    return any(frame_signature(frame) not in fragment_signatures for frame in full_statement[1])
+
+
+def frame_signature(frame: Frame) -> tuple[str, tuple[tuple[str, str], ...]]:
+    return (
+        frame.frame_type,
+        tuple(sorted((role.name, role.value) for role in frame.roles)),
+    )
 
 
 def ingest_statement_sentence(
@@ -236,7 +269,7 @@ def finalize_parse_context(
 
 
 def output_entities(context: ParseContext, query: Query | None) -> tuple[Entity, ...]:
-    entities = list(context.entities)
+    entities = [entity for entity in context.entities if entity.role != "query_intent"]
     if query is not None:
         entities.extend(query_referenced_discourse_entities(query, context.discourse_entities))
     return dedupe_entities(entities)

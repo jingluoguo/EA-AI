@@ -162,7 +162,7 @@ def resolve_query_candidates(
     meaningful_queries = [
         query
         for query in parsed_queries
-        if not (query.intent == "dialog_act" and query.target in {"greeting", "thanks", "farewell", "clarification"})
+        if not (query.intent == "dialog_act" and query.target in {"greeting", "thanks", "farewell", "clarification", "apology"})
     ]
     if meaningful_queries:
         parsed_queries = meaningful_queries

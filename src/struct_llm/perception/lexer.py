@@ -37,39 +37,4 @@ def split_query_candidate(candidate: str) -> tuple[str, ...]:
     tail = normalized[start:].strip("，,；;")
     if tail:
         parts.append(tail)
-    if not parts:
-        return (normalized,)
-
-    merged: list[str] = []
-    index = 0
-    while index < len(parts):
-        fragment = parts[index]
-        next_fragment = parts[index + 1] if index + 1 < len(parts) else ""
-        if index + 1 < len(parts) and should_merge_with_next_fragment(fragment, next_fragment):
-            merged.append(f"{fragment}，{parts[index + 1]}")
-            index += 2
-            continue
-        merged.append(fragment)
-        index += 1
-
-    return tuple(merged)
-
-
-def should_merge_with_next_fragment(fragment: str, next_fragment: str) -> bool:
-    normalized = fragment.strip()
-    next_normalized = next_fragment.strip()
-    if normalized.startswith("如果") and "就" in next_normalized:
-        return True
-    if normalized.startswith("因为") and next_normalized.startswith("所以"):
-        return True
-    if normalized.startswith("如果") and "没有" in normalized:
-        return True
-    if "没有" in normalized and any(word in next_normalized for word in ("会在哪里", "会在哪儿", "会在什么地方")):
-        return True
-    if "不是在" in normalized and next_normalized.startswith("是"):
-        return True
-    if "之前" in normalized and any(word in normalized for word in ("哪里", "哪儿", "什么地方")):
-        return True
-    if "之后" in normalized and "发生" in normalized and "什么" in normalized:
-        return True
-    return False
+    return tuple(parts) if parts else (normalized,)

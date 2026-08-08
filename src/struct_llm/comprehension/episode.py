@@ -545,6 +545,8 @@ def episode_score(example: str, text: str) -> float:
         return 0.0
     if example == text:
         return 1.0
+    if len(text) >= 3 and text in example:
+        return 0.95
     if len(example) <= 4:
         return 0.0
     if example in text:

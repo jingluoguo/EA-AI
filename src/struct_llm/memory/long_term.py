@@ -262,7 +262,7 @@ def entities_for_state(state: State) -> tuple[Entity, ...]:
     if state.name == "focus_topic":
         return (Entity("topic", state.right),)
     if state.name == "focus_query_intent":
-        return ()
+        return (Entity("query_intent", state.right),)
     if state.name == "at":
         return (Entity("thing", state.left), Entity("place", state.right))
     if state.name == "in":

@@ -65,6 +65,7 @@ QUERY_NEURAL_INTEGRATED_FRAGMENT_INTENTS = frozenset(
         "contents_after_event",
     }
 )
+QUERY_CONTEXT_ENTITY_ROLES = frozenset({"query_intent"})
 QUERY_NEURAL_EMBED_DIM = 128
 QUERY_NEURAL_HIDDEN_DIM = 128
 QUERY_NEURAL_DROPOUT = 0.20
@@ -222,7 +223,7 @@ class LoadedNeuralQueryParser:
     def predict_labels(self, sentence: str, entities: tuple[Entity, ...], top_k: int = QUERY_NEURAL_TOP_K) -> tuple[tuple[int, float], ...]:
         self.model.eval()
         with torch.no_grad():
-            text = build_query_input(sentence, entities_referenced_by_text(sentence, query_entities_for_sentence(sentence, entities)))
+            text = build_query_input(sentence, query_entities_for_sentence(sentence, entities))
             token_ids = torch.tensor([encode_text(text, self.vocab)], dtype=torch.long)
             lengths = torch.tensor([token_ids.shape[1]], dtype=torch.long)
             logits = self.model(token_ids, lengths)
@@ -613,7 +614,7 @@ def materialize_topic_value(value: str, topic_slots: dict[str, str]) -> str:
 
 def build_query_input(sentence: str, entities: Iterable[Any]) -> str:
     parts = [canonical_text(sentence)]
-    ordered_entities = entities_referenced_by_text(sentence, entities)
+    ordered_entities = query_input_entities(sentence, tuple(entities))
     if ordered_entities:
         entity_bits = [f"{canonical_text(entity.role)}:{canonical_text(entity.name)}" for entity in ordered_entities if entity.role and entity.name]
         if entity_bits:
@@ -645,6 +646,34 @@ def entities_referenced_by_text(sentence: str, entities: Iterable[Any]) -> tuple
         if getattr(entity, "name", "") and canonical_text(getattr(entity, "name")) in text
     ]
     return tuple(sorted(referenced, key=lambda entity: text.index(canonical_text(getattr(entity, "name")))))
+
+
+def query_input_entities(sentence: str, entities: tuple[Any, ...]) -> tuple[Any, ...]:
+    referenced = list(entities_referenced_by_text(sentence, entities))
+    if not contextual_ellipsis_uses_query_intent(sentence, tuple(referenced)):
+        return tuple(referenced)
+    referenced_ids = {id(entity) for entity in referenced}
+    referenced.extend(
+        entity
+        for entity in entities
+        if id(entity) not in referenced_ids and getattr(entity, "role", "") in QUERY_CONTEXT_ENTITY_ROLES
+    )
+    return tuple(referenced)
+
+
+def contextual_ellipsis_uses_query_intent(sentence: str, referenced_entities: tuple[Any, ...]) -> bool:
+    explicit_entities = tuple(
+        entity
+        for entity in referenced_entities
+        if getattr(entity, "role", "") not in QUERY_CONTEXT_ENTITY_ROLES
+        and canonical_text(getattr(entity, "name", ""))
+    )
+    if not explicit_entities:
+        return False
+    remainder = canonical_text(sentence)
+    for entity in sorted(explicit_entities, key=lambda value: len(canonical_text(getattr(value, "name", ""))), reverse=True):
+        remainder = remainder.replace(canonical_text(getattr(entity, "name", "")), "")
+    return len(remainder) <= 2
 
 
 def query_entities_for_sentence(sentence: str, entities: tuple[Entity, ...]) -> tuple[Entity, ...]:
