@@ -7,6 +7,7 @@ from typing import Any, Iterable
 from ..dataset_io import append_jsonl_object, file_sha256, load_jsonl_objects
 from ..memory.long_term import memory_entities_from_states
 from ..perception.normalizer import bare_topic_followup, normalize_question
+from ..perception.reference import strip_ellipsis_particles
 from ..structure import Entity, Frame, PragmaticAct, Query, Role, State, Structure
 from .query import query_from_dict, query_to_dict
 
@@ -177,8 +178,6 @@ def resolved_query_suppresses_pragmatic_example(example: EpisodeTrainingExample)
 def bare_topic_followup_act(text: str, structure) -> PragmaticAct | None:
     if structure is not None and getattr(structure, "query", None) is not None:
         return None
-    if recall_previous_turn_surface(text):
-        return None
     topic = bare_topic_followup(text)
     if topic is None:
         return None
@@ -189,17 +188,10 @@ def bare_topic_followup_act(text: str, structure) -> PragmaticAct | None:
         confidence=1.0,
         source="structural",
     )
-
-
-def recall_previous_turn_surface(text: str) -> bool:
-    normalized = normalize_question(text)
-    return "刚刚说" in normalized or "刚才说" in normalized
-
-
 def ambiguous_reference_act(structure) -> PragmaticAct | None:
     if structure is None or getattr(structure, "query", None) is not None:
         return None
-    if getattr(structure, "frames", ()):
+    if any(frame.time >= getattr(structure, "current_frame_start_time", 1) for frame in getattr(structure, "frames", ())):
         return None
     reference = unresolved_reference_entity(structure)
     if reference is None:
@@ -672,7 +664,10 @@ def clean_string_tuple(values: Iterable[str]) -> tuple[str, ...]:
 
 
 def normalize_episode_text(text: str) -> str:
-    return normalize_question(text).replace("。", "").replace("，", "").replace(",", "").strip()
+    normalized = normalize_question(text)
+    if not normalized:
+        normalized = bare_topic_followup(text) or strip_ellipsis_particles(text) or text.strip().rstrip("。！？!?，,；;")
+    return normalized.replace("。", "").replace("，", "").replace(",", "").strip()
 
 
 def episode_score(example: str, text: str) -> float:

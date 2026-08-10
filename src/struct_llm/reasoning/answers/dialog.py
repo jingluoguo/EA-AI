@@ -133,7 +133,7 @@ def answer_structural_update_acknowledgement(structure: Structure) -> str | None
 def profile_statement_subject(subject: str | None) -> str:
     if subject in {"", None, "我", "self"}:
         return "你"
-    return subject
+    return subject or ''
 
 
 def latest_profile_frame(structure: Structure):

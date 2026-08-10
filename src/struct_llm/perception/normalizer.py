@@ -5,17 +5,15 @@ from ..structure import Entity
 
 
 def normalize_question(sentence: str) -> str:
-    normalized = sentence.strip().replace("？", "").replace("?", "")
-    normalized = normalized.replace("啥", "什么")
-    normalized = normalize_question_surface_words(normalized)
-    changed = True
-    while changed:
-        previous = normalized
-        normalized = normalize_take_out_expression(
-            normalize_containment_expression(strip_question_frames(normalize_slot_value(normalized)))
-        )
-        changed = normalized != previous
-    return normalized
+    from ..neural.perception_classifier import default_perception_model
+
+    return default_perception_model().normalize(sentence, "question")
+
+
+def normalize_statement(sentence: str) -> str:
+    from ..neural.perception_classifier import default_perception_model
+
+    return default_perception_model().normalize(sentence, "statement")
 
 
 def bare_topic_followup(sentence: str) -> str | None:
@@ -71,7 +69,7 @@ def strip_question_frames(sentence: str) -> str:
 
 
 def normalize_slot_value(value: str) -> str:
-    normalized = value.strip()
+    normalized = value.strip(" \t\r\n\u3000。！？!?，,；;、")
     changed = True
     while changed:
         changed = False
@@ -86,7 +84,7 @@ def normalize_slot_value(value: str) -> str:
             if normalized.endswith(word) and len(normalized) > len(word):
                 normalized = normalized[: -len(word)]
                 changed = True
-    return normalized
+    return normalized.strip(" \t\r\n\u3000。！？!?，,；;、")
 
 
 def normalize_container_slot(value: str) -> str:

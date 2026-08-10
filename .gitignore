@@ -7,3 +7,4 @@ __pycache__/
 data/*.pt
 data/*_model.json
 data/unrecognized_examples.jsonl
+/.vscode

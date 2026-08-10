@@ -11,6 +11,7 @@
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"demonstrative_prefix","forms":["这个","这件","那个","那件"],"source":"linguistic_lexicon"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"bare_reference_word","forms":["这个","那个","这件","那件","它","他","她","这里","那里","那儿"],"source":"linguistic_lexicon"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"query_marker","forms":["谁","哪","什么","怎么","为何","为什么","多少","几","是否","有没有","在哪"],"source":"linguistic_lexicon"}
+{"schema":"struct_llm.surface_lexicon_example.v1","category":"query_marker","forms":["啥","啥子"],"source":"linguistic_lexicon"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"object_pronoun","forms":["这个东西","这件东西","这个物品","它"],"source":"linguistic_lexicon"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"person_pronoun","forms":["这个人","他","她"],"source":"linguistic_lexicon"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"place_pronoun","forms":["这个地方","这里","那儿","那里"],"source":"linguistic_lexicon"}
@@ -18,6 +19,7 @@
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"object_followup_query_intent","forms":["location","contents","owner","color","object_state","existence","polar_location","polar_contents","polar_existence","same_location","initial_location"],"source":"structural_schema"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"salient_reference_role","forms":["item","container","thing","person","giver","receiver"],"source":"structural_schema"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"profile_name_query_marker","forms":["叫什么","叫啥","是谁","名字","称呼"],"source":"structural_schema"}
+{"schema":"struct_llm.surface_lexicon_example.v1","category":"profile_name_query_marker","forms":["哪位"],"source":"failure_feedback"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"profile_like_query_marker","forms":["喜欢","爱好","偏好","爱什么","喜欢哪些"],"source":"structural_schema"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"profile_dislike_query_marker","forms":["不喜欢","讨厌","厌恶","反感","避讳"],"source":"structural_schema"}
 {"schema":"struct_llm.surface_lexicon_example.v1","category":"capabilities_query_marker","forms":["能做什么","能做啥","能干嘛","能干什么","会做什么","会做啥","会干嘛","会干什么","会什么","能帮我什么","可以帮我什么","有什么本事","有啥本事","擅长什么","都能干啥","都能做啥"],"source":"structural_schema"}

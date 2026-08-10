@@ -23,5 +23,6 @@
 - 模块边界：新增切句/候选保留能力放在 `perception/lexer.py`；新增表层剥离和槽位清理放在 `perception/normalizer.py`；新增指代消解放在 `perception/reference.py`；新增陈述样本消费放在 `comprehension/statement.py`；新增 Query 样本消费和模型替换放在 `comprehension/query.py`；新增意图样本消费放在 `comprehension/intent.py`；新增状态转移放在 `world/state.py`；新增事件 schema 放在 `world/event_schema.py`；新增条件规则和因果展开放在 `world/causal.py`；新增规则和答案优先放在 `reasoning/core.py`，`reasoning/pipeline.py` 只保留门面，后续按领域拆入 `reasoning/rules/` 和 `reasoning/answers/`；新增置信度策略放在 `metacognition/confidence.py`；新增反馈和对话输出放在 `motor/feedback.py`、`motor/dialogue.py`。`capabilities.py` 负责定义认知内核可插拔能力接口和组合方式；`kernel.py` 是唯一结构推理流水线，负责串联感知、理解、世界状态、推理、元认知和输出层。
 - 能力注册：陈述学习、状态投影、状态覆盖、Query 学习、规则推导、答案生成都必须以小能力函数注册到 `CognitiveCapabilities`。新增能力时优先更新数据集或替换学习能力，不能为了一个新问法改成端到端特殊分支。
 - 实验验证：每次新增能力都要加入覆盖主动、被动、换序或同义表达的测试，证明它们映射到同一个中间结构。训练相关改动还必须测试数据 loader、反馈写入、schema 校验或评估路径，不能只测试某条句子是否答对。
+- 运行环境：执行测试、训练、验证或其它项目命令前，先运行 `source .venv/bin/activate` 进入仓库虚拟环境，再执行后续命令。
 
 不得新增绕过结构中间层的表层表达分支。表层差异只能通过通用归一化和训练样本进入统一结构。

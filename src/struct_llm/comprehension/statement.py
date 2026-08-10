@@ -10,10 +10,8 @@ from ..structure import Entity, Frame, Role
 from ..capabilities import StatementParseResult
 from ..perception.normalizer import (
     normalize_container_slot,
-    normalize_containment_expression,
-    normalize_container_surface,
+    normalize_statement,
     normalize_slot_value,
-    normalize_take_out_expression,
 )
 
 
@@ -110,7 +108,7 @@ def compile_statement_examples(
 def statement_pattern_from_dict(record: Any) -> CompiledStatementPattern:
     if not isinstance(record, dict):
         raise ValueError("Statement model pattern entries must be objects.")
-    template = normalize_statement_text(str(record.get("sentence_template") or ""))
+    template = normalize_statement_template(str(record.get("sentence_template") or ""))
     if not template:
         raise ValueError("Statement model pattern requires sentence_template.")
     raw_entities = record.get("entities", ())
@@ -204,7 +202,7 @@ def statement_example_to_record(example: StatementTrainingExample) -> dict[str, 
 def statement_example_from_dict(record: dict[str, Any], *, line_number: int | None = None) -> StatementTrainingExample:
     prefix = f"Statement example at line {line_number}" if line_number is not None else "Statement example"
     sentence = normalize_statement_text(str(record.get("sentence") or record.get("text") or ""))
-    template = normalize_statement_text(str(record.get("sentence_template") or ""))
+    template = normalize_statement_template(str(record.get("sentence_template") or ""))
     if not sentence or not template:
         raise ValueError(f"{prefix} requires sentence and sentence_template.")
 
@@ -297,6 +295,13 @@ def extract_slots(template: str, sentence: str) -> dict[str, str] | None:
     position = 0
     for index, part in enumerate(parts):
         if is_slot(part):
+            previous_value = slots.get(part)
+            if previous_value:
+                found_previous = sentence.find(previous_value, position)
+                if found_previous < position:
+                    return None
+                position = found_previous + len(previous_value)
+                continue
             next_literal = next((value for value in parts[index + 1 :] if not is_slot(value) and value), "")
             if next_literal:
                 next_position = sentence.find(next_literal, position)
@@ -368,10 +373,44 @@ def slots_from_example(example: StatementTrainingExample) -> dict[str, str]:
 
 
 def normalize_statement_text(sentence: str) -> str:
-    normalized = normalize_slot_value(sentence).strip().rstrip("。！？!?，,")
-    normalized = normalize_containment_expression(normalize_take_out_expression(normalized))
-    normalized = normalize_container_surface(normalized)
-    return normalized
+    return normalize_statement(sentence)
+
+
+def normalize_statement_template(template: str) -> str:
+    """Normalize a template with placeholder context preserved."""
+    parts = split_template(template)
+    protected = protect_template_slots(parts)
+    normalized = normalize_statement(protected)
+    return restore_template_slots(normalized, parts).strip().rstrip("。！？!?，,")
+
+
+def protect_template_slots(parts: tuple[str, ...]) -> str:
+    slot_markers = template_slot_markers(parts)
+    slot_index = 0
+    protected_parts: list[str] = []
+    for part in parts:
+        if is_slot(part):
+            protected_parts.append(slot_markers[slot_index])
+            slot_index += 1
+        else:
+            protected_parts.append(part)
+    return "".join(protected_parts)
+
+
+def restore_template_slots(normalized: str, parts: tuple[str, ...]) -> str:
+    slot_markers = template_slot_markers(parts)
+    slot_index = 0
+    restored = normalized
+    for part in parts:
+        if not is_slot(part):
+            continue
+        restored = restored.replace(slot_markers[slot_index], part, 1)
+        slot_index += 1
+    return restored
+
+
+def template_slot_markers(parts: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(chr(0xE000 + index) for index, part in enumerate(parts) if is_slot(part))
 
 
 def statement_score(template: str, sentence: str) -> float:
@@ -412,8 +451,8 @@ def character_bigrams(text: str) -> set[str]:
 
 def linearize_statement_result(result: StatementParseResult) -> tuple[str, ...]:
     entities, frames = result
-    lines = [entity.linearize() for entity in entities]
+    lines = [entity.linearize() for entity in sorted(entities, key=lambda entity: (entity.role, entity.name))]
     for frame in frames:
         lines.append(f"FRAME {frame.frame_type}")
-        lines.extend(f"ROLE {role.name}={role.value}" for role in frame.roles)
+        lines.extend(f"ROLE {role.name}={role.value}" for role in sorted(frame.roles, key=lambda role: role.name))
     return tuple(lines)

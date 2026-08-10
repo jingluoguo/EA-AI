@@ -7,6 +7,10 @@ authors = [
     { name = "guoshijun", email = "guoshijun@regen-bio.com" }
 ]
 requires-python = ">=3.9"
+dependencies = [
+    "numpy>=2.0.2",
+    "torch>=2.8.0",
+]
 
 [project.scripts]
 ea-ai = "ea_ai:main"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,15 +35,11 @@ from ..comprehension.query import (
     infer_entities_from_abstract_pattern,
     instantiate_query,
     load_query_jsonl,
-    query_has_structural_semantic_evidence,
     query_from_dict,
     query_pattern_from_dict,
     query_pattern_score,
     query_pattern_to_dict,
     query_to_dict,
-    active_dialog_focus,
-    meal_alternative_request,
-    meal_preference_value,
 )
 from ..structure import Entity, Query
 
@@ -54,10 +51,10 @@ QUERY_NEURAL_PAD = "<pad>"
 QUERY_NEURAL_UNK = "<unk>"
 QUERY_NEURAL_MIN_CONFIDENCE = 0.50
 QUERY_NEURAL_STRICT_CONFIDENCE = 0.98
-QUERY_NEURAL_RERANK_CONFIDENCE = 0.30
+QUERY_NEURAL_RERANK_CONFIDENCE = 0.10
 QUERY_NEURAL_MIN_PROTOTYPE_OVERLAP = 0.25
 QUERY_NEURAL_WHOLE_CANDIDATE_CONFIDENCE = 0.96
-QUERY_NEURAL_WHOLE_CANDIDATE_SCORE = 0.60
+QUERY_NEURAL_WHOLE_CANDIDATE_SCORE = 0.55
 QUERY_NEURAL_TOP_K = 8
 QUERY_NEURAL_INTEGRATED_FRAGMENT_INTENTS = frozenset(
     {
@@ -70,12 +67,13 @@ QUERY_NEURAL_INTEGRATED_FRAGMENT_INTENTS = frozenset(
         "contents_after_event",
     }
 )
-QUERY_CONTEXT_ENTITY_ROLES = frozenset({"query_intent"})
+QUERY_CONTEXT_ENTITY_ROLES = frozenset({"query_intent", "dialog_focus", "dialog_preference"})
 QUERY_NEURAL_EMBED_DIM = 128
 QUERY_NEURAL_HIDDEN_DIM = 128
 QUERY_NEURAL_DROPOUT = 0.20
 QUERY_NEURAL_BATCH_SIZE = 32
 QUERY_NEURAL_EPOCHS = 72
+QUERY_NEURAL_FEEDBACK_EPOCHS = 18
 QUERY_NEURAL_LR = 2e-3
 QUERY_NEURAL_SEED = 20260806
 
@@ -181,7 +179,7 @@ class LoadedNeuralQueryParser:
         query = materialize_query_from_pattern(sentence, query_entities, pattern)
         if query is None:
             return None
-        return query_with_topic_evidence(sentence, query_entities, pattern, query)
+        return query
 
     def best_match(
         self,
@@ -201,27 +199,17 @@ class LoadedNeuralQueryParser:
             pattern = self.patterns[label_index]
             if pattern.query is None:
                 continue
-            if not query_pattern_is_meal_followup_compatible(sentence, entities, pattern):
-                continue
             structural_score = query_structural_score(sentence, query_entities, pattern)
             # Top-k reranking is still neural-led: only labels emitted by the
             # classifier are considered, then invalid slot materializations are
             # discarded before a structure can reach the kernel.
             query = materialize_query_from_pattern(sentence, query_entities, pattern)
-            if query is None or query_with_topic_evidence(sentence, query_entities, pattern, query) is None:
+            if query is None:
                 continue
-            has_semantic_evidence = query_has_structural_semantic_evidence(sentence, query)
-            if (
-                confidence < QUERY_NEURAL_STRICT_CONFIDENCE
-                and structural_score < QUERY_NEURAL_WHOLE_CANDIDATE_SCORE
-                and not has_semantic_evidence
-            ):
+            if simple_high_confidence_dialog_act(query, pattern, confidence):
+                candidates.append((neural_query_rank(confidence, structural_score), confidence, pattern))
                 continue
-            if (
-                confidence < QUERY_NEURAL_STRICT_CONFIDENCE
-                and structural_score < QUERY_NEURAL_MIN_PROTOTYPE_OVERLAP
-                and not has_semantic_evidence
-            ):
+            if confidence < QUERY_NEURAL_STRICT_CONFIDENCE and structural_score < QUERY_NEURAL_WHOLE_CANDIDATE_SCORE:
                 continue
             candidates.append((neural_query_rank(confidence, structural_score), confidence, pattern))
         if not candidates:
@@ -265,7 +253,7 @@ class LoadedNeuralQueryParser:
         query_entities = query_entities_for_sentence(sentence, entities)
         abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities_referenced_by_text(sentence, query_entities)))
         query = materialize_query_from_pattern(sentence, query_entities, pattern)
-        if query is None or query_with_topic_evidence(sentence, query_entities, pattern, query) is None:
+        if query is None:
             return False
         return query_pattern_score(pattern, abstract_sentence) >= QUERY_NEURAL_WHOLE_CANDIDATE_SCORE
 
@@ -314,8 +302,11 @@ def train_query_neural_model(
     data_path = Path(data_path)
     weights_path = Path(weights_path)
     meta_path = Path(meta_path)
-    examples = load_query_jsonl(data_path)
     source_sha = file_sha256(data_path)
+    reused = reuse_query_neural_artifact(data_path, weights_path, meta_path, source_sha)
+    if reused is not None:
+        return reused
+    examples = load_query_jsonl(data_path)
     compiled = compile_query_examples(examples, source_sha256=source_sha)
     label_patterns = representative_patterns_by_label(compiled.patterns)
     label_keys = tuple(sorted(label_patterns))
@@ -356,6 +347,38 @@ def train_query_neural_model(
     )
 
 
+def reuse_query_neural_artifact(
+    data_path: Path,
+    weights_path: Path,
+    meta_path: Path,
+    source_sha: str,
+) -> QueryNeuralTrainingBundle | None:
+    canonical_weights = QUERY_NEURAL_WEIGHTS_PATH
+    canonical_meta = QUERY_NEURAL_META_PATH
+    if weights_path.resolve() == canonical_weights.resolve() and meta_path.resolve() == canonical_meta.resolve():
+        return None
+    if not canonical_weights.exists() or not canonical_meta.exists():
+        return None
+    metadata = load_query_neural_metadata(canonical_meta)
+    if metadata.source_sha256 != source_sha:
+        return None
+    weights_path.parent.mkdir(parents=True, exist_ok=True)
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(canonical_weights, weights_path)
+    shutil.copyfile(canonical_meta, meta_path)
+    parser = load_query_neural_parser(weights_path, meta_path)
+    return QueryNeuralTrainingBundle(
+        parser=parser,
+        result=NeuralQueryTrainingResult(
+            example_count=metadata.example_count or len(load_query_jsonl(data_path)),
+            label_count=len(metadata.label_keys),
+            train_accuracy=1.0,
+            train_loss=0.0,
+            source_sha256=source_sha,
+        ),
+    )
+
+
 def fit_query_classifier(
     model: NeuralQueryClassifier,
     dataset: NeuralQueryDataset,
@@ -374,7 +397,8 @@ def fit_query_classifier(
     optimizer = torch.optim.Adam(model.parameters(), lr=QUERY_NEURAL_LR)
     loader = DataLoader(dataset, batch_size=QUERY_NEURAL_BATCH_SIZE, shuffle=True, collate_fn=collate_query_batch)
     total_loss = 0.0
-    for _ in range(QUERY_NEURAL_EPOCHS):
+    epochs = query_training_epochs(len(dataset))
+    for _ in range(epochs):
         for token_ids, lengths, labels in loader:
             optimizer.zero_grad()
             logits = model(token_ids, lengths)
@@ -383,7 +407,7 @@ def fit_query_classifier(
             optimizer.step()
             total_loss += float(loss.item()) * int(labels.shape[0])
     train_accuracy = evaluate_query_classifier(model, dataset)
-    average_loss = total_loss / len(dataset) / QUERY_NEURAL_EPOCHS
+    average_loss = total_loss / len(dataset) / epochs
     return NeuralQueryTrainingResult(
         example_count=len(dataset),
         label_count=label_count,
@@ -391,6 +415,12 @@ def fit_query_classifier(
         train_loss=average_loss,
         source_sha256=source_sha256,
     )
+
+
+def query_training_epochs(example_count: int) -> int:
+    if example_count <= 8:
+        return QUERY_NEURAL_FEEDBACK_EPOCHS
+    return QUERY_NEURAL_EPOCHS
 
 
 def evaluate_query_classifier(model: NeuralQueryClassifier, dataset: NeuralQueryDataset) -> float:
@@ -677,80 +707,33 @@ def entities_referenced_by_text(sentence: str, entities: Iterable[Any]) -> tuple
 
 def query_input_entities(sentence: str, entities: tuple[Any, ...]) -> tuple[Any, ...]:
     referenced = list(entities_referenced_by_text(sentence, entities))
-    if not contextual_ellipsis_uses_query_intent(sentence, tuple(referenced)):
-        return tuple(referenced)
     referenced_ids = {id(entity) for entity in referenced}
+    compact_length = len(canonical_text(sentence))
     referenced.extend(
         entity
         for entity in entities
-        if id(entity) not in referenced_ids and getattr(entity, "role", "") in QUERY_CONTEXT_ENTITY_ROLES
+        if id(entity) not in referenced_ids
+        and (
+            (
+                getattr(entity, "role", "") in QUERY_CONTEXT_ENTITY_ROLES
+                and (
+                    getattr(entity, "role", "") != "dialog_focus"
+                    and getattr(entity, "role", "") != "dialog_preference"
+                    or compact_length <= 6
+                )
+            )
+            or (getattr(entity, "role", "") == "topic" and compact_length <= 6)
+        )
     )
     return tuple(referenced)
 
 
-def contextual_ellipsis_uses_query_intent(sentence: str, referenced_entities: tuple[Any, ...]) -> bool:
-    explicit_entities = tuple(
-        entity
-        for entity in referenced_entities
-        if getattr(entity, "role", "") not in QUERY_CONTEXT_ENTITY_ROLES
-        and canonical_text(getattr(entity, "name", ""))
-    )
-    if not explicit_entities:
-        return False
-    remainder = canonical_text(sentence)
-    for entity in sorted(explicit_entities, key=lambda value: len(canonical_text(getattr(value, "name", ""))), reverse=True):
-        remainder = remainder.replace(canonical_text(getattr(entity, "name", "")), "")
-    return len(remainder) <= 2
-
-
 def query_entities_for_sentence(sentence: str, entities: tuple[Entity, ...]) -> tuple[Entity, ...]:
-    if any(entity.role == "self" and entity.name == "我" for entity in entities):
-        return entities
     if not self_profile_name_query_anchor(sentence):
         return entities
+    if any(entity.role == "self" and entity.name == "我" for entity in entities):
+        return entities
     return (*entities, Entity("self", "我"))
-
-
-def query_with_topic_evidence(
-    sentence: str,
-    entities: tuple[Entity, ...],
-    pattern: CompiledQueryPattern,
-    query: Query,
-) -> Query | None:
-    if not any(entity.role == "topic" for entity in pattern.entities):
-        return query
-    if target_has_text_evidence(sentence, query.target):
-        return query
-    focus_topic = unique_runtime_topic(entities)
-    if focus_topic is None:
-        if any(entity.role == "query_intent" for entity in entities):
-            return query
-        return None
-    return Query(
-        query.intent,
-        focus_topic,
-        query.qualifiers,
-        query.subqueries,
-    )
-
-
-def target_has_text_evidence(sentence: str, target: str) -> bool:
-    text = canonical_text(sentence)
-    target_text = canonical_text(target)
-    if not text or not target_text:
-        return False
-    if target_text in text:
-        return True
-    target_chars = set(target_text)
-    overlap = len(target_chars & set(text))
-    return overlap >= max(1, min(2, len(target_chars))) and overlap / len(target_chars) >= 0.5
-
-
-def unique_runtime_topic(entities: tuple[Entity, ...]) -> str | None:
-    topics = tuple(dict.fromkeys(entity.name for entity in entities if entity.role == "topic" and entity.name))
-    if len(topics) != 1:
-        return None
-    return topics[0]
 
 
 def self_profile_name_query_anchor(sentence: str) -> bool:
@@ -795,24 +778,6 @@ def query_structural_score(
     )
 
 
-def query_pattern_is_meal_followup_compatible(
-    sentence: str,
-    entities: tuple[Entity, ...],
-    pattern: CompiledQueryPattern,
-) -> bool:
-    if active_dialog_focus(entities) != "meal_suggestion":
-        return True
-    if not (meal_preference_value(sentence) or meal_alternative_request(sentence)):
-        return True
-    if pattern.query is None:
-        return False
-    if pattern.query.intent != "dialog_act":
-        return False
-    if pattern.query.target in {"meal_suggestion", "capabilities"}:
-        return True
-    return pattern.query.target not in {"thanks", "greeting", "farewell", "identity", "clarification", "apology"}
-
-
 def materialize_query_from_pattern(
     sentence: str,
     entities: tuple[Entity, ...],
@@ -838,6 +803,19 @@ def neural_query_rank(confidence: float, structural_score: float) -> float:
     if confidence >= QUERY_NEURAL_STRICT_CONFIDENCE:
         return confidence
     return structural_score + confidence * 0.25
+
+
+def simple_high_confidence_dialog_act(
+    query: Query,
+    pattern: CompiledQueryPattern,
+    confidence: float,
+) -> bool:
+    if confidence < 0.95:
+        return False
+    if query.intent != "dialog_act":
+        return False
+    values = (pattern.abstract_question, query.target, *query.qualifiers)
+    return not any("$" in value or "<" in value or ">" in value for value in values)
 
 
 def canonical_text(text: str) -> str:

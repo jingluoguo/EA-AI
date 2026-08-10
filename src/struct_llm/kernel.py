@@ -11,8 +11,8 @@ from .neural.intent_classifier import default_neural_intent_analyzer
 from .neural.pragmatic_classifier import default_neural_pragmatic_analyzer
 from .neural.query_classifier import default_neural_query_parser
 from .neural.statement_classifier import default_neural_statement_parser
+from .neural.perception_classifier import default_perception_model
 from .memory.long_term import default_memory_states
-from .perception.lexer import split_sentences
 from .reasoning.pipeline import (
     DEFAULT_ANSWERERS,
     DEFAULT_RULE_INFERERS,
@@ -38,6 +38,7 @@ def default_capabilities(
     use_environment: bool = True,
     use_memory: bool = True,
 ) -> CognitiveCapabilities:
+    perception_model = default_perception_model()
     capabilities = CognitiveCapabilities(
         statement_parsers=(default_neural_statement_parser(),),
         state_projectors=DEFAULT_STATE_PROJECTORS,
@@ -46,6 +47,10 @@ def default_capabilities(
         rule_inferers=DEFAULT_RULE_INFERERS,
         answerers=(default_learned_dialog_answerer(), *DEFAULT_ANSWERERS),
         intent_analyzers=(default_neural_intent_analyzer(),),
+        sentence_segmenters=(perception_model.split_sentences,),
+        candidate_segmenters=(perception_model.split_query_candidate,),
+        text_normalizers=(perception_model.normalize,),
+        reference_resolvers=(perception_model.resolve_references,),
     )
     if use_memory:
         memory_states = default_memory_states()
@@ -69,7 +74,7 @@ def default_capabilities(
 def parse_text_with_capabilities(text: str, capabilities: CognitiveCapabilities) -> Structure:
     context = initial_parse_context(capabilities)
 
-    for sentence, is_question in split_sentences(text):
+    for sentence, is_question in capabilities.segment_sentences(text):
         ingest_sentence(sentence, is_question, context, capabilities)
 
     return finalize_parse_context(text, context, capabilities)

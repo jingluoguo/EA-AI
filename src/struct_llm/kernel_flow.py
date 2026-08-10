@@ -7,8 +7,7 @@ from .comprehension.query import query_candidate_is_learned_unit, resolve_query_
 from .comprehension.structure_helpers import dedupe_entities, with_time
 from .errors import ParseError
 from .memory.long_term import memory_entities_from_states
-from .perception.lexer import split_query_candidate, split_sentences
-from .perception.reference import resolve_references, unresolved_reference_mention
+from .perception.reference import unresolved_reference_mention
 from .structure import Entity, Frame, PragmaticAct, Query, Role, ScopedFrame, ScopedState, State, Structure
 from .world.causal import expand_conditionals
 from .world.state import materialize_events, materialize_relations
@@ -66,10 +65,16 @@ def ingest_sentence(
     context: ParseContext,
     capabilities: CognitiveCapabilities,
 ) -> None:
-    resolved_sentence = resolve_references(sentence, context.known_entities())
+    resolved_sentence = capabilities.resolve_references(sentence, context.known_entities())
     mention = unresolved_reference_mention(sentence, resolved_sentence)
     try:
-        fragments = split_query_candidate(sentence)
+        if not is_question:
+            extracted = capabilities.parse_statement(resolved_sentence)
+            if extracted is not None:
+                add_extracted_structure(extracted, context, capabilities)
+                return
+
+        fragments = capabilities.segment_candidates(sentence)
 
         if not is_question and ingest_mixed_statement_fragments(sentence, context, capabilities):
             return
@@ -109,17 +114,17 @@ def ingest_mixed_statement_fragments(
     context: ParseContext,
     capabilities: CognitiveCapabilities,
 ) -> bool:
-    fragments = split_query_candidate(sentence)
+    fragments = capabilities.segment_candidates(sentence)
     if len(fragments) <= 1:
         return False
 
     parsed_fragments: list[tuple[str, tuple[list[Entity], list[Frame]] | None]] = []
     has_statement = False
     known_entities = context.known_entities()
-    resolved_sentence = resolve_references(sentence, known_entities)
+    resolved_sentence = capabilities.resolve_references(sentence, known_entities)
     full_statement = capabilities.parse_statement(resolved_sentence)
     for fragment in fragments:
-        resolved_fragment = resolve_references(fragment, known_entities)
+        resolved_fragment = capabilities.resolve_references(fragment, known_entities)
         extracted = capabilities.parse_statement(resolved_fragment)
         fragment_query = resolve_query_candidate(resolved_fragment, known_entities, capabilities.query_parsers)
         if extracted is not None and fragment_query is not None and statement_should_yield_to_query(
@@ -214,7 +219,7 @@ def ingest_query_fragment(
     context: ParseContext,
     capabilities: CognitiveCapabilities,
 ) -> None:
-    resolved_fragment = resolve_references(fragment, context.known_entities())
+    resolved_fragment = capabilities.resolve_references(fragment, context.known_entities())
     if is_question:
         if resolve_query_candidate(resolved_fragment, context.known_entities(), capabilities.query_parsers) is not None:
             context.query_candidates.append(resolved_fragment)

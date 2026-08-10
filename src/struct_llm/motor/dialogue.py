@@ -90,6 +90,8 @@ class LearnedDialogActAnswerer:
         query = structure.query
         if query is None or query.intent != "dialog_act":
             return None
+        if any(act.act == "recall_previous_turn" for act in structure.pragmatic_acts):
+            return None
         if query.target == "clarification" and any(
             act.act == "underspecified_action_request" for act in structure.pragmatic_acts
         ):

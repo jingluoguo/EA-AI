@@ -221,6 +221,10 @@ def with_neural_boundary(
         answerers=answerers,
         intent_analyzers=intent_analyzers,
         pragmatic_analyzers=pragmatic_analyzers,
+        sentence_segmenters=capabilities.sentence_segmenters,
+        candidate_segmenters=capabilities.candidate_segmenters,
+        text_normalizers=capabilities.text_normalizers,
+        reference_resolvers=capabilities.reference_resolvers,
         memory_states=capabilities.memory_states,
         memory_frames=capabilities.memory_frames,
     )

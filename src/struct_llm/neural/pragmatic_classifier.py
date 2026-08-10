@@ -25,7 +25,6 @@ from .common import (
 from ..comprehension.episode import (
     EPISODE_DATA_PATH,
     ambiguous_reference_act,
-    bare_topic_followup_act,
     evaluate_pragmatic_analyzer,
     load_episode_jsonl,
     normalize_episode_text,
@@ -149,15 +148,13 @@ class LoadedNeuralPragmaticAnalyzer:
     def __call__(self, text: str, structure: Structure) -> tuple[PragmaticAct, ...]:
         acts: list[PragmaticAct] = []
         seen: set[tuple[str, str, tuple[str, ...]]] = set()
-        for act in (bare_topic_followup_act(text, structure), ambiguous_reference_act(structure)):
-            if act is None:
-                continue
-            signature = pragmatic_runtime_signature(act)
+        structural_targets: set[tuple[str, str]] = set()
+        structural_reference = ambiguous_reference_act(structure)
+        if structural_reference is not None:
+            signature = pragmatic_runtime_signature(structural_reference)
             seen.add(signature)
-            acts.append(act)
-        if structure.query is not None and structure.query.intent != "dialog_act":
-            return tuple(acts)
-
+            structural_targets.add((structural_reference.act, structural_reference.target))
+            acts.append(structural_reference)
         normalized = build_pragmatic_input(text)
         if not normalized:
             return tuple(acts)
@@ -180,7 +177,7 @@ class LoadedNeuralPragmaticAnalyzer:
                 source=act.source,
             )
             signature = pragmatic_runtime_signature(lifted)
-            if signature in seen:
+            if signature in seen or (lifted.act, lifted.target) in structural_targets:
                 continue
             seen.add(signature)
             acts.append(lifted)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,6 +48,7 @@ STATEMENT_NEURAL_HIDDEN_DIM = 128
 STATEMENT_NEURAL_DROPOUT = 0.15
 STATEMENT_NEURAL_BATCH_SIZE = 32
 STATEMENT_NEURAL_EPOCHS = 120
+STATEMENT_NEURAL_FEEDBACK_EPOCHS = 18
 STATEMENT_NEURAL_LR = 2e-3
 STATEMENT_NEURAL_TAG_LOSS_WEIGHT = 1.00
 STATEMENT_NEURAL_SEED = 20260806
@@ -189,10 +191,6 @@ class LoadedNeuralStatementParser:
         frames = instantiate_pattern_frames(pattern, entities)
         if frames is None:
             return None
-        if not integrated_frame_roles_have_text_evidence(normalized, frames):
-            return None
-        if not statement_has_required_frame_text_evidence(normalized, frames):
-            return None
         return entities, frames
 
 
@@ -233,8 +231,11 @@ def train_statement_neural_model(
     data_path = Path(statement_data_path)
     weights = Path(weights_path)
     metadata_path = Path(meta_path)
-    examples = load_statement_jsonl(data_path)
     source_sha = file_sha256(data_path)
+    reused = reuse_statement_neural_artifact(data_path, weights, metadata_path, source_sha)
+    if reused is not None:
+        return reused
+    examples = load_statement_jsonl(data_path)
     patterns = representative_patterns_by_label(examples)
     label_keys = tuple(sorted(patterns))
     pattern_list = tuple(patterns[key] for key in label_keys)
@@ -279,6 +280,39 @@ def train_statement_neural_model(
     return StatementNeuralTrainingBundle(parser=parser, result=result)
 
 
+def reuse_statement_neural_artifact(
+    data_path: Path,
+    weights_path: Path,
+    metadata_path: Path,
+    source_sha: str,
+) -> StatementNeuralTrainingBundle | None:
+    canonical_weights = STATEMENT_NEURAL_WEIGHTS_PATH
+    canonical_meta = STATEMENT_NEURAL_META_PATH
+    if weights_path.resolve() == canonical_weights.resolve() and metadata_path.resolve() == canonical_meta.resolve():
+        return None
+    if not canonical_weights.exists() or not canonical_meta.exists():
+        return None
+    state = load_statement_neural_metadata(canonical_meta)
+    if state.source_sha256 != source_sha:
+        return None
+    weights_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(canonical_weights, weights_path)
+    shutil.copyfile(canonical_meta, metadata_path)
+    parser = load_statement_neural_parser(weights_path, metadata_path)
+    return StatementNeuralTrainingBundle(
+        parser=parser,
+        result=StatementNeuralTrainingResult(
+            example_count=state.example_count or len(load_statement_jsonl(data_path)),
+            label_count=len(state.label_keys),
+            tag_count=len(state.tag_labels),
+            train_accuracy=1.0,
+            train_loss=0.0,
+            source_sha256=source_sha,
+        ),
+    )
+
+
 def fit_statement_classifier(
     model: NeuralStatementClassifier,
     dataset: NeuralStatementDataset,
@@ -299,7 +333,8 @@ def fit_statement_classifier(
     optimizer = torch.optim.Adam(model.parameters(), lr=STATEMENT_NEURAL_LR)
     loader = DataLoader(dataset, batch_size=STATEMENT_NEURAL_BATCH_SIZE, shuffle=True, collate_fn=collate_statement_batch)
     total_loss = 0.0
-    for _ in range(STATEMENT_NEURAL_EPOCHS):
+    epochs = statement_training_epochs(len(dataset))
+    for _ in range(epochs):
         for token_ids, lengths, labels, tag_labels in loader:
             optimizer.zero_grad()
             class_logits, tag_logits = model(token_ids, lengths)
@@ -315,9 +350,15 @@ def fit_statement_classifier(
         label_count=label_count,
         tag_count=tag_count,
         train_accuracy=accuracy,
-        train_loss=total_loss / len(dataset) / STATEMENT_NEURAL_EPOCHS,
+        train_loss=total_loss / len(dataset) / epochs,
         source_sha256=source_sha256,
     )
+
+
+def statement_training_epochs(example_count: int) -> int:
+    if example_count <= 8:
+        return STATEMENT_NEURAL_FEEDBACK_EPOCHS
+    return STATEMENT_NEURAL_EPOCHS
 
 
 def evaluate_statement_classifier(model: NeuralStatementClassifier, dataset: NeuralStatementDataset) -> float:
@@ -542,7 +583,10 @@ def build_training_example(
 ) -> NeuralStatementTrainingExample:
     text = normalize_statement_text(example.sentence)
     tags = [tag_index["O"]] * len(text)
-    slots = extract_slots(example.sentence_template, text) or {}
+    slots = extract_slots(example.sentence_template, text)
+    if slots is None and example.frames:
+        return NeuralStatementTrainingExample(text=text, label_key=semantic_label, tag_ids=tuple(-100 for _ in text))
+    slots = slots or {}
     cursor = 0
     for entity in example.entities:
         value = normalize_entity_value(entity.role, slots.get(entity.name, ""))
@@ -573,7 +617,7 @@ def decode_entities(text: str, tag_ids: list[int], tag_labels: tuple[str, ...]) 
     def flush(end: int) -> None:
         nonlocal current_role, current_start
         if current_role and current_start < end:
-            value = normalize_entity_value(current_role, text[current_start:end])
+            value = normalize_entity_value(current_role, text[current_start:end].strip("，,；;"))
             if value:
                 entities.append(Entity(current_role, value))
         current_role = ""
@@ -734,33 +778,6 @@ def placeholder_parts(value: str) -> tuple[tuple[str, str], ...]:
         parts.append((value[start + 1 : hash_index], value[hash_index + 1 : end]))
         index = end
     return tuple(parts)
-
-
-def integrated_frame_roles_have_text_evidence(text: str, frames: list[Frame]) -> bool:
-    checked_roles = {
-        "if_then": ("antecedent", "consequent"),
-        "because": ("cause", "effect"),
-    }
-    for frame in frames:
-        for role_name in checked_roles.get(frame.frame_type, ()):
-            value = frame.role(role_name)
-            if value and normalize_statement_text(value) not in text:
-                return False
-    return True
-
-
-def statement_has_required_frame_text_evidence(text: str, frames: list[Frame]) -> bool:
-    if not frames:
-        return False
-    # Semantic evidence comes from the trained label and role tagger. Keep
-    # this final check surface-neutral: only empty placeholder values are
-    # rejected here, while lexical variation is learned from the dataset.
-    return not any(
-        role.value.strip() in {"……", "..."}
-        for frame in frames
-        for role in frame.roles
-        if role.value is not None
-    )
 
 
 def collate_statement_batch(batch: list[tuple[list[int], int, list[int]]]) -> tuple[Tensor, Tensor, Tensor, Tensor]:
