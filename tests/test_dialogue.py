@@ -411,6 +411,50 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("QUERY why(铁会生锈,type=why)", followup.structure.linearize())
         self.assertEqual(followup.answer, "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。")
 
+    def test_unknown_material_rust_observation_asks_before_explaining_iron(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False).with_answerers(
+            default_learned_memory_knowledge_answerer("data/memory_knowledge_model.json")
+        )
+
+        cases = (
+            ("我家桌子生锈了", "桌子"),
+            ("我家锅生锈了", "锅"),
+            ("家里的水龙头生锈了", "水龙头"),
+            ("我的桌子有点生锈", "桌子"),
+        )
+        for text, item in cases:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                structure = prediction.structure.linearize()
+                self.assertIn(f"ENTITY item={item}", structure)
+                self.assertIn(f"REL condition({item},生锈)", structure)
+                self.assertIn("RULE condition_observation_needs_clarification", structure)
+                self.assertNotIn("QUERY why(铁会生锈,type=why)", structure)
+                self.assertIn("材质", prediction.answer)
+                self.assertIn("处理办法", prediction.answer)
+                self.assertNotIn("我记录到", prediction.answer)
+
+    def test_material_followup_after_rust_observation_uses_object_focus(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        observation = predict("我家桌子生锈了", capabilities)
+        self.assertEqual(observation.answer, "你想先了解它的材质、处理办法，还是生锈原因？")
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "我家桌子生锈了",
+            observation.structure.states,
+            observation.structure.query,
+            observation.structure.frames,
+        )
+
+        followup = predict("材质是什么", capabilities)
+
+        structure = followup.structure.linearize()
+        self.assertIn("桌子", structure)
+        self.assertIn("QUERY object_attribute(桌子,attribute=material)", structure)
+        self.assertIn("RULE object_attribute_material_unknown", structure)
+        self.assertNotIn("QUERY dialog_act(identity)", structure)
+        self.assertEqual(followup.answer, "我还不知道桌子的材质。你可以告诉我它是什么材质，或者描述一下外观。")
+
     def test_principle_request_without_focus_waits_for_completion(self) -> None:
         prediction = predict("我想了解下原理", default_capabilities(use_environment=False, use_memory=False))
 

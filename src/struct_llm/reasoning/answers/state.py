@@ -11,6 +11,7 @@ __all__ = (
     "answer_object_not_exists",
     "answer_object_exists",
     "answer_existence_unknown",
+    "answer_object_attribute",
     "answer_transfer_changes_owner",
     "answer_paint_changes_color",
     "answer_object_access_state",
@@ -46,6 +47,21 @@ def answer_existence_unknown(structure: Structure) -> str | None:
         return None
     query = require_query(structure)
     return f"不知道{query.target}是否存在。"
+
+
+def answer_object_attribute(structure: Structure) -> str | None:
+    rules = set(structure.rules)
+    if not any(rule.startswith("object_attribute_") for rule in rules):
+        return None
+    query = require_query(structure)
+    attribute = optional_query_qualifier(query, "attribute")
+    attribute_label = object_attribute_label(attribute)
+    if attribute and f"object_attribute_{attribute}_found" in rules:
+        state = state_for_left(structure, attribute, query.target)
+        return f"{query.target}的{attribute_label}是{state.right}。"
+    return f"我还不知道{query.target}的{attribute_label}。你可以告诉我它是什么材质，或者描述一下外观。"
+
+
 def answer_transfer_changes_owner(structure: Structure) -> str | None:
     if "transfer_changes_owner" not in set(structure.rules):
         return None
@@ -69,3 +85,12 @@ def answer_object_access_state(structure: Structure) -> str | None:
     state_name = optional_query_qualifier(query, "state") or "access"
     state = state_for_left(structure, state_name, query.target)
     return f"{state.left}是{state.right}状态。"
+
+
+def object_attribute_label(attribute: str | None) -> str:
+    labels = {
+        "material": "材质",
+        "color": "颜色",
+        "condition": "状态",
+    }
+    return labels.get(attribute or "", attribute or "属性")

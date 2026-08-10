@@ -208,6 +208,11 @@ class Frame:
             result = self.role("result")
             qualifiers = (f"result={result}",) if result else ()
             return Event(self.frame_type, actor, theme, qualifiers)
+        if self.frame_type == "condition":
+            theme = self.role("theme") or ""
+            result = self.role("result") or ""
+            qualifiers = (f"state={result}",) if result else ()
+            return Event("condition", "", theme, qualifiers)
         if self.frame_type in {"create", "destroy"}:
             actor = self.role("actor") or ""
             theme = self.role("theme") or ""

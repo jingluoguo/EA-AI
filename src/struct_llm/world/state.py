@@ -61,7 +61,7 @@ def overwrite_current_state(states: list[State], state: State) -> bool:
         ]
         return True
 
-    if state.name in {"in", "at", "owner", "color", "access"}:
+    if state.name in {"in", "at", "owner", "color", "access", "condition"}:
         states[:] = [
             existing
             for existing in states

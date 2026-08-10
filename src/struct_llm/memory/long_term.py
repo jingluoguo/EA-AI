@@ -280,6 +280,8 @@ def entities_for_state(state: State) -> tuple[Entity, ...]:
         return (Entity("item", state.left), Entity("color", state.right))
     if state.name == "access":
         return (Entity("container", state.left),)
+    if state.name == "condition":
+        return (Entity("thing", state.left), Entity("topic", state.left))
     return (Entity("thing", state.left),)
 
 

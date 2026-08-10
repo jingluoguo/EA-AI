@@ -678,3 +678,7 @@
 {"sentence":"我想让你帮我给郭士君发送一个邮件","sentence_template":"我想让你帮我给郭士君发送一个邮件","entities":[],"frames":[],"source":"dialog_task_request_statement_reject","split":"test"}
 {"sentence":"实验室呢","sentence_template":"实验室呢","entities":[],"frames":[],"source":"topic_ellipsis_statement_reject","split":"train"}
 {"sentence":"仓库呢","sentence_template":"仓库呢","entities":[],"frames":[],"source":"topic_ellipsis_statement_reject","split":"test"}
+{"sentence":"我家桌子生锈了","sentence_template":"我家$item#1生锈了","entities":[{"role":"item","name":"$item#1"}],"frames":[{"frame_type":"condition","roles":{"theme":"$item#1","result":"生锈"}}],"source":"rust_observation_material_boundary","split":"train"}
+{"sentence":"我家锅生锈了","sentence_template":"我家$item#1生锈了","entities":[{"role":"item","name":"$item#1"}],"frames":[{"frame_type":"condition","roles":{"theme":"$item#1","result":"生锈"}}],"source":"rust_observation_material_boundary","split":"train"}
+{"sentence":"家里的水龙头生锈了","sentence_template":"家里的$item#1生锈了","entities":[{"role":"item","name":"$item#1"}],"frames":[{"frame_type":"condition","roles":{"theme":"$item#1","result":"生锈"}}],"source":"rust_observation_material_boundary","split":"test"}
+{"sentence":"我的桌子有点生锈","sentence_template":"我的$item#1有点生锈","entities":[{"role":"item","name":"$item#1"}],"frames":[{"frame_type":"condition","roles":{"theme":"$item#1","result":"生锈"}}],"source":"rust_observation_material_boundary","split":"test"}

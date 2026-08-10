@@ -51,6 +51,7 @@ QUERY_NEURAL_PAD = "<pad>"
 QUERY_NEURAL_UNK = "<unk>"
 QUERY_NEURAL_MIN_CONFIDENCE = 0.50
 QUERY_NEURAL_STRICT_CONFIDENCE = 0.98
+QUERY_NEURAL_HIGH_CONFIDENCE = 0.95
 QUERY_NEURAL_RERANK_CONFIDENCE = 0.10
 QUERY_NEURAL_MIN_PROTOTYPE_OVERLAP = 0.25
 QUERY_NEURAL_WHOLE_CANDIDATE_CONFIDENCE = 0.96
@@ -68,6 +69,29 @@ QUERY_NEURAL_INTEGRATED_FRAGMENT_INTENTS = frozenset(
     }
 )
 QUERY_CONTEXT_ENTITY_ROLES = frozenset({"query_intent", "dialog_focus", "dialog_preference"})
+QUERY_EXPLICIT_CUES = frozenset(
+    {
+        "哪",
+        "谁",
+        "什么",
+        "啥",
+        "几",
+        "多少",
+        "是否",
+        "吗",
+        "怎么",
+        "为什么",
+        "原因",
+        "原理",
+        "状态",
+        "颜色",
+        "材质",
+        "问",
+        "归谁",
+        "拥有",
+        "存在",
+    }
+)
 QUERY_NEURAL_EMBED_DIM = 128
 QUERY_NEURAL_HIDDEN_DIM = 128
 QUERY_NEURAL_DROPOUT = 0.20
@@ -103,6 +127,7 @@ class NeuralQueryModelState:
     vocab: dict[str, int]
     label_keys: tuple[str, ...]
     patterns: tuple[CompiledQueryPattern, ...]
+    pattern_groups: tuple[tuple[CompiledQueryPattern, ...], ...]
     embed_dim: int
     hidden_dim: int
     dropout: float
@@ -166,6 +191,7 @@ class LoadedNeuralQueryParser:
     vocab: dict[str, int]
     label_keys: tuple[str, ...]
     patterns: tuple[CompiledQueryPattern, ...]
+    pattern_groups: tuple[tuple[CompiledQueryPattern, ...], ...] = ()
     min_confidence: float = QUERY_NEURAL_MIN_CONFIDENCE
 
     def __call__(self, sentence: str, entities: tuple[Entity, ...]) -> Query | None:
@@ -189,27 +215,52 @@ class LoadedNeuralQueryParser:
         candidates: list[tuple[float, float, CompiledQueryPattern]] = []
         query_entities = query_entities_for_sentence(sentence, entities)
         predictions = self.predict_labels(sentence, entities)
+        prediction_confidence = {label_index: confidence for label_index, confidence in predictions}
+        context_intent = contextual_query_intent(sentence, query_entities)
         if predictions:
             top_label_index, top_confidence = predictions[0]
-            if self.patterns[top_label_index].query is None and top_confidence >= self.min_confidence:
-                return top_confidence, self.patterns[top_label_index]
+            top_pattern = self.best_pattern_for_label(sentence, query_entities, top_label_index)
+            if top_pattern.query is None and top_confidence >= self.min_confidence:
+                return top_confidence, top_pattern
         for label_index, confidence in predictions:
-            if confidence < QUERY_NEURAL_RERANK_CONFIDENCE:
-                continue
-            pattern = self.patterns[label_index]
+            pattern = self.best_pattern_for_label(sentence, query_entities, label_index)
             if pattern.query is None:
                 continue
             structural_score = query_structural_score(sentence, query_entities, pattern)
+            if confidence < QUERY_NEURAL_RERANK_CONFIDENCE and structural_score < QUERY_NEURAL_STRICT_CONFIDENCE:
+                continue
             query = materialize_query_from_pattern(sentence, query_entities, pattern)
             if query is None:
                 continue
-            if confidence < QUERY_NEURAL_STRICT_CONFIDENCE and structural_score < QUERY_NEURAL_WHOLE_CANDIDATE_SCORE:
+            if context_intent and query.intent != context_intent:
                 continue
+            if structural_score < QUERY_NEURAL_WHOLE_CANDIDATE_SCORE:
+                if confidence < QUERY_NEURAL_HIGH_CONFIDENCE or not query_like_sentence(sentence):
+                    continue
             candidates.append((neural_query_rank(confidence, structural_score), confidence, pattern))
         if not candidates:
             return None
         _, confidence, pattern = max(candidates, key=lambda item: item[0])
         return confidence, pattern
+
+    def best_pattern_for_label(
+        self,
+        sentence: str,
+        entities: tuple[Entity, ...],
+        label_index: int,
+    ) -> CompiledQueryPattern:
+        groups = self.pattern_groups or tuple((pattern,) for pattern in self.patterns)
+        if label_index >= len(groups):
+            return self.patterns[label_index]
+        patterns = groups[label_index]
+        materializable = [
+            pattern
+            for pattern in patterns
+            if pattern.query is None or materialize_query_from_pattern(sentence, entities, pattern) is not None
+        ]
+        if not materializable:
+            return patterns[0]
+        return max(materializable, key=lambda pattern: (query_structural_score(sentence, entities, pattern), pattern.support))
 
     def predict_label(self, sentence: str, entities: tuple[Entity, ...]) -> tuple[int | None, float]:
         labels = self.predict_labels(sentence, entities, top_k=1)
@@ -302,9 +353,10 @@ def train_query_neural_model(
         return reused
     examples = load_query_jsonl(data_path)
     compiled = compile_query_examples(examples, source_sha256=source_sha)
-    label_patterns = representative_patterns_by_label(compiled.patterns)
-    label_keys = tuple(sorted(label_patterns))
-    pattern_list = tuple(label_patterns[key] for key in label_keys)
+    label_pattern_groups = query_pattern_groups_by_label(compiled.patterns)
+    label_keys = tuple(sorted(label_pattern_groups))
+    pattern_groups = tuple(label_pattern_groups[key] for key in label_keys)
+    pattern_list = tuple(representative_pattern(patterns) for patterns in pattern_groups)
     neural_examples = build_neural_query_examples(examples)
     vocab = build_vocabulary(example.text for example in neural_examples)
     label_index = {label_key: index for index, label_key in enumerate(label_keys)}
@@ -320,6 +372,7 @@ def train_query_neural_model(
             vocab=vocab,
             label_keys=label_keys,
             patterns=pattern_list,
+            pattern_groups=pattern_groups,
             embed_dim=QUERY_NEURAL_EMBED_DIM,
             hidden_dim=QUERY_NEURAL_HIDDEN_DIM,
             dropout=QUERY_NEURAL_DROPOUT,
@@ -334,6 +387,7 @@ def train_query_neural_model(
         vocab=vocab,
         label_keys=label_keys,
         patterns=pattern_list,
+        pattern_groups=pattern_groups,
     )
     return QueryNeuralTrainingBundle(
         parser=parser,
@@ -507,6 +561,7 @@ def load_query_neural_parser_from_metadata(
         vocab=metadata.vocab,
         label_keys=metadata.label_keys,
         patterns=metadata.patterns,
+        pattern_groups=metadata.pattern_groups,
         min_confidence=metadata.min_confidence,
     )
 
@@ -522,6 +577,15 @@ def load_query_neural_metadata(path: str | Path) -> NeuralQueryModelState:
     raw_patterns = raw.get("patterns", [])
     if not isinstance(raw_patterns, list):
         raise ValueError("Neural query metadata patterns must be a list.")
+    patterns = tuple(query_pattern_from_dict(value) for value in raw_patterns)
+    raw_pattern_groups = raw.get("pattern_groups", [])
+    if raw_pattern_groups and not isinstance(raw_pattern_groups, list):
+        raise ValueError("Neural query metadata pattern_groups must be a list.")
+    pattern_groups = (
+        tuple(tuple(query_pattern_from_dict(item) for item in group) for group in raw_pattern_groups if isinstance(group, list))
+        if raw_pattern_groups
+        else tuple((pattern,) for pattern in patterns)
+    )
     raw_vocab = raw.get("vocab", {})
     if not isinstance(raw_vocab, dict):
         raise ValueError("Neural query metadata vocab must be an object.")
@@ -533,7 +597,8 @@ def load_query_neural_metadata(path: str | Path) -> NeuralQueryModelState:
         source_sha256=str(raw.get("source_sha256") or ""),
         vocab={str(key): int(value) for key, value in raw_vocab.items()},
         label_keys=tuple(str(value) for value in raw_label_keys),
-        patterns=tuple(query_pattern_from_dict(value) for value in raw_patterns),
+        patterns=patterns,
+        pattern_groups=pattern_groups,
         embed_dim=int(raw.get("embed_dim") or QUERY_NEURAL_EMBED_DIM),
         hidden_dim=int(raw.get("hidden_dim") or QUERY_NEURAL_HIDDEN_DIM),
         dropout=float(raw.get("dropout") or QUERY_NEURAL_DROPOUT),
@@ -561,6 +626,10 @@ def save_query_neural_model(
                 "vocab": metadata.vocab,
                 "label_keys": list(metadata.label_keys),
                 "patterns": [query_pattern_to_dict(pattern) for pattern in metadata.patterns],
+                "pattern_groups": [
+                    [query_pattern_to_dict(pattern) for pattern in group]
+                    for group in metadata.pattern_groups
+                ],
                 "embed_dim": metadata.embed_dim,
                 "hidden_dim": metadata.hidden_dim,
                 "dropout": metadata.dropout,
@@ -603,7 +672,14 @@ def query_from_label_key(label_key: str) -> Query | None:
 
 
 def representative_patterns_by_label(patterns: Iterable[CompiledQueryPattern]) -> dict[str, CompiledQueryPattern]:
-    grouped: dict[str, CompiledQueryPattern] = {}
+    return {
+        label: representative_pattern(group)
+        for label, group in query_pattern_groups_by_label(patterns).items()
+    }
+
+
+def query_pattern_groups_by_label(patterns: Iterable[CompiledQueryPattern]) -> dict[str, tuple[CompiledQueryPattern, ...]]:
+    groups: dict[str, list[CompiledQueryPattern]] = {}
     for pattern in patterns:
         materialized_query = materialize_topic_query(pattern.query, pattern.entities)
         materialized_pattern = CompiledQueryPattern(
@@ -614,10 +690,15 @@ def representative_patterns_by_label(patterns: Iterable[CompiledQueryPattern]) -
             support=pattern.support,
         )
         key = query_label_key(materialized_pattern.query)
-        existing = grouped.get(key)
-        if existing is None or pattern.support > existing.support:
-            grouped[key] = materialized_pattern
-    return grouped
+        groups.setdefault(key, []).append(materialized_pattern)
+    return {
+        key: tuple(sorted(values, key=lambda pattern: (-pattern.support, pattern.abstract_question)))
+        for key, values in groups.items()
+    }
+
+
+def representative_pattern(patterns: tuple[CompiledQueryPattern, ...]) -> CompiledQueryPattern:
+    return max(patterns, key=lambda pattern: (pattern.support, -len(pattern.abstract_question)))
 
 
 def materialize_topic_query(query: Query | None, entities: Iterable[Any]) -> Query | None:
@@ -722,6 +803,31 @@ def query_input_entities(sentence: str, entities: tuple[Any, ...]) -> tuple[Any,
     return tuple(referenced)
 
 
+def contextual_query_intent(sentence: str, entities: tuple[Entity, ...]) -> str | None:
+    if not contextual_ellipsis_sentence(sentence):
+        return None
+    intents = [
+        entity.name
+        for entity in entities
+        if entity.role == "query_intent" and entity.name
+    ]
+    if len(set(intents)) == 1:
+        return intents[-1]
+    return None
+
+
+def contextual_ellipsis_sentence(sentence: str) -> bool:
+    text = canonical_text(sentence)
+    if not text or len(text) > 6:
+        return False
+    return not any(cue in text for cue in QUERY_EXPLICIT_CUES)
+
+
+def query_like_sentence(sentence: str) -> bool:
+    text = canonical_text(sentence)
+    return any(cue in text for cue in QUERY_EXPLICIT_CUES)
+
+
 def query_entities_for_sentence(sentence: str, entities: tuple[Entity, ...]) -> tuple[Entity, ...]:
     return entities
 
@@ -777,14 +883,63 @@ def materialize_query_from_pattern(
         (*entities, *inferred_entities),
         allow_example_slot_values=False,
     )
+    query = rematerialize_topic_values(query, pattern.entities, (*entities, *inferred_entities))
     if query_has_unresolved_slot(query):
         return None
     return query
 
 
+def rematerialize_topic_values(
+    query: Query,
+    example_entities: tuple[Any, ...],
+    runtime_entities: tuple[Entity, ...],
+) -> Query:
+    mapping = topic_runtime_value_mapping(example_entities, runtime_entities)
+    if not mapping:
+        return query
+    return Query(
+        query.intent,
+        rematerialize_value(query.target, mapping),
+        tuple(rematerialize_value(qualifier, mapping) for qualifier in query.qualifiers),
+        tuple(rematerialize_topic_values(subquery, example_entities, runtime_entities) for subquery in query.subqueries),
+    )
+
+
+def topic_runtime_value_mapping(
+    example_entities: tuple[Any, ...],
+    runtime_entities: tuple[Entity, ...],
+) -> dict[str, str]:
+    example_topics = [
+        str(getattr(entity, "name", "")).strip()
+        for entity in example_entities
+        if str(getattr(entity, "role", "")).strip() == "topic" and str(getattr(entity, "name", "")).strip()
+    ]
+    runtime_topics = [
+        entity.name
+        for entity in runtime_entities
+        if entity.role == "topic" and entity.name
+    ]
+    if not example_topics or not runtime_topics:
+        return {}
+    mapping: dict[str, str] = {}
+    for index, example_topic in enumerate(example_topics):
+        runtime_topic = runtime_topics[index] if index < len(runtime_topics) else runtime_topics[-1]
+        mapping[example_topic] = runtime_topic
+    return mapping
+
+
+def rematerialize_value(value: str, mapping: dict[str, str]) -> str:
+    result = value
+    for source, target in sorted(mapping.items(), key=lambda item: len(item[0]), reverse=True):
+        result = result.replace(source, target)
+    return result
+
+
 def neural_query_rank(confidence: float, structural_score: float) -> float:
+    if structural_score >= QUERY_NEURAL_STRICT_CONFIDENCE:
+        return 2.0 + confidence
     if confidence >= QUERY_NEURAL_STRICT_CONFIDENCE:
-        return confidence
+        return 1.0 + structural_score
     return structural_score + confidence * 0.25
 
 

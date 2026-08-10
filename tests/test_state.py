@@ -103,6 +103,13 @@ class StateTest(unittest.TestCase):
                 self.assertIn(expected, structure)
                 self.assertEqual(prediction.answer, answer)
 
+    def test_condition_frame_projects_current_object_condition(self) -> None:
+        frame = with_time(frame_from_roles("condition", theme="桌子", result="生锈"), 1)
+
+        states = states_for_frame_schema(frame)
+
+        self.assertEqual(states, (State("condition", "桌子", "生锈", "f1"),))
+
     def test_open_close_events_update_access_state(self) -> None:
         examples = (
             ("小王打开盒子。盒子是什么状态？", "EVENT open(小王,盒子) WITH result=打开", "盒子是打开状态。"),

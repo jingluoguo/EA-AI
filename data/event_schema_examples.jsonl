@@ -14,3 +14,4 @@
 {"schema":"struct_llm.event_schema.v1","frame_type":"profile_name","effects":[{"name":"name","left_role":"subject","right_role":"value"}],"qualifier_roles":{}}
 {"schema":"struct_llm.event_schema.v1","frame_type":"profile_like","effects":[{"name":"likes","left_role":"subject","right_role":"value"}],"qualifier_roles":{}}
 {"schema":"struct_llm.event_schema.v1","frame_type":"profile_dislike","effects":[{"name":"dislikes","left_role":"subject","right_role":"value"}],"qualifier_roles":{}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"condition","effects":[{"name":"condition","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme","state":"result"}}

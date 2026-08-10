@@ -8,6 +8,7 @@ __all__ = (
     "infer_object_not_exists",
     "infer_object_exists",
     "infer_existence_unknown",
+    "infer_object_attribute",
     "infer_transfer_changes_owner",
     "infer_paint_changes_color",
     "infer_object_access_state",
@@ -42,6 +43,20 @@ def infer_existence_unknown(structure: Structure) -> str | None:
     if query is not None and query.intent == "existence" and not object_is_known(structure, query.target):
         return "existence_unknown"
     return None
+
+
+def infer_object_attribute(structure: Structure) -> str | None:
+    query = structure.query
+    if query is None or query.intent != "object_attribute":
+        return None
+    attribute = optional_query_qualifier(query, "attribute")
+    if attribute and has_state_left(structure, attribute, query.target):
+        return f"object_attribute_{attribute}_found"
+    if attribute:
+        return f"object_attribute_{attribute}_unknown"
+    return "object_attribute_unknown"
+
+
 def infer_transfer_changes_owner(structure: Structure) -> str | None:
     query = structure.query
     if query is not None and query.intent == "owner" and has_state_left(structure, "owner", query.target):

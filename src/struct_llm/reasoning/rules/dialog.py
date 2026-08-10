@@ -9,6 +9,7 @@ __all__ = (
     "infer_dialog_act",
     "infer_pragmatic_response_policy",
     "infer_profile_lookup",
+    "infer_condition_observation_needs_clarification",
     "infer_structural_update_acknowledgement",
 )
 
@@ -45,6 +46,19 @@ def infer_profile_lookup(structure: Structure) -> str | None:
         return None
     attribute = query_qualifier(query, "attribute")
     return f"profile_{attribute}_found" if profile_values(structure, query.target, attribute) else f"profile_{attribute}_unknown"
+
+
+def infer_condition_observation_needs_clarification(structure: Structure) -> str | None:
+    if structure.query is not None:
+        return None
+    if any(
+        frame.frame_type == "condition"
+        and frame.time >= structure.current_frame_start_time
+        and (frame.role("result") or "") == "生锈"
+        for frame in structure.frames
+    ):
+        return "condition_observation_needs_clarification"
+    return None
 
 
 def infer_structural_update_acknowledgement(structure: Structure) -> str | None:
