@@ -183,8 +183,6 @@ class LoadedNeuralStatementParser:
         if not pattern.frames:
             return None
         entities = decode_entities(normalized, predicted_tags, self.tag_labels)
-        entities = expand_short_entity_boundaries(normalized, entities)
-        entities = recover_missing_actor_entities(normalized, entities, pattern.entities)
         entities = filter_expected_entities(entities, pattern.entities)
         if not expected_entities_present(entities, pattern.entities):
             return None
@@ -640,70 +638,6 @@ def decode_entities(text: str, tag_ids: list[int], tag_labels: tuple[str, ...]) 
             flush(index)
     flush(len(tag_ids))
     return entities
-
-
-def expand_short_entity_boundaries(text: str, entities: list[Entity]) -> list[Entity]:
-    return [expand_short_entity_boundary(text, entity) for entity in entities]
-
-
-def expand_short_entity_boundary(text: str, entity: Entity) -> Entity:
-    if entity.role not in EXPANDABLE_SHORT_ENTITY_ROLES or len(entity.name) != 1:
-        return entity
-    start = text.find(entity.name)
-    if start < 0:
-        return entity
-    end = start + len(entity.name)
-    while end < len(text) and text[end] not in ENTITY_BOUNDARY_STOP_CHARS:
-        end += 1
-    expanded = text[start:end].strip()
-    if len(expanded) <= len(entity.name):
-        return entity
-    return Entity(entity.role, expanded)
-
-
-EXPANDABLE_SHORT_ENTITY_ROLES = frozenset(
-    {"person", "giver", "receiver", "item", "thing", "container", "place", "profile_value", "color"}
-)
-ENTITY_BOUNDARY_STOP_CHARS = frozenset(" ，,。！？!?；;、的是了吗呢吧和与及把被从到给在里中上下注放交搬带取拿")
-
-
-def recover_missing_actor_entities(
-    text: str,
-    entities: list[Entity],
-    expected: tuple[EntitySlot, ...],
-) -> list[Entity]:
-    if any(entity.role == "person" for entity in entities):
-        return entities
-    if not any(entity.role == "person" for entity in expected):
-        return entities
-    actor = leading_actor_before_action(text)
-    if not actor:
-        return entities
-    return [Entity("person", actor), *entities]
-
-
-def leading_actor_before_action(text: str) -> str:
-    stripped = strip_clause_prefix(text)
-    for marker in ("把", "从", "给", "打开", "关闭", "关上", "合上"):
-        index = stripped.find(marker)
-        if index <= 0:
-            continue
-        candidate = stripped[:index].strip()
-        if candidate and len(candidate) <= 6:
-            return candidate
-    return ""
-
-
-def strip_clause_prefix(text: str) -> str:
-    stripped = text.strip()
-    changed = True
-    while changed:
-        changed = False
-        for prefix in ("因为", "由于", "既然", "如果", "假如", "假使", "后来", "随后", "起初", "先", "刚才"):
-            if stripped.startswith(prefix) and len(stripped) > len(prefix):
-                stripped = stripped[len(prefix) :].strip()
-                changed = True
-    return stripped
 
 
 def filter_expected_entities(entities: list[Entity], expected: tuple[EntitySlot, ...]) -> list[Entity]:

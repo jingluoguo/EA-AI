@@ -4,7 +4,7 @@ import unittest
 from collections import Counter
 
 from struct_llm.perception.lexer import split_query_candidate
-from struct_llm.perception.normalizer import bare_topic_followup, normalize_question
+from struct_llm.perception.normalizer import normalize_question, normalize_slot_value
 from struct_llm.perception.reference import strip_ellipsis_particles
 from struct_llm.comprehension.surface_lexicon import load_surface_lexicon_jsonl, surface_forms, surface_replacements
 from struct_llm.world.event_schema import event_schemas, load_event_schema_jsonl
@@ -47,7 +47,11 @@ class StructuralCoverageTest(unittest.TestCase):
         self.assertIn("在哪里", surface_forms("location_query_marker"))
         self.assertEqual(strip_ellipsis_particles("那个呢？"), "那个")
         self.assertEqual(normalize_question("我想知道物品放入托盘里面了吗？"), "东西放进托盘里面")
-        self.assertEqual(bare_topic_followup("实验室呢"), "实验室")
+        self.assertEqual(normalize_question("实验室呢"), "实验室")
+        self.assertEqual(normalize_slot_value("【小王】"), "小王")
+        self.assertEqual(normalize_slot_value("（芯片）？"), "芯片")
+        self.assertEqual(normalize_slot_value("“托盘”！"), "托盘")
+        self.assertEqual(normalize_slot_value("　小李　"), "小李")
 
     def test_event_state_schemas_are_loaded_from_data(self) -> None:
         schemas = load_event_schema_jsonl("data/event_schema_examples.jsonl")
@@ -227,10 +231,9 @@ class StructuralCoverageTest(unittest.TestCase):
         self.assertGreater(episode_pragmatic_qualifier_count(examples, "train", "status=failure"), 0)
         self.assertGreater(episode_pragmatic_qualifier_count(examples, "test", "status=failure"), 0)
 
-        train_examples = tuple(example for example in examples if example.split == "train")
         test_examples = tuple(example for example in examples if example.split == "test")
-        heldout_result = evaluate_pragmatic_analyzer(InMemoryPragmaticAnalyzer(train_examples), test_examples)
-        self.assertEqual(heldout_result.matched, heldout_result.total)
+        neural_result = evaluate_pragmatic_analyzer(default_neural_pragmatic_analyzer(), test_examples)
+        self.assertEqual(neural_result.matched, neural_result.total)
 
     def test_intent_test_split_covers_contextual_intention_families(self) -> None:
         records = load_intent_jsonl("data/intent_examples.jsonl")

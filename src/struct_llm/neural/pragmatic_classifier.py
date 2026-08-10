@@ -30,6 +30,7 @@ from ..comprehension.episode import (
     normalize_episode_text,
     pragmatic_act_from_dict,
     pragmatic_act_matches,
+    pragmatic_runtime_target,
     pragmatic_act_to_dict,
 )
 from ..structure import PragmaticAct, Structure
@@ -171,7 +172,7 @@ class LoadedNeuralPragmaticAnalyzer:
         for act in self.acts_by_label[int(label_index.item())]:
             lifted = PragmaticAct(
                 act=act.act,
-                target=act.target,
+                target=pragmatic_runtime_target(act, text),
                 qualifiers=act.qualifiers,
                 confidence=min(1.0, max(act.confidence, score)),
                 source=act.source,

@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from ..structure import Intention, Structure
 from .intent_dataset import intent_record_from_dict, load_intent_jsonl
 from ..perception.normalizer import normalize_question
+
+
+IntentAnalyzerLike = Callable[[str, Structure], tuple[Intention, ...]]
 
 
 @dataclass(frozen=True)
@@ -83,7 +86,7 @@ def example_from_record(record: dict[str, Any]) -> IntentTrainingExample:
 
 
 def evaluate_intent_analyzer(
-    analyzer: InMemoryIntentAnalyzer,
+    analyzer: IntentAnalyzerLike,
     examples: tuple[IntentTrainingExample, ...],
 ) -> IntentEvaluationResult:
     matched = 0

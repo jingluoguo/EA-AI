@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from ..dataset_io import append_jsonl_object, file_sha256, load_jsonl_objects
 from ..memory.long_term import memory_entities_from_states
-from ..perception.normalizer import bare_topic_followup, normalize_question
+from ..perception.normalizer import normalize_question
 from ..perception.reference import strip_ellipsis_particles
 from ..structure import Entity, Frame, PragmaticAct, Query, Role, State, Structure
 from .query import query_from_dict, query_to_dict
@@ -34,6 +34,9 @@ RESPONSE_POLICIES = frozenset(
         "confirm",
     }
 )
+
+
+PragmaticAnalyzerLike = Callable[[str, Structure], tuple[PragmaticAct, ...]]
 
 
 @dataclass(frozen=True)
@@ -143,14 +146,13 @@ class InMemoryPragmaticAnalyzer:
             for example in examples
         ]
         matches = [
-            acts_with_runtime_source(example.expected_pragmatic_acts, score)
+            acts_with_runtime_source(example.expected_pragmatic_acts, text, score)
             for score, example in sorted(scored, key=lambda item: item[0], reverse=True)
             if score >= self.min_score
         ]
         acts: list[PragmaticAct] = []
         seen: set[tuple[str, str, tuple[str, ...]]] = set()
         structural_acts = (
-            bare_topic_followup_act(text, structure),
             ambiguous_reference_act(structure),
         )
         structural_targets: set[tuple[str, str]] = set()
@@ -175,19 +177,6 @@ def resolved_query_suppresses_pragmatic_example(example: EpisodeTrainingExample)
     return any(act.act in RESOLVED_QUERY_SUPPRESSED_ACTS for act in example.expected_pragmatic_acts)
 
 
-def bare_topic_followup_act(text: str, structure) -> PragmaticAct | None:
-    if structure is not None and getattr(structure, "query", None) is not None:
-        return None
-    topic = bare_topic_followup(text)
-    if topic is None:
-        return None
-    return PragmaticAct(
-        "underspecified_reference_query",
-        topic,
-        ("missing=query_intent", "response_policy=ask_clarification"),
-        confidence=1.0,
-        source="structural",
-    )
 def ambiguous_reference_act(structure) -> PragmaticAct | None:
     if structure is None or getattr(structure, "query", None) is not None:
         return None
@@ -278,7 +267,7 @@ def compile_episode_model_from_jsonl(path: str | Path = EPISODE_DATA_PATH) -> Co
 
 
 def evaluate_pragmatic_analyzer(
-    analyzer: InMemoryPragmaticAnalyzer,
+    analyzer: PragmaticAnalyzerLike,
     examples: tuple[EpisodeTrainingExample, ...],
 ) -> EpisodeEvaluationResult:
     matched = 0
@@ -460,17 +449,24 @@ def episode_example_from_dict(record: dict[str, Any], *, line_number: int | None
     )
 
 
-def acts_with_runtime_source(acts: tuple[PragmaticAct, ...], score: float) -> tuple[PragmaticAct, ...]:
+def acts_with_runtime_source(acts: tuple[PragmaticAct, ...], text: str, score: float) -> tuple[PragmaticAct, ...]:
     return tuple(
         PragmaticAct(
             act=act.act,
-            target=act.target,
+            target=pragmatic_runtime_target(act, text),
             qualifiers=act.qualifiers,
             confidence=min(1.0, max(act.confidence, score)),
             source=act.source,
         )
         for act in acts
     )
+
+
+def pragmatic_runtime_target(act: PragmaticAct, text: str) -> str:
+    if act.act != "underspecified_reference_query":
+        return act.target
+    normalized = normalize_question(text)
+    return normalized or act.target
 
 
 def pragmatic_act_matches(predicted: PragmaticAct, expected: PragmaticAct) -> bool:
@@ -666,7 +662,7 @@ def clean_string_tuple(values: Iterable[str]) -> tuple[str, ...]:
 def normalize_episode_text(text: str) -> str:
     normalized = normalize_question(text)
     if not normalized:
-        normalized = bare_topic_followup(text) or strip_ellipsis_particles(text) or text.strip().rstrip("。！？!?，,；;")
+        normalized = strip_ellipsis_particles(text) or text.strip().rstrip("。！？!?，,；;")
     return normalized.replace("。", "").replace("，", "").replace(",", "").strip()
 
 
