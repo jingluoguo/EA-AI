@@ -44,6 +44,7 @@
 {"entities": [{"name": "药瓶", "role": "item"}], "query": {"intent": "location", "qualifiers": [], "target": "$item#1"}, "question": "药瓶在哪里", "source": "migrated_training", "split": "train"}
 {"entities": [], "query": {"intent": "dialog_act", "qualifiers": [], "target": "summary"}, "question": "总结一下", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "我", "role": "self"}], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "$self#1"}, "question": "我叫什么", "source": "migrated_training", "split": "train"}
+{"entities": [], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "我"}, "question": "我叫什么", "source": "context_contrast_profile_name_without_explicit_self", "split": "train"}
 {"entities": [{"name": "我", "role": "self"}], "query": {"intent": "profile", "qualifiers": ["attribute=likes"], "target": "$self#1"}, "question": "我喜欢什么", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "我", "role": "self"}], "query": {"intent": "profile", "qualifiers": ["attribute=dislikes"], "target": "$self#1"}, "question": "我不喜欢什么", "source": "migrated_training", "split": "train"}
 {"entities": [], "query": {"intent": "dialog_act", "qualifiers": [], "target": "greeting"}, "question": "你好", "source": "migrated_training", "split": "train"}
@@ -404,8 +405,11 @@
 {"entities": [{"name": "笔记本", "role": "item"}], "query": {"intent": "places_visited", "qualifiers": [], "target": "$item#1"}, "question": "笔记本到过哪里", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "笔记本", "role": "item"}], "query": {"intent": "places_visited", "qualifiers": [], "target": "$item#1"}, "question": "笔记本经过了哪些地方", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "我", "role": "self"}], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "$self#1"}, "question": "我叫什么名字", "source": "migrated_training", "split": "train"}
+{"entities": [], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "我"}, "question": "我叫什么名字", "source": "context_contrast_profile_name_without_explicit_self", "split": "train"}
 {"entities": [{"name": "我", "role": "self"}], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "$self#1"}, "question": "我的名字是什么", "source": "migrated_training", "split": "train"}
+{"entities": [], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "我"}, "question": "我的名字是什么", "source": "context_contrast_profile_name_without_explicit_self", "split": "train"}
 {"entities": [{"name": "我", "role": "self"}], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "$self#1"}, "question": "我是谁", "source": "migrated_training", "split": "train"}
+{"entities": [], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "我"}, "question": "我是谁", "source": "context_contrast_profile_name_without_explicit_self", "split": "train"}
 {"entities": [{"name": "我", "role": "self"}], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "$self#1"}, "question": "你知道我叫啥吗", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "我", "role": "self"}], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "$self#1"}, "question": "我叫什么来着", "source": "migrated_training", "split": "train"}
 {"entities": [{"name": "我", "role": "self"}], "query": {"intent": "profile", "qualifiers": ["attribute=name"], "target": "$self#1"}, "question": "告诉我我的名字", "source": "migrated_training", "split": "train"}

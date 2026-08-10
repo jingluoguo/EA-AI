@@ -200,14 +200,8 @@ class LoadedNeuralQueryParser:
             if pattern.query is None:
                 continue
             structural_score = query_structural_score(sentence, query_entities, pattern)
-            # Top-k reranking is still neural-led: only labels emitted by the
-            # classifier are considered, then invalid slot materializations are
-            # discarded before a structure can reach the kernel.
             query = materialize_query_from_pattern(sentence, query_entities, pattern)
             if query is None:
-                continue
-            if simple_high_confidence_dialog_act(query, pattern, confidence):
-                candidates.append((neural_query_rank(confidence, structural_score), confidence, pattern))
                 continue
             if confidence < QUERY_NEURAL_STRICT_CONFIDENCE and structural_score < QUERY_NEURAL_WHOLE_CANDIDATE_SCORE:
                 continue
@@ -729,18 +723,7 @@ def query_input_entities(sentence: str, entities: tuple[Any, ...]) -> tuple[Any,
 
 
 def query_entities_for_sentence(sentence: str, entities: tuple[Entity, ...]) -> tuple[Entity, ...]:
-    if not self_profile_name_query_anchor(sentence):
-        return entities
-    if any(entity.role == "self" and entity.name == "我" for entity in entities):
-        return entities
-    return (*entities, Entity("self", "我"))
-
-
-def self_profile_name_query_anchor(sentence: str) -> bool:
-    text = canonical_text(sentence)
-    if "我" not in text:
-        return False
-    return any(anchor in text for anchor in ("我是谁", "我叫啥", "我叫什么", "我的名字", "我叫甚"))
+    return entities
 
 
 def query_has_unresolved_slot(query: Query) -> bool:
@@ -803,19 +786,6 @@ def neural_query_rank(confidence: float, structural_score: float) -> float:
     if confidence >= QUERY_NEURAL_STRICT_CONFIDENCE:
         return confidence
     return structural_score + confidence * 0.25
-
-
-def simple_high_confidence_dialog_act(
-    query: Query,
-    pattern: CompiledQueryPattern,
-    confidence: float,
-) -> bool:
-    if confidence < 0.95:
-        return False
-    if query.intent != "dialog_act":
-        return False
-    values = (pattern.abstract_question, query.target, *query.qualifiers)
-    return not any("$" in value or "<" in value or ">" in value for value in values)
 
 
 def canonical_text(text: str) -> str:
