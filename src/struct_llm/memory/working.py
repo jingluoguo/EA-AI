@@ -56,7 +56,54 @@ def focus_states_for_query(query: Query | None) -> tuple[State, ...]:
     return (
         State("focus_topic", "user", target, "working_memory"),
         State("focus_query_intent", "user", query.intent, "working_memory"),
+        *focus_condition_states_for_query(query),
     )
+
+
+def focus_states_for_frames(frames: tuple[Frame, ...]) -> tuple[State, ...]:
+    latest_topic = ""
+    latest_condition_topic = ""
+    for frame in frames:
+        if frame.frame_type == "condition":
+            condition_topic = condition_frame_focus_topic(frame)
+            if condition_topic:
+                latest_condition_topic = condition_topic
+            continue
+        if frame.frame_type == "material":
+            topic = frame_focus_topic(frame)
+            if topic:
+                latest_topic = topic
+    states: list[State] = []
+    if latest_topic:
+        states.append(State("focus_topic", "user", latest_topic, "working_memory"))
+    if latest_condition_topic:
+        states.append(State("focus_condition_topic", "user", latest_condition_topic, "working_memory"))
+    return tuple(states)
+
+
+def focus_condition_states_for_query(query: Query | None) -> tuple[State, ...]:
+    if query is None or query.intent != "why":
+        return ()
+    target = query.target.strip()
+    if not target or "$" in target or target == "multi":
+        return ()
+    return (State("focus_condition_topic", "user", target, "working_memory"),)
+
+
+def condition_frame_focus_topic(frame: Frame) -> str:
+    theme = frame.role("theme")
+    result = frame.role("result")
+    if not theme or not result:
+        return ""
+    return f"{theme}{result}"
+
+
+def frame_focus_topic(frame: Frame) -> str:
+    for role_name in ("theme", "item", "object", "subject"):
+        value = frame.role(role_name)
+        if value:
+            return value
+    return ""
 
 
 def capabilities_with_last_user_utterance(
@@ -108,6 +155,8 @@ def capabilities_with_working_turn(
     for frame in new_frames:
         for state in capabilities.states_from_frame(frame):
             capabilities.apply_state(preserved, state)
+    for state in focus_states_for_frames(new_frames):
+        capabilities.apply_state(preserved, state)
     preserved_frames = (*existing_frames, *new_frames) if new_frames else existing_frames
     return capabilities.evolve(memory_states=tuple(preserved), memory_frames=preserved_frames)
 

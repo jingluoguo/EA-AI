@@ -28,6 +28,7 @@ PERCEPTION_HIDDEN_DIM = 64
 PERCEPTION_EPOCHS = 96
 PERCEPTION_LEARNING_RATE = 0.02
 PERCEPTION_SEED = 20260809
+REFERENCE_RESOLUTION_MIN_CONFIDENCE = 0.50
 
 
 @dataclass(frozen=True)
@@ -357,7 +358,10 @@ class PerceptionNeuralModel:
             self.reference_ranker.eval()
             with torch.no_grad():
                 scores = torch.softmax(self.reference_ranker(token_ids, lengths), dim=-1)[:, 1]
-            selected = candidates[int(scores.argmax().item())][0]
+            selected_index = int(scores.argmax().item())
+            if float(scores[selected_index].item()) < REFERENCE_RESOLUTION_MIN_CONFIDENCE:
+                continue
+            selected = candidates[selected_index][0]
             if not selected:
                 continue
             start = resolved.find(mention)

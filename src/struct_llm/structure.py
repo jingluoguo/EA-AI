@@ -202,6 +202,10 @@ class Frame:
             theme = self.role("theme") or ""
             color = self.role("result") or ""
             return Event("paint", theme, color)
+        if self.frame_type == "material":
+            theme = self.role("theme") or ""
+            value = self.role("value") or ""
+            return Event("material", theme, value)
         if self.frame_type in {"open", "close"}:
             actor = self.role("actor") or ""
             theme = self.role("theme") or ""

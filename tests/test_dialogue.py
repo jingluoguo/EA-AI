@@ -411,33 +411,40 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("QUERY why(铁会生锈,type=why)", followup.structure.linearize())
         self.assertEqual(followup.answer, "铁和空气里的氧、水发生反应后，会生成疏松的氧化物，也就是锈。")
 
-    def test_unknown_material_rust_observation_asks_before_explaining_iron(self) -> None:
+    def test_condition_observations_ask_goal_before_explaining(self) -> None:
         capabilities = default_capabilities(use_environment=False, use_memory=False).with_answerers(
             default_learned_memory_knowledge_answerer("data/memory_knowledge_model.json")
         )
 
         cases = (
-            ("我家桌子生锈了", "桌子"),
-            ("我家锅生锈了", "锅"),
-            ("家里的水龙头生锈了", "水龙头"),
-            ("我的桌子有点生锈", "桌子"),
+            ("我家桌子生锈了", "桌子", "生锈"),
+            ("我家里的锅生锈了", "锅", "生锈"),
+            ("我家水管漏水了", "水管", "漏水"),
+            ("我的手机发烫了", "手机", "发烫"),
+            ("家里的墙发霉了", "墙", "发霉"),
+            ("门把手松动了", "门把手", "松动"),
+            ("电脑风扇有异响", "电脑风扇", "异响"),
         )
-        for text, item in cases:
+        for text, item, condition in cases:
             with self.subTest(text=text):
                 prediction = predict(text, capabilities)
                 structure = prediction.structure.linearize()
                 self.assertIn(f"ENTITY item={item}", structure)
-                self.assertIn(f"REL condition({item},生锈)", structure)
-                self.assertIn("RULE condition_observation_needs_clarification", structure)
+                self.assertIn(f"REL condition({item},{condition})", structure)
+                self.assertIn(
+                    "PRAGMATIC_ACT condition_observation(observed_condition,missing=user_goal,response_policy=ask_clarification)",
+                    structure,
+                )
+                self.assertIn("RULE pragmatic_response_ask_clarification", structure)
                 self.assertNotIn("QUERY why(铁会生锈,type=why)", structure)
-                self.assertIn("材质", prediction.answer)
+                self.assertIn("补充哪些信息", prediction.answer)
                 self.assertIn("处理办法", prediction.answer)
                 self.assertNotIn("我记录到", prediction.answer)
 
-    def test_material_followup_after_rust_observation_uses_object_focus(self) -> None:
+    def test_material_followup_after_condition_observation_uses_object_focus(self) -> None:
         capabilities = default_capabilities(use_environment=False, use_memory=False)
         observation = predict("我家桌子生锈了", capabilities)
-        self.assertEqual(observation.answer, "你想先了解它的材质、处理办法，还是生锈原因？")
+        self.assertEqual(observation.answer, "你想先了解需要补充哪些信息、处理办法，还是可能原因？")
         capabilities = capabilities_with_working_turn(
             capabilities,
             "我家桌子生锈了",
@@ -454,6 +461,158 @@ class DialogueTest(unittest.TestCase):
         self.assertIn("RULE object_attribute_material_unknown", structure)
         self.assertNotIn("QUERY dialog_act(identity)", structure)
         self.assertEqual(followup.answer, "我还不知道桌子的材质。你可以告诉我它是什么材质，或者描述一下外观。")
+
+    def test_reason_followup_after_condition_observation_uses_condition_focus(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        observation = predict("我家锅生锈了", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "我家锅生锈了",
+            observation.structure.states,
+            observation.structure.query,
+            observation.structure.frames,
+        )
+
+        followup = predict("因为啥呀", capabilities)
+
+        structure = followup.structure.linearize()
+        self.assertIn("ENTITY topic=锅生锈", structure)
+        self.assertIn("QUERY why(锅生锈,type=why)", structure)
+        self.assertIn("RULE condition_reason_needs_context", structure)
+        self.assertNotIn("QUERY why(呀,type=why)", structure)
+        self.assertNotIn("铁和空气里的氧", followup.answer)
+        self.assertIn("锅生锈", followup.answer)
+        self.assertIn("材质或结构", followup.answer)
+
+    def test_material_statement_after_condition_observation_continues_dialogue(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        observation = predict("我家锅生锈了", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "我家锅生锈了",
+            observation.structure.states,
+            observation.structure.query,
+            observation.structure.frames,
+        )
+        reason = predict("因为啥呀", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "因为啥呀",
+            reason.structure.states,
+            reason.structure.query,
+            reason.structure.frames,
+        )
+
+        material = predict("锅是铁的", capabilities)
+        capabilities = capabilities_with_working_turn(
+            capabilities,
+            "锅是铁的",
+            material.structure.states,
+            material.structure.query,
+            material.structure.frames,
+        )
+        followup = predict("材质是什么", capabilities)
+
+        material_structure = material.structure.linearize()
+        self.assertIn("REL material(锅,铁)", material_structure)
+        self.assertIn("FRAME f2 type=material time=2", material_structure)
+        self.assertEqual(material.answer, "我知道了。")
+        self.assertIn("QUERY object_attribute(锅,attribute=material)", followup.structure.linearize())
+        self.assertEqual(followup.answer, "锅的材质是铁。")
+
+    def test_reason_followup_after_material_statement_keeps_condition_focus(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+        for text in ("我家锅生锈了", "因为啥呀", "锅是铁的"):
+            prediction = predict(text, capabilities)
+            capabilities = capabilities_with_working_turn(
+                capabilities,
+                text,
+                prediction.structure.states,
+                prediction.structure.query,
+                prediction.structure.frames,
+            )
+
+        followup = predict("所以因为啥", capabilities)
+        structure = followup.structure.linearize()
+
+        self.assertIn("ENTITY topic=锅生锈", structure)
+        self.assertIn("QUERY why(锅生锈,type=why)", structure)
+        self.assertIn("RULE condition_reason_needs_context", structure)
+        self.assertEqual(
+            followup.answer,
+            "还不能直接确定锅生锈的原因。需要先了解锅的材质或结构、使用环境，以及生锈出现的位置和时间。",
+        )
+
+    def test_material_updates_remain_available_after_many_dialogue_turns(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+
+        turns = (
+            ("我家锅生锈了", "你想先了解需要补充哪些信息、处理办法，还是可能原因？"),
+            ("因为啥呀", "还不能直接确定锅生锈的原因。需要先了解锅的材质或结构、使用环境，以及生锈出现的位置和时间。"),
+            ("你好", "你好呀，很高兴见到你，有什么我可以帮你的吗？"),
+            ("我叫小锣", "我知道了。"),
+            ("我喜欢咖啡", "我知道了。"),
+            ("锅是铁的", "我知道了。"),
+            ("锅是什么材质", "锅的材质是铁。"),
+            ("桌子是木头的", "我知道了。"),
+            ("材质是什么", "桌子的材质是木头。"),
+        )
+
+        for text, answer in turns:
+            with self.subTest(text=text):
+                prediction = predict(text, capabilities)
+                structure = prediction.structure.linearize()
+                self.assertEqual(prediction.answer, answer)
+                if text == "锅是铁的":
+                    self.assertIn("REL material(锅,铁)", structure)
+                    self.assertIn("FRAME f4 type=material time=4", structure)
+                elif text == "锅是什么材质":
+                    self.assertIn("QUERY object_attribute(锅,attribute=material)", structure)
+                    self.assertIn("RULE object_attribute_material_found", structure)
+                elif text == "桌子是木头的":
+                    self.assertIn("REL material(桌子,木头)", structure)
+                    self.assertIn("FRAME f5 type=material time=5", structure)
+                elif text == "材质是什么":
+                    self.assertIn("QUERY object_attribute(桌子,attribute=material)", structure)
+                capabilities = capabilities_with_working_turn(
+                    capabilities,
+                    text,
+                    prediction.structure.states,
+                    prediction.structure.query,
+                    prediction.structure.frames,
+                )
+
+    def test_material_focus_survives_many_unrelated_dialogue_turns(self) -> None:
+        capabilities = default_capabilities(use_environment=False, use_memory=False)
+
+        for text in ("我家锅生锈了", "因为啥呀", "锅是铁的"):
+            prediction = predict(text, capabilities)
+            capabilities = capabilities_with_working_turn(
+                capabilities,
+                text,
+                prediction.structure.states,
+                prediction.structure.query,
+                prediction.structure.frames,
+            )
+
+        for index in range(20):
+            text = "你好" if index % 2 == 0 else "你能做什么"
+            prediction = predict(text, capabilities)
+            capabilities = capabilities_with_working_turn(
+                capabilities,
+                text,
+                prediction.structure.states,
+                prediction.structure.query,
+                prediction.structure.frames,
+            )
+
+        followup = predict("材质是什么", capabilities)
+        structure = followup.structure.linearize()
+
+        self.assertIn("REL material(锅,铁)", structure)
+        self.assertIn("QUERY object_attribute(锅,attribute=material)", structure)
+        self.assertIn("RULE object_attribute_material_found", structure)
+        self.assertEqual(followup.answer, "锅的材质是铁。")
 
     def test_principle_request_without_focus_waits_for_completion(self) -> None:
         prediction = predict("我想了解下原理", default_capabilities(use_environment=False, use_memory=False))

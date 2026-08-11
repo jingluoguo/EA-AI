@@ -10,7 +10,6 @@ __all__ = (
     "answer_pragmatic_response_policy",
     "answer_profile_lookup",
     "answer_profile_statement_acknowledgement",
-    "answer_condition_observation_needs_clarification",
     "answer_structural_update_acknowledgement",
 )
 
@@ -123,15 +122,6 @@ def answer_profile_statement_acknowledgement(structure: Structure) -> str | None
     return None
 
 
-def answer_condition_observation_needs_clarification(structure: Structure) -> str | None:
-    if "condition_observation_needs_clarification" not in set(structure.rules):
-        return None
-    frame = latest_condition_frame(structure, "生锈")
-    if frame is None:
-        return None
-    return "你想先了解它的材质、处理办法，还是生锈原因？"
-
-
 def answer_structural_update_acknowledgement(structure: Structure) -> str | None:
     if structure.query is not None:
         return None
@@ -156,15 +146,3 @@ def latest_profile_frame(structure: Structure):
         return None
     return max(frames, key=lambda frame: frame.time)
 
-
-def latest_condition_frame(structure: Structure, result: str):
-    frames = [
-        frame
-        for frame in structure.frames
-        if frame.frame_type == "condition"
-        and frame.time >= structure.current_frame_start_time
-        and frame.role("result") == result
-    ]
-    if not frames:
-        return None
-    return max(frames, key=lambda frame: frame.time)

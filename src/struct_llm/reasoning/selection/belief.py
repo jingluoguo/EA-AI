@@ -11,6 +11,8 @@ __all__ = (
     "belief_states",
     "claim_speakers",
     "belief_sources",
+    "condition_state_for_target",
+    "condition_target_phrases",
     "states_from_proposition",
     "explanation_for_target",
     "explain_location_target",
@@ -143,6 +145,23 @@ def explanation_for_target(structure: Structure, target: str) -> str | None:
             return color
 
     return None
+
+
+def condition_target_phrases(structure: Structure) -> tuple[str, ...]:
+    phrases = [condition_phrase(state) for state in structure.states if state.name == "condition" and state.left and state.right]
+    return tuple(dict.fromkeys(phrases))
+
+
+def condition_state_for_target(structure: Structure, target: str) -> State | None:
+    normalized = target.strip().rstrip("。！？!?")
+    for state in reversed(structure.states):
+        if state.name == "condition" and condition_phrase(state) == normalized:
+            return state
+    return None
+
+
+def condition_phrase(state: State) -> str:
+    return f"{state.left}{state.right}"
 def states_cover_target(candidates: tuple[State, ...], target_states: tuple[State, ...]) -> bool:
     if not candidates or not target_states:
         return False

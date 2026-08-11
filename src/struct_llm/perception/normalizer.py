@@ -4,12 +4,14 @@ import unicodedata
 
 from ..comprehension.surface_lexicon import surface_forms
 from ..structure import Entity
+from .reference import strip_ellipsis_particles
 
 
 def normalize_question(sentence: str) -> str:
     from ..neural.perception_classifier import default_perception_model
 
-    return default_perception_model().normalize(sentence, "question")
+    normalized = default_perception_model().normalize(sentence, "question")
+    return strip_ellipsis_particles(normalized)
 
 
 def normalize_statement(sentence: str) -> str:

@@ -12,7 +12,6 @@ __all__ = (
     "answer_pragmatic_response_policy",
     "answer_profile_lookup",
     "answer_profile_statement_acknowledgement",
-    "answer_condition_observation_needs_clarification",
     "answer_structural_update_acknowledgement",
     "answer_event_actor",
     "answer_latest_event_actor",

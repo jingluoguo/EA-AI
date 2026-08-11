@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from .capabilities import CognitiveCapabilities
 from .comprehension.episode import EPISODE_DATA_PATH
 from .kernel_flow import finalize_parse_context, ingest_sentence, initial_parse_context
-from .motor.dialogue import default_learned_dialog_answerer
+from .motor.dialogue import default_learned_dialog_answerer, default_learned_pragmatic_answerer
 from .neural import NeuralBoundaryModel, configured_neural_boundary_model, with_neural_boundary
 from .neural.intent_classifier import default_neural_intent_analyzer
 from .neural.pragmatic_classifier import default_neural_pragmatic_analyzer
@@ -45,7 +45,7 @@ def default_capabilities(
         state_reducers=DEFAULT_STATE_REDUCERS,
         query_parsers=(default_neural_query_parser(),),
         rule_inferers=DEFAULT_RULE_INFERERS,
-        answerers=(default_learned_dialog_answerer(), *DEFAULT_ANSWERERS),
+        answerers=(default_learned_dialog_answerer(), default_learned_pragmatic_answerer(EPISODE_DATA_PATH), *DEFAULT_ANSWERERS),
         intent_analyzers=(default_neural_intent_analyzer(),),
         sentence_segmenters=(perception_model.split_sentences,),
         candidate_segmenters=(perception_model.split_query_candidate,),

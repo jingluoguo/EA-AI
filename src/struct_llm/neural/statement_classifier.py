@@ -33,6 +33,7 @@ from ..comprehension.statement import (
     load_statement_jsonl,
     normalize_entity_value,
     normalize_statement_text,
+    statement_score,
 )
 from ..structure import Entity, Frame, Role
 
@@ -58,6 +59,7 @@ STATEMENT_NEURAL_SEED = 20260806
 class NeuralStatementPattern:
     entities: tuple[EntitySlot, ...]
     frames: tuple[FrameTemplate, ...]
+    templates: tuple[str, ...] = ()
     support: int = 1
 
 
@@ -180,6 +182,8 @@ class LoadedNeuralStatementParser:
             predicted_tags = torch.argmax(tag_logits, dim=-1)[0].tolist()[: int(lengths[0].item())]
 
         pattern = self.patterns[label_index]
+        if pattern.frames and not statement_pattern_is_compatible(normalized, pattern):
+            return None
         if not pattern.frames:
             return None
         entities = decode_entities(normalized, predicted_tags, self.tag_labels)
@@ -493,9 +497,14 @@ def representative_patterns_by_label(
         key = label_key(example)
         previous = grouped.get(key)
         if previous is None:
-            grouped[key] = NeuralStatementPattern(example.entities, example.frames, support=1)
+            grouped[key] = NeuralStatementPattern(example.entities, example.frames, templates=(example.sentence_template,), support=1)
         else:
-            grouped[key] = NeuralStatementPattern(previous.entities, previous.frames, support=previous.support + 1)
+            grouped[key] = NeuralStatementPattern(
+                previous.entities,
+                previous.frames,
+                templates=tuple(dict.fromkeys((*previous.templates, example.sentence_template))),
+                support=previous.support + 1,
+            )
     return grouped
 
 
@@ -514,6 +523,7 @@ def statement_pattern_to_dict(pattern: NeuralStatementPattern) -> dict[str, Any]
     return {
         "entities": [{"role": entity.role, "name": entity.name} for entity in pattern.entities],
         "frames": [frame_template_to_dict(frame) for frame in pattern.frames],
+        "templates": list(pattern.templates),
         "support": pattern.support,
     }
 
@@ -538,7 +548,9 @@ def statement_pattern_from_dict(record: Any) -> NeuralStatementPattern:
         for value in raw_frames
         if isinstance(value, dict)
     )
-    return NeuralStatementPattern(entities, frames, int(record.get("support") or 1))
+    raw_templates = record.get("templates", ())
+    templates = tuple(str(value) for value in raw_templates if str(value).strip()) if isinstance(raw_templates, list) else ()
+    return NeuralStatementPattern(entities, frames, templates, int(record.get("support") or 1))
 
 
 def select_statement_label(
@@ -572,6 +584,14 @@ def statement_semantic_signature(pattern: NeuralStatementPattern) -> tuple[Any, 
         tuple(sorted(entity_counts.items())),
         tuple((frame.frame_type, tuple(frame.roles)) for frame in pattern.frames),
     )
+
+
+def statement_pattern_is_compatible(sentence: str, pattern: NeuralStatementPattern) -> bool:
+    if not pattern.templates:
+        return True
+    if any(extract_slots(template, sentence) is not None for template in pattern.templates):
+        return True
+    return max((statement_score(template, sentence) for template in pattern.templates), default=0.0) >= 0.80
 
 
 def build_training_example(

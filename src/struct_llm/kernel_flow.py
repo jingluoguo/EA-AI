@@ -460,10 +460,23 @@ def filter_resolved_pragmatic_acts(
 
 
 def pragmatic_act_is_resolved_by_structure(act: PragmaticAct, structure: Structure) -> bool:
+    if act.act == "action_result_report" and (
+        structure.query is not None
+        or any(frame.time >= structure.current_frame_start_time for frame in structure.frames)
+    ):
+        return True
+    if act.act == "condition_observation" and not any(
+        frame.frame_type == "condition" and frame.time >= structure.current_frame_start_time
+        for frame in structure.frames
+    ):
+        return True
     if structure.query is not None and act.act in {
         "ambiguous_reference",
         "clarification_request",
+        "condition_observation",
         "incomplete_utterance",
+        "recall_previous_turn",
+        "repair_previous_understanding",
         "underspecified_action_request",
         "underspecified_reference_query",
     }:

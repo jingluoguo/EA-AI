@@ -14,10 +14,16 @@ __all__ = (
 )
 
 def answer_why(structure: Structure) -> str | None:
-    if "causal_explanation" not in set(structure.rules):
+    rules = set(structure.rules)
+    if "causal_explanation" not in rules and "condition_reason_needs_context" not in rules:
         return None
     query = require_query(structure)
     explanation = explanation_for_target(structure, query.target)
+    if explanation is None and "condition_reason_needs_context" in rules:
+        state = condition_state_for_target(structure, query.target)
+        if state is None:
+            raise ParseError(f"Expected condition target for {query.target}.")
+        return f"还不能直接确定{state.left}{state.right}的原因。需要先了解{state.left}的材质或结构、使用环境，以及{state.right}出现的位置和时间。"
     if explanation is None:
         raise ParseError(f"Expected explanation for {query.target}.")
     return explanation

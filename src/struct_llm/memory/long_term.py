@@ -27,6 +27,7 @@ CHAT_MEMORY_STATE_NAMES = frozenset(
         "in",
         "owner",
         "color",
+        "material",
         "access",
         "exists",
     }
@@ -261,6 +262,8 @@ def entities_for_state(state: State) -> tuple[Entity, ...]:
         return ()
     if state.name == "focus_topic":
         return (Entity("topic", state.right),)
+    if state.name == "focus_condition_topic":
+        return (Entity("topic", state.right),)
     if state.name == "focus_query_intent":
         return (Entity("query_intent", state.right),)
     if state.name == "focus_dialog_act":
@@ -278,10 +281,16 @@ def entities_for_state(state: State) -> tuple[Entity, ...]:
         return (Entity(subject_role, state.left), Entity("profile_value", state.right))
     if state.name == "color":
         return (Entity("item", state.left), Entity("color", state.right))
+    if state.name == "material":
+        return (Entity("item", state.left), Entity("material", state.right))
     if state.name == "access":
         return (Entity("container", state.left),)
     if state.name == "condition":
-        return (Entity("thing", state.left), Entity("topic", state.left))
+        return (
+            Entity("thing", state.left),
+            Entity("topic", state.left),
+            Entity("topic", f"{state.left}{state.right}"),
+        )
     return (Entity("thing", state.left),)
 
 

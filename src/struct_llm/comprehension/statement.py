@@ -381,7 +381,130 @@ def normalize_statement_template(template: str) -> str:
     parts = split_template(template)
     protected = protect_template_slots(parts)
     normalized = normalize_statement(protected)
+    normalized = preserve_template_slot_markers(normalized, parts)
+    normalized = preserve_template_literal_anchors(normalized, parts)
     return restore_template_slots(normalized, parts).strip().rstrip("。！？!?，,")
+
+
+def preserve_template_slot_markers(normalized: str, parts: tuple[str, ...]) -> str:
+    markers = template_slot_markers(parts)
+    slot_marker_index = 0
+    result = normalized
+    for index, part in enumerate(parts):
+        if not is_slot(part):
+            continue
+        marker = markers[slot_marker_index]
+        slot_marker_index += 1
+        if marker in result:
+            continue
+        result = insert_missing_template_marker(result, marker, parts, index, markers[:slot_marker_index])
+    return result
+
+
+def insert_missing_template_marker(
+    normalized: str,
+    marker: str,
+    parts: tuple[str, ...],
+    part_index: int,
+    seen_markers: tuple[str, ...],
+) -> str:
+    previous_anchor = previous_template_anchor(parts, part_index, seen_markers)
+    if previous_anchor:
+        position = normalized.rfind(previous_anchor)
+        if position >= 0:
+            return normalized[: position + len(previous_anchor)] + marker + normalized[position + len(previous_anchor) :]
+    next_anchor = next_template_anchor(parts, part_index)
+    if next_anchor:
+        position = normalized.find(next_anchor)
+        if position >= 0:
+            return normalized[:position] + marker + normalized[position:]
+    return marker + normalized
+
+
+def previous_template_anchor(parts: tuple[str, ...], part_index: int, seen_markers: tuple[str, ...]) -> str:
+    marker_index = len(seen_markers) - 2
+    for part in reversed(parts[:part_index]):
+        if is_slot(part):
+            if marker_index >= 0:
+                marker = seen_markers[marker_index]
+                marker_index -= 1
+                return marker
+            continue
+        if part:
+            return part
+    return ""
+
+
+def next_template_anchor(parts: tuple[str, ...], part_index: int) -> str:
+    for part in parts[part_index + 1 :]:
+        if not is_slot(part) and part:
+            return part
+    return ""
+
+
+def preserve_template_literal_anchors(normalized: str, parts: tuple[str, ...]) -> str:
+    result = normalized
+    markers = template_slot_markers(parts)
+    marker_by_part_index: dict[int, str] = {}
+    marker_index = 0
+    for index, part in enumerate(parts):
+        if is_slot(part):
+            marker_by_part_index[index] = markers[marker_index]
+            marker_index += 1
+    for index, part in enumerate(parts):
+        if is_slot(part) or not part or part in result:
+            continue
+        previous_marker = previous_slot_marker(marker_by_part_index, index)
+        next_marker = next_slot_marker(marker_by_part_index, index)
+        if previous_marker and not next_marker:
+            result = preserve_trailing_literal_anchor(result, previous_marker, part)
+            continue
+        if not previous_marker or not next_marker:
+            continue
+        previous_position = result.find(previous_marker)
+        next_position = result.find(next_marker)
+        if previous_position < 0 or next_position < previous_position:
+            continue
+        insert_at = previous_position + len(previous_marker)
+        result = result[:insert_at] + part + result[insert_at:]
+    return result
+
+
+def preserve_trailing_literal_anchor(normalized: str, previous_marker: str, literal: str) -> str:
+    marker_position = normalized.rfind(previous_marker)
+    if marker_position < 0:
+        return normalized
+    literal_start = marker_position + len(previous_marker)
+    normalized_literal = normalized[literal_start:]
+    if not normalized_literal or normalized_literal == literal:
+        return normalized
+    if literal.startswith(normalized_literal):
+        return normalized
+    if not is_subsequence(normalized_literal, literal):
+        return normalized
+    return normalized[:literal_start] + literal
+
+
+def is_subsequence(needle: str, haystack: str) -> bool:
+    position = 0
+    for char in needle:
+        position = haystack.find(char, position)
+        if position < 0:
+            return False
+        position += 1
+    return True
+
+
+def previous_slot_marker(marker_by_part_index: dict[int, str], index: int) -> str:
+    for candidate_index in sorted((value for value in marker_by_part_index if value < index), reverse=True):
+        return marker_by_part_index[candidate_index]
+    return ""
+
+
+def next_slot_marker(marker_by_part_index: dict[int, str], index: int) -> str:
+    for candidate_index in sorted(value for value in marker_by_part_index if value > index):
+        return marker_by_part_index[candidate_index]
+    return ""
 
 
 def protect_template_slots(parts: tuple[str, ...]) -> str:

@@ -7,7 +7,13 @@ from pathlib import Path
 from typing import Any
 
 from ..dataset_io import append_jsonl_object, file_sha256, load_jsonl_objects
-from ..structure import Query, Structure
+from ..structure import PragmaticAct, Query, Structure
+from ..comprehension.episode import (
+    EPISODE_DATA_PATH,
+    EpisodeTrainingExample,
+    load_episode_jsonl,
+    pragmatic_act_matches,
+)
 from ..comprehension.query import (
     query_from_dict,
     query_signature,
@@ -28,6 +34,7 @@ VERIFIED_ANSWER_SOURCES = frozenset(
     }
 )
 STRUCTURE_DEPENDENT_DIALOG_TARGETS = frozenset({"summary"})
+STRUCTURE_DEPENDENT_PRAGMATIC_ACTS = frozenset({"recall_previous_turn"})
 
 
 @dataclass(frozen=True)
@@ -62,6 +69,91 @@ class DialogActAnswerEvaluationResult:
     @property
     def accuracy(self) -> float:
         return self.matched / self.total if self.total else 0.0
+
+
+@dataclass(frozen=True)
+class LearnedPragmaticAnswerPattern:
+    pragmatic_acts: tuple[PragmaticAct, ...]
+    answer: str
+    support: int = 1
+
+
+@dataclass(frozen=True)
+class LearnedPragmaticAnswerer:
+    examples: tuple[EpisodeTrainingExample, ...] = ()
+    patterns: tuple[LearnedPragmaticAnswerPattern, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.examples and not self.patterns:
+            object.__setattr__(self, "patterns", compile_pragmatic_answer_examples(self.examples))
+
+    @classmethod
+    def from_jsonl(cls, path: str | Path) -> LearnedPragmaticAnswerer:
+        return cls((), patterns=compile_pragmatic_answer_examples(load_episode_jsonl(path)))
+
+    def __call__(self, structure: Structure) -> str | None:
+        if structure.query is not None or not structure.pragmatic_acts:
+            return None
+        for pattern in self.patterns:
+            if pragmatic_answer_pattern_matches(structure.pragmatic_acts, pattern.pragmatic_acts):
+                return pattern.answer
+        return None
+
+
+def compile_pragmatic_answer_examples(
+    examples: tuple[EpisodeTrainingExample, ...],
+) -> tuple[LearnedPragmaticAnswerPattern, ...]:
+    grouped: dict[tuple[Any, ...], LearnedPragmaticAnswerPattern] = {}
+    for example in examples:
+        if not example.expected_answer or not example.expected_pragmatic_acts:
+            continue
+        if any(act.act in STRUCTURE_DEPENDENT_PRAGMATIC_ACTS for act in example.expected_pragmatic_acts):
+            continue
+        key = (
+            tuple(pragmatic_answer_signature(act) for act in example.expected_pragmatic_acts),
+            example.expected_answer,
+        )
+        previous = grouped.get(key)
+        if previous is None:
+            grouped[key] = LearnedPragmaticAnswerPattern(
+                pragmatic_acts=example.expected_pragmatic_acts,
+                answer=example.expected_answer,
+            )
+            continue
+        grouped[key] = LearnedPragmaticAnswerPattern(
+            pragmatic_acts=previous.pragmatic_acts,
+            answer=previous.answer,
+            support=previous.support + 1,
+        )
+    return tuple(sorted(grouped.values(), key=lambda pattern: (-pattern.support, pattern.answer)))
+
+
+def pragmatic_answer_pattern_matches(
+    actual_acts: tuple[PragmaticAct, ...],
+    expected_acts: tuple[PragmaticAct, ...],
+) -> bool:
+    return all(
+        any(pragmatic_act_matches(actual, expected) for actual in actual_acts)
+        for expected in expected_acts
+    )
+
+
+def pragmatic_answer_signature(act: PragmaticAct) -> tuple[str, str, tuple[str, ...]]:
+    return (act.act, act.target, act.qualifiers)
+
+
+def default_learned_pragmatic_answerer(path: str | Path = EPISODE_DATA_PATH) -> LearnedPragmaticAnswerer:
+    data_path = Path(path)
+    if data_path.exists():
+        return _cached_default_learned_pragmatic_answerer(str(data_path), file_sha256(data_path))
+    return _cached_default_learned_pragmatic_answerer("", "")
+
+
+@lru_cache(maxsize=8)
+def _cached_default_learned_pragmatic_answerer(path: str, source_sha: str) -> LearnedPragmaticAnswerer:
+    if path:
+        return LearnedPragmaticAnswerer.from_jsonl(path)
+    return LearnedPragmaticAnswerer()
 
 
 @dataclass(frozen=True)

@@ -219,7 +219,7 @@ class LearningTest(unittest.TestCase):
                 assert query is not None
                 self.assertEqual(query.linearize(), "QUERY why(铁会生锈,type=why)")
 
-    def test_neural_query_parser_rejects_unknown_material_rust_observations(self) -> None:
+    def test_neural_query_parser_rejects_condition_observations(self) -> None:
         parser = default_neural_query_parser()
 
         cases = (
@@ -227,11 +227,31 @@ class LearningTest(unittest.TestCase):
             ("我家锅生锈了", (Entity("item", "锅"),)),
             ("家里的水龙头生锈了", (Entity("item", "水龙头"),)),
             ("我的桌子有点生锈", (Entity("item", "桌子"),)),
+            ("我家水管漏水了", (Entity("item", "水管"),)),
+            ("我的手机发烫了", (Entity("item", "手机"),)),
+            ("家里的墙发霉了", (Entity("item", "墙"),)),
+            ("门把手松动了", (Entity("item", "门把手"),)),
         )
         for text, entities in cases:
             with self.subTest(text=text):
                 self.assertIsNone(parser(text, entities))
                 self.assertIsNone(parser(text, ()))
+
+    def test_neural_query_parser_maps_material_attribute_variants(self) -> None:
+        parser = default_neural_query_parser()
+
+        cases = (
+            ("锅是什么材质", (Entity("item", "锅"),), "QUERY object_attribute(锅,attribute=material)"),
+            ("锅材质是什么", (Entity("item", "锅"),), "QUERY object_attribute(锅,attribute=material)"),
+            ("水管材质是什么", (Entity("item", "水管"),), "QUERY object_attribute(水管,attribute=material)"),
+            ("杯子是什么材质", (Entity("item", "杯子"),), "QUERY object_attribute(杯子,attribute=material)"),
+        )
+        for text, entities, expected in cases:
+            with self.subTest(text=text):
+                query = parser(text, entities)
+                self.assertIsNotNone(query)
+                assert query is not None
+                self.assertEqual(query.linearize(), expected)
 
     def test_neural_query_parser_does_not_materialize_compound_from_single_candidate(self) -> None:
         parser = default_neural_query_parser()
@@ -267,16 +287,55 @@ class LearningTest(unittest.TestCase):
 
         self.assertIsNone(parser("我想了解下原理", ()))
 
-    def test_neural_statement_parser_maps_rust_observations_to_condition_frame(self) -> None:
+    def test_default_neural_query_parser_reuses_condition_topic_for_reason_followups(self) -> None:
+        parser = default_neural_query_parser()
+
+        cases = (
+            ("因为啥呀", Entity("topic", "锅生锈"), "QUERY why(锅生锈,type=why)"),
+            ("因为啥呢", Entity("topic", "水管漏水"), "QUERY why(水管漏水,type=why)"),
+            ("啥原因", Entity("topic", "手机发烫"), "QUERY why(手机发烫,type=why)"),
+            ("咋回事", Entity("topic", "墙发霉"), "QUERY why(墙发霉,type=why)"),
+            ("什么原因", Entity("topic", "门把手松动"), "QUERY why(门把手松动,type=why)"),
+            (
+                "所以因为啥",
+                (Entity("item", "锅"), Entity("topic", "锅生锈"), Entity("query_intent", "why")),
+                "QUERY why(锅生锈,type=why)",
+            ),
+            (
+                "那所以为什么",
+                (Entity("item", "水管"), Entity("topic", "水管漏水"), Entity("query_intent", "why")),
+                "QUERY why(水管漏水,type=why)",
+            ),
+            (
+                "所以啥原因",
+                (Entity("item", "墙"), Entity("topic", "墙发霉"), Entity("query_intent", "why")),
+                "QUERY why(墙发霉,type=why)",
+            ),
+        )
+        for text, context_entities, query_line in cases:
+            with self.subTest(text=text):
+                entities = context_entities if isinstance(context_entities, tuple) else (context_entities,)
+                query = parser(text, entities)
+                self.assertIsNotNone(query)
+                assert query is not None
+                self.assertEqual(query.linearize(), query_line)
+
+        for text in ("因为啥呀", "因为啥呢", "啥原因", "咋回事"):
+            with self.subTest(text=text):
+                self.assertIsNone(parser(text, ()))
+
+    def test_neural_statement_parser_maps_condition_observations_to_condition_frame(self) -> None:
         parser = default_neural_statement_parser()
 
         cases = (
-            ("我家桌子生锈了", "桌子"),
-            ("我家锅生锈了", "锅"),
-            ("家里的水龙头生锈了", "水龙头"),
-            ("我的桌子有点生锈", "桌子"),
+            ("我家桌子生锈了", "桌子", "生锈"),
+            ("我家水管漏水了", "水管", "漏水"),
+            ("我的手机发烫了", "手机", "发烫"),
+            ("家里的墙发霉了", "墙", "发霉"),
+            ("门把手松动了", "门把手", "松动"),
+            ("电脑风扇有异响", "电脑风扇", "异响"),
         )
-        for text, item in cases:
+        for text, item, condition in cases:
             with self.subTest(text=text):
                 parsed = parser(text)
                 self.assertIsNotNone(parsed)
@@ -285,7 +344,28 @@ class LearningTest(unittest.TestCase):
                 self.assertIn(f"ENTITY item={item}", lines)
                 self.assertIn("FRAME condition", lines)
                 self.assertIn(f"ROLE theme={item}", lines)
-                self.assertIn("ROLE result=生锈", lines)
+                self.assertIn(f"ROLE result={condition}", lines)
+
+    def test_neural_statement_parser_maps_material_statements_to_material_frame(self) -> None:
+        parser = default_neural_statement_parser()
+
+        cases = (
+            ("锅是铁的", "锅", "铁"),
+            ("水管材质是铜", "水管", "铜"),
+            ("手机外壳是铝合金", "手机", "铝合金"),
+            ("杯子是玻璃材质", "杯子", "玻璃"),
+        )
+        for text, item, material in cases:
+            with self.subTest(text=text):
+                parsed = parser(text)
+                self.assertIsNotNone(parsed)
+                assert parsed is not None
+                lines = linearize_statement_result(parsed)
+                self.assertIn(f"ENTITY item={item}", lines)
+                self.assertIn(f"ENTITY material={material}", lines)
+                self.assertIn("FRAME material", lines)
+                self.assertIn(f"ROLE theme={item}", lines)
+                self.assertIn(f"ROLE value={material}", lines)
 
     def test_neural_query_parser_learns_non_query_rejection(self) -> None:
         parser = default_neural_query_parser()

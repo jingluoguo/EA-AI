@@ -265,10 +265,20 @@ def suggest_query_pattern(
             if best is not None:
                 score, pattern = best
                 if score >= min_score and pattern.query is not None:
-                    suggestions.append((score, pattern))
+                    if query_suggestion_is_structurally_compatible(sentence, entities, pattern):
+                        suggestions.append((score, pattern))
     if not suggestions:
         return None
     return max(suggestions, key=lambda item: item[0])
+
+
+def query_suggestion_is_structurally_compatible(
+    sentence: str,
+    entities: tuple[Entity, ...],
+    pattern: CompiledQueryPattern,
+) -> bool:
+    abstract_sentence = abstract_question(sentence, entity_examples_from_runtime(entities))
+    return query_pattern_score(pattern, abstract_sentence) >= 0.25
 
 
 def dedupe_queries(queries: list[Query]) -> list[Query]:

@@ -16,6 +16,8 @@ def infer_why(structure: Structure) -> str | None:
     query = structure.query
     if query is not None and query.intent == "why" and explanation_for_target(structure, query.target):
         return "causal_explanation"
+    if query is not None and query.intent == "why" and condition_state_for_target(structure, query.target) is not None:
+        return "condition_reason_needs_context"
     return None
 def infer_claim_source(structure: Structure) -> str | None:
     query = structure.query

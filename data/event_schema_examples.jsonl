@@ -5,6 +5,7 @@
 {"schema":"struct_llm.event_schema.v1","frame_type":"move","effects":[{"name":"at","left_role":"theme","right_role":"goal"}],"qualifier_roles":{"item":"theme"}}
 {"schema":"struct_llm.event_schema.v1","frame_type":"give","effects":[{"name":"owner","left_role":"theme","right_role":"recipient"}],"qualifier_roles":{"item":"theme"}}
 {"schema":"struct_llm.event_schema.v1","frame_type":"paint","effects":[{"name":"color","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
+{"schema":"struct_llm.event_schema.v1","frame_type":"material","effects":[{"name":"material","left_role":"theme","right_role":"value"}],"qualifier_roles":{"item":"theme"}}
 {"schema":"struct_llm.event_schema.v1","frame_type":"open","effects":[{"name":"access","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
 {"schema":"struct_llm.event_schema.v1","frame_type":"close","effects":[{"name":"access","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}
 {"schema":"struct_llm.event_schema.v1","frame_type":"create","effects":[{"name":"exists","left_role":"theme","right_role":"result"}],"qualifier_roles":{"item":"theme"}}

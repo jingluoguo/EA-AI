@@ -19,7 +19,6 @@ __all__ = (
     "infer_dialog_act",
     "infer_pragmatic_response_policy",
     "infer_profile_lookup",
-    "infer_condition_observation_needs_clarification",
     "infer_structural_update_acknowledgement",
     "infer_initial_location",
     "infer_location_before_actor_action",

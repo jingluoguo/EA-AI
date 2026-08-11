@@ -61,7 +61,7 @@ def overwrite_current_state(states: list[State], state: State) -> bool:
         ]
         return True
 
-    if state.name in {"in", "at", "owner", "color", "access", "condition"}:
+    if state.name in {"in", "at", "owner", "color", "material", "access", "condition"}:
         states[:] = [
             existing
             for existing in states
@@ -80,7 +80,13 @@ def overwrite_current_state(states: list[State], state: State) -> bool:
         ]
         states.append(state)
         return True
-    if state.name in {"focus_topic", "focus_query_intent", "focus_dialog_act", "focus_dialog_preference"}:
+    if state.name in {
+        "focus_topic",
+        "focus_condition_topic",
+        "focus_query_intent",
+        "focus_dialog_act",
+        "focus_dialog_preference",
+    }:
         states[:] = [
             existing
             for existing in states

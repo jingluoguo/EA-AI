@@ -37,4 +37,10 @@ def entity_role_priority(role: str) -> int:
         return 0
     if role in {"unresolved_reference", "profile_value"}:
         return 1
+    if role in {"thing"}:
+        return 2
+    if role in {"item", "container", "place", "person", "material", "color"}:
+        return 3
+    if role == "self":
+        return 4
     return 2

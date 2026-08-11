@@ -110,6 +110,23 @@ class StateTest(unittest.TestCase):
 
         self.assertEqual(states, (State("condition", "桌子", "生锈", "f1"),))
 
+    def test_material_frame_projects_current_object_material(self) -> None:
+        frame = with_time(frame_from_roles("material", theme="锅", value="铁"), 1)
+
+        states = states_for_frame_schema(frame)
+
+        self.assertEqual(states, (State("material", "锅", "铁", "f1"),))
+
+    def test_material_state_updates_and_answers_attribute_query(self) -> None:
+        prediction = predict("锅是铁的。锅是什么材质？")
+
+        structure = prediction.structure.linearize()
+        self.assertIn("FRAME f1 type=material time=1", structure)
+        self.assertIn("REL material(锅,铁)", structure)
+        self.assertIn("QUERY object_attribute(锅,attribute=material)", structure)
+        self.assertIn("RULE object_attribute_material_found", structure)
+        self.assertEqual(prediction.answer, "锅的材质是铁。")
+
     def test_open_close_events_update_access_state(self) -> None:
         examples = (
             ("小王打开盒子。盒子是什么状态？", "EVENT open(小王,盒子) WITH result=打开", "盒子是打开状态。"),

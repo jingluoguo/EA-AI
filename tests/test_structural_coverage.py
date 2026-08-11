@@ -129,6 +129,7 @@ class StructuralCoverageTest(unittest.TestCase):
             "move",
             "give",
             "paint",
+            "material",
             "open",
             "close",
             "create",
@@ -139,6 +140,7 @@ class StructuralCoverageTest(unittest.TestCase):
             "because",
             "be_in",
             "not_in",
+            "condition",
             "profile_name",
             "profile_like",
             "profile_dislike",
@@ -153,6 +155,9 @@ class StructuralCoverageTest(unittest.TestCase):
         self.assertGreater(source_count_for_split(examples, "structural_pattern_ownership_state_eval", "test"), 0)
         self.assertGreater(source_count_for_split(examples, "structural_pattern_attribute_state_eval", "train"), 0)
         self.assertGreater(source_count_for_split(examples, "structural_pattern_attribute_state_eval", "test"), 0)
+        condition_results = statement_condition_results(examples, "condition_observation_boundary")
+        self.assertGreaterEqual(len(condition_results), 6)
+        self.assertTrue({"生锈", "漏水", "发烫", "发霉", "松动", "异响"}.issubset(condition_results))
         for source in structural_pattern_sources(examples):
             with self.subTest(source=source):
                 self.assertGreater(source_count_for_split(examples, source, "train"), 0)
@@ -198,6 +203,7 @@ class StructuralCoverageTest(unittest.TestCase):
             "confirmation_check",
             "continuation_request",
             "repair_previous_understanding",
+            "condition_observation",
         ):
             with self.subTest(act=act):
                 self.assertGreater(train_acts[act] + test_acts[act], 0)
@@ -207,6 +213,8 @@ class StructuralCoverageTest(unittest.TestCase):
         self.assertGreater(test_acts["clarification_request"], 0)
         self.assertGreater(test_acts["continuation_request"], 0)
         self.assertGreater(test_acts["recall_previous_turn"], 0)
+        self.assertGreater(train_acts["condition_observation"], 0)
+        self.assertGreater(test_acts["condition_observation"], 0)
         self.assertGreater(train_acts["repair_previous_understanding"], 0)
         self.assertGreater(test_acts["repair_previous_understanding"], 0)
         self.assertGreater(train_acts["action_result_report"], 0)
@@ -630,6 +638,19 @@ def statement_frames_for_split(examples, split: str) -> Counter[str]:
 
 def empty_statement_count(examples, split: str) -> int:
     return sum(1 for example in examples if example.split == split and not example.frames)
+
+
+def statement_condition_results(examples, source: str) -> set[str]:
+    return {
+        value
+        for example in examples
+        if example.source == source
+        for frame in example.frames
+        if frame.frame_type == "condition"
+        for role, value in frame.roles
+        if role == "result"
+        if value
+    }
 
 
 def pragmatic_acts_for_split(examples, split: str) -> Counter[str]:

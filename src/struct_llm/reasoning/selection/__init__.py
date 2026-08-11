@@ -65,6 +65,8 @@ __all__ = (
     "belief_states",
     "claim_speakers",
     "belief_sources",
+    "condition_state_for_target",
+    "condition_target_phrases",
     "states_from_proposition",
     "explanation_for_target",
     "explain_location_target",

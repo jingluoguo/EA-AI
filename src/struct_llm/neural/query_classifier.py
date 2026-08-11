@@ -69,29 +69,6 @@ QUERY_NEURAL_INTEGRATED_FRAGMENT_INTENTS = frozenset(
     }
 )
 QUERY_CONTEXT_ENTITY_ROLES = frozenset({"query_intent", "dialog_focus", "dialog_preference"})
-QUERY_EXPLICIT_CUES = frozenset(
-    {
-        "哪",
-        "谁",
-        "什么",
-        "啥",
-        "几",
-        "多少",
-        "是否",
-        "吗",
-        "怎么",
-        "为什么",
-        "原因",
-        "原理",
-        "状态",
-        "颜色",
-        "材质",
-        "问",
-        "归谁",
-        "拥有",
-        "存在",
-    }
-)
 QUERY_NEURAL_EMBED_DIM = 128
 QUERY_NEURAL_HIDDEN_DIM = 128
 QUERY_NEURAL_DROPOUT = 0.20
@@ -216,7 +193,6 @@ class LoadedNeuralQueryParser:
         query_entities = query_entities_for_sentence(sentence, entities)
         predictions = self.predict_labels(sentence, entities)
         prediction_confidence = {label_index: confidence for label_index, confidence in predictions}
-        context_intent = contextual_query_intent(sentence, query_entities)
         if predictions:
             top_label_index, top_confidence = predictions[0]
             top_pattern = self.best_pattern_for_label(sentence, query_entities, top_label_index)
@@ -232,10 +208,8 @@ class LoadedNeuralQueryParser:
             query = materialize_query_from_pattern(sentence, query_entities, pattern)
             if query is None:
                 continue
-            if context_intent and query.intent != context_intent:
-                continue
             if structural_score < QUERY_NEURAL_WHOLE_CANDIDATE_SCORE:
-                if confidence < QUERY_NEURAL_HIGH_CONFIDENCE or not query_like_sentence(sentence):
+                if confidence < QUERY_NEURAL_HIGH_CONFIDENCE:
                     continue
             candidates.append((neural_query_rank(confidence, structural_score), confidence, pattern))
         if not candidates:
@@ -803,31 +777,6 @@ def query_input_entities(sentence: str, entities: tuple[Any, ...]) -> tuple[Any,
     return tuple(referenced)
 
 
-def contextual_query_intent(sentence: str, entities: tuple[Entity, ...]) -> str | None:
-    if not contextual_ellipsis_sentence(sentence):
-        return None
-    intents = [
-        entity.name
-        for entity in entities
-        if entity.role == "query_intent" and entity.name
-    ]
-    if len(set(intents)) == 1:
-        return intents[-1]
-    return None
-
-
-def contextual_ellipsis_sentence(sentence: str) -> bool:
-    text = canonical_text(sentence)
-    if not text or len(text) > 6:
-        return False
-    return not any(cue in text for cue in QUERY_EXPLICIT_CUES)
-
-
-def query_like_sentence(sentence: str) -> bool:
-    text = canonical_text(sentence)
-    return any(cue in text for cue in QUERY_EXPLICIT_CUES)
-
-
 def query_entities_for_sentence(sentence: str, entities: tuple[Entity, ...]) -> tuple[Entity, ...]:
     return entities
 
@@ -914,18 +863,37 @@ def topic_runtime_value_mapping(
         for entity in example_entities
         if str(getattr(entity, "role", "")).strip() == "topic" and str(getattr(entity, "name", "")).strip()
     ]
-    runtime_topics = [
+    runtime_topic_candidates = [
         entity.name
         for entity in runtime_entities
-        if entity.role == "topic" and entity.name
+        if entity.role in {"topic", "item", "thing", "container", "place"} and entity.name
     ]
-    if not example_topics or not runtime_topics:
+    if not example_topics or not runtime_topic_candidates:
         return {}
     mapping: dict[str, str] = {}
     for index, example_topic in enumerate(example_topics):
-        runtime_topic = runtime_topics[index] if index < len(runtime_topics) else runtime_topics[-1]
+        runtime_topic = best_runtime_topic(example_topic, runtime_topic_candidates, index)
         mapping[example_topic] = runtime_topic
     return mapping
+
+
+def best_runtime_topic(example_topic: str, runtime_topics: list[str], index: int) -> str:
+    scored = [
+        (topic_alignment_score(example_topic, runtime_topic), -abs(len(runtime_topic) - len(example_topic)), -candidate_index, runtime_topic)
+        for candidate_index, runtime_topic in enumerate(runtime_topics)
+    ]
+    score, _, _, runtime_topic = max(scored, key=lambda item: item[:3])
+    if score > 0:
+        return runtime_topic
+    return runtime_topics[index] if index < len(runtime_topics) else runtime_topics[-1]
+
+
+def topic_alignment_score(example_topic: str, runtime_topic: str) -> float:
+    if example_topic == runtime_topic:
+        return 1.0
+    if example_topic in runtime_topic or runtime_topic in example_topic:
+        return 0.9
+    return character_set_similarity(example_topic, runtime_topic)
 
 
 def rematerialize_value(value: str, mapping: dict[str, str]) -> str:
